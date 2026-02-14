@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 20% 4%;
+    --foreground: 240 10% 90%;
+    --card: 240 20% 6%;
+    --card-foreground: 240 10% 90%;
+    --popover: 240 20% 6%;
+    --popover-foreground: 240 10% 90%;
+    --primary: 0 60% 45%;
+    --primary-foreground: 0 10% 95%;
+    --secondary: 270 30% 20%;
+    --secondary-foreground: 270 20% 85%;
+    --muted: 240 15% 15%;
+    --muted-foreground: 240 10% 55%;
+    --accent: 270 40% 30%;
+    --accent-foreground: 270 20% 90%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 10% 95%;
+    --border: 240 15% 18%;
+    --input: 240 15% 18%;
+    --ring: 0 50% 40%;
+    --radius: 0.5rem;
+    --sidebar-background: 240 20% 5%;
+    --sidebar-foreground: 240 5% 65%;
+    --sidebar-primary: 0 60% 45%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 15% 12%;
+    --sidebar-accent-foreground: 240 5% 65%;
+    --sidebar-border: 240 15% 15%;
+    --sidebar-ring: 0 50% 40%;
+  }
+
+  .dark {
+    --background: 240 20% 4%;
+    --foreground: 240 10% 90%;
+    --card: 240 20% 6%;
+    --card-foreground: 240 10% 90%;
+    --popover: 240 20% 6%;
+    --popover-foreground: 240 10% 90%;
+    --primary: 0 60% 45%;
+    --primary-foreground: 0 10% 95%;
+    --secondary: 270 30% 20%;
+    --secondary-foreground: 270 20% 85%;
+    --muted: 240 15% 15%;
+    --muted-foreground: 240 10% 55%;
+    --accent: 270 40% 30%;
+    --accent-foreground: 270 20% 90%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 10% 95%;
+    --border: 240 15% 18%;
+    --input: 240 15% 18%;
+    --ring: 0 50% 40%;
+    --sidebar-background: 240 20% 5%;
+    --sidebar-foreground: 240 5% 65%;
+    --sidebar-primary: 0 60% 45%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 15% 12%;
+    --sidebar-accent-foreground: 240 5% 65%;
+    --sidebar-border: 240 15% 15%;
+    --sidebar-ring: 0 50% 40%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    overflow: hidden;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}

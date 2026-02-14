@@ -1,0 +1,975 @@
+// Psychological horror ambient system
+// Philosophy: silence is the scariest sound. Sparse, unpredictable audio events.
+// No drones, no loops, no constant noise. Just dread.
+import { HorrorEvent, Particle, Viewport } from './types';
+import * as C from './constants';
+
+// ============ AUDIO CONTEXT ============
+
+let bgCtx: AudioContext | null = null;
+let ambienceActive = false;
+let ambienceTimers: ReturnType<typeof setTimeout>[] = [];
+
+function getBgCtx(): AudioContext {
+  if (!bgCtx) bgCtx = new AudioContext();
+  if (bgCtx.state === 'suspended') bgCtx.resume();
+  return bgCtx;
+}
+
+function rng(min: number, max: number) {
+  return Math.random() * (max - min) + min;
+}
+
+function maybe(chance: number): boolean {
+  return Math.random() < chance;
+}
+
+function createNoise(ctx: AudioContext, duration: number): AudioBufferSourceNode {
+  const len = ctx.sampleRate * duration;
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  return src;
+}
+
+// ── Layer 1: Distant wind (barely audible, filtered) ─────
+
+function playDistantWind() {
+  if (!ambienceActive) return;
+  const ctx = getBgCtx();
+  const duration = rng(4, 10);
+  const noise = createNoise(ctx, duration);
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(rng(80, 200), ctx.currentTime);
+  const gain = ctx.createGain();
+  const vol = rng(0.008, 0.025);
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + duration * 0.3);
+  gain.gain.linearRampToValueAtTime(vol * 0.5, ctx.currentTime + duration * 0.7);
+  gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  noise.start();
+  ambienceTimers.push(setTimeout(playDistantWind, rng(8000, 25000)));
+}
+
+// ── Layer 2: Random ambient creak/crack (very rare) ──────
+
+function playAmbientCreak() {
+  if (!ambienceActive) return;
+  const ctx = getBgCtx();
+  const type = Math.floor(rng(0, 3));
+  if (type === 0) {
+    // Creak
+    const dur = rng(0.05, 0.15);
+    const noise = createNoise(ctx, dur);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(rng(800, 2000), ctx.currentTime);
+    filter.Q.setValueAtTime(rng(5, 15), ctx.currentTime);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(rng(0.02, 0.06), ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    noise.start();
+  } else if (type === 1) {
+    // Drip
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(rng(1200, 3000), ctx.currentTime);
+    gain.gain.setValueAtTime(rng(0.01, 0.03), ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.08);
+  } else {
+    // Low scrape
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    const dur = rng(0.1, 0.3);
+    osc.frequency.setValueAtTime(rng(60, 150), ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(rng(30, 80), ctx.currentTime + dur);
+    gain.gain.setValueAtTime(rng(0.01, 0.03), ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + dur);
+  }
+  ambienceTimers.push(setTimeout(playAmbientCreak, rng(12000, 45000)));
+}
+
+// ── Layer 3: Near-inaudible whispers (no words, just feeling) ──
+
+function playAmbientWhisper() {
+  if (!ambienceActive) return;
+  const ctx = getBgCtx();
+  const duration = rng(0.8, 2.5);
+  const noise = createNoise(ctx, duration);
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(rng(300, 800), ctx.currentTime);
+  filter.Q.setValueAtTime(rng(3, 8), ctx.currentTime);
+  const gain = ctx.createGain();
+  const vol = rng(0.006, 0.018);
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  const syllables = Math.floor(rng(2, 5));
+  const syllableDur = duration / syllables;
+  for (let i = 0; i < syllables; i++) {
+    const t = ctx.currentTime + i * syllableDur;
+    gain.gain.linearRampToValueAtTime(vol * rng(0.3, 1), t + syllableDur * 0.2);
+    gain.gain.linearRampToValueAtTime(vol * 0.05, t + syllableDur * 0.8);
+  }
+  gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+  const panner = ctx.createStereoPanner();
+  panner.pan.setValueAtTime(rng(-0.8, 0.8), ctx.currentTime);
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(panner);
+  panner.connect(ctx.destination);
+  noise.start();
+  ambienceTimers.push(setTimeout(playAmbientWhisper, rng(20000, 60000)));
+}
+
+// ── Layer 4: Breathing (sometimes close, sometimes far) ──
+
+function playBreathing() {
+  if (!ambienceActive) return;
+  const ctx = getBgCtx();
+  const isClose = maybe(0.3);
+  const baseVol = isClose ? rng(0.02, 0.04) : rng(0.005, 0.015);
+  const breathCount = Math.floor(rng(2, 5));
+  const breathDur = rng(0.6, 1.2);
+  for (let i = 0; i < breathCount; i++) {
+    const delay = i * breathDur * 1.4;
+    const startTime = ctx.currentTime + delay;
+    const noise = createNoise(ctx, breathDur);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(isClose ? rng(200, 500) : rng(100, 300), startTime);
+    filter.Q.setValueAtTime(rng(1, 4), startTime);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(baseVol, startTime + breathDur * 0.3);
+    gain.gain.linearRampToValueAtTime(baseVol * 0.6, startTime + breathDur * 0.5);
+    gain.gain.linearRampToValueAtTime(baseVol * 0.8, startTime + breathDur * 0.7);
+    gain.gain.linearRampToValueAtTime(0, startTime + breathDur);
+    const panner = ctx.createStereoPanner();
+    panner.pan.setValueAtTime(isClose ? rng(-0.3, 0.3) : rng(-1, 1), startTime);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(panner);
+    panner.connect(ctx.destination);
+    noise.start(startTime);
+    noise.stop(startTime + breathDur);
+  }
+  ambienceTimers.push(setTimeout(playBreathing, rng(25000, 70000)));
+}
+
+// ── Layer 5: Deep heartbeat (VERY rare) ──────────────────
+
+function playDeepHeartbeat() {
+  if (!ambienceActive) return;
+  const ctx = getBgCtx();
+  const beats = Math.floor(rng(3, 8));
+  const interval = rng(0.7, 1.2);
+  const vol = rng(0.03, 0.06);
+  for (let i = 0; i < beats; i++) {
+    const t = ctx.currentTime + i * interval;
+    // Lub
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(rng(35, 50), t);
+    gain1.gain.setValueAtTime(vol, t);
+    gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(t);
+    osc1.stop(t + 0.15);
+    // Dub
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(rng(50, 70), t + 0.12);
+    gain2.gain.setValueAtTime(vol * 0.7, t + 0.12);
+    gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(t + 0.12);
+    osc2.stop(t + 0.25);
+  }
+  ambienceTimers.push(setTimeout(playDeepHeartbeat, rng(40000, 120000)));
+}
+
+// ── Combat Tension System ────────────────────────────────
+// Dynamic audio layers that intensify during combat
+
+let combatIntensity = 0; // 0 = calm, 1 = max tension
+let combatDroneOsc: OscillatorNode | null = null;
+let combatDroneGain: GainNode | null = null;
+let combatPulseTimer = 0;
+
+export function updateCombatTension(enemyCount: number, closestEnemyDist: number, dt: number) {
+  // Calculate target intensity based on enemies and proximity
+  let target = 0;
+  if (enemyCount > 0) {
+    target = Math.min(1, enemyCount * 0.08); // more enemies = more tension
+    if (closestEnemyDist < 80) target = Math.min(1, target + 0.4);
+    else if (closestEnemyDist < 150) target = Math.min(1, target + 0.15);
+  }
+  
+  // Smooth transition
+  const speed = target > combatIntensity ? 2.0 : 0.5; // ramp up fast, fade slow
+  combatIntensity += (target - combatIntensity) * speed * dt;
+  combatIntensity = Math.max(0, Math.min(1, combatIntensity));
+  
+  if (!ambienceActive) return;
+  const ctx = getBgCtx();
+  
+  // Manage sub-bass drone that intensifies with combat
+  if (combatIntensity > 0.05) {
+    if (!combatDroneOsc) {
+      combatDroneOsc = ctx.createOscillator();
+      combatDroneGain = ctx.createGain();
+      combatDroneOsc.type = 'sine';
+      combatDroneOsc.frequency.setValueAtTime(35, ctx.currentTime);
+      combatDroneGain.gain.setValueAtTime(0, ctx.currentTime);
+      combatDroneOsc.connect(combatDroneGain);
+      combatDroneGain.connect(ctx.destination);
+      combatDroneOsc.start();
+    }
+    // Modulate volume and frequency based on intensity
+    if (combatDroneGain) {
+      const vol = combatIntensity * 0.06; // max 0.06 - present but not loud
+      combatDroneGain.gain.setTargetAtTime(vol, ctx.currentTime, 0.1);
+      combatDroneOsc!.frequency.setTargetAtTime(30 + combatIntensity * 15, ctx.currentTime, 0.1);
+    }
+  } else if (combatDroneOsc && combatDroneGain) {
+    combatDroneGain.gain.setTargetAtTime(0, ctx.currentTime, 0.3);
+    setTimeout(() => {
+      try { combatDroneOsc?.stop(); } catch {}
+      combatDroneOsc = null;
+      combatDroneGain = null;
+    }, 1000);
+  }
+  
+  // Occasional tension pulses during high combat
+  combatPulseTimer -= dt;
+  if (combatIntensity > 0.4 && combatPulseTimer <= 0) {
+    combatPulseTimer = 2 + Math.random() * 4 * (1 - combatIntensity);
+    // Low impact pulse
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(rng(25, 45), ctx.currentTime);
+    const vol = combatIntensity * 0.08;
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+  }
+}
+
+export function getCombatIntensity(): number {
+  return combatIntensity;
+}
+
+// ── Public API (same names so engine.ts doesn't break) ───
+
+export function startBackgroundMusic() {
+  if (ambienceActive) return;
+  ambienceActive = true;
+  combatIntensity = 0;
+  // Stagger initial starts — never all at once
+  ambienceTimers.push(setTimeout(playDistantWind, rng(3000, 8000)));
+  ambienceTimers.push(setTimeout(playAmbientCreak, rng(10000, 20000)));
+  ambienceTimers.push(setTimeout(playAmbientWhisper, rng(15000, 35000)));
+  ambienceTimers.push(setTimeout(playBreathing, rng(20000, 40000)));
+  ambienceTimers.push(setTimeout(playDeepHeartbeat, rng(30000, 60000)));
+}
+
+export function stopBackgroundMusic() {
+  ambienceActive = false;
+  ambienceTimers.forEach(clearTimeout);
+  ambienceTimers = [];
+  if (combatDroneOsc) {
+    try { combatDroneOsc.stop(); } catch {}
+    combatDroneOsc = null;
+    combatDroneGain = null;
+  }
+  combatIntensity = 0;
+}
+
+// ============ HORROR SOUND EFFECTS ============
+
+export const HorrorSFX = {
+  whisper() {
+    const ctx = getBgCtx();
+    // Breathy noise filtered to sound like whisper
+    const bufferSize = ctx.sampleRate * 1.5;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.sin(i / bufferSize * Math.PI);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(2000 + Math.random() * 1000, ctx.currentTime);
+    bp.Q.setValueAtTime(5, ctx.currentTime);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.04, ctx.currentTime + 0.3);
+    g.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
+    src.connect(bp);
+    bp.connect(g);
+    g.connect(ctx.destination);
+    src.start();
+  },
+
+  heartbeat() {
+    const ctx = getBgCtx();
+    // Two thumps
+    for (let i = 0; i < 2; i++) {
+      setTimeout(() => {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(50, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.15);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.12, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        osc.connect(g);
+        g.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+      }, i * 250);
+    }
+  },
+
+  distantScream() {
+    const ctx = getBgCtx();
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(600, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.8);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(800, ctx.currentTime);
+    filter.Q.setValueAtTime(3, ctx.currentTime);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1);
+    osc.connect(filter);
+    filter.connect(g);
+    g.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 1);
+  },
+
+  metalCreak() {
+    const ctx = getBgCtx();
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(80 + Math.random() * 40, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(120 + Math.random() * 60, ctx.currentTime + 0.5);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.03, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.5);
+  },
+
+  chestOpen() {
+    const ctx = getBgCtx();
+    const notes = [400, 500, 600, 800];
+    notes.forEach((f, i) => {
+      setTimeout(() => {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, ctx.currentTime);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.08, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.connect(g);
+        g.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+      }, i * 70);
+    });
+  },
+
+  trapSpring() {
+    const ctx = getBgCtx();
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(1200, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.2);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.12, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+    // Noise burst
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.2, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g2 = ctx.createGain();
+    g2.gain.setValueAtTime(0.1, ctx.currentTime);
+    g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    src.connect(g2);
+    g2.connect(ctx.destination);
+    src.start();
+  },
+
+  phantomScream() {
+    const ctx = getBgCtx();
+    // Horrifying rising screech
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(200, ctx.currentTime);
+    osc1.frequency.exponentialRampToValueAtTime(2000, ctx.currentTime + 0.3);
+    osc1.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.8);
+    const g1 = ctx.createGain();
+    g1.gain.setValueAtTime(0.15, ctx.currentTime);
+    g1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+    const f1 = ctx.createBiquadFilter();
+    f1.type = 'bandpass';
+    f1.frequency.setValueAtTime(1200, ctx.currentTime);
+    f1.Q.setValueAtTime(4, ctx.currentTime);
+    osc1.connect(f1);
+    f1.connect(g1);
+    g1.connect(ctx.destination);
+    osc1.start();
+    osc1.stop(ctx.currentTime + 0.8);
+    // Noise burst for extra horror
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.sin(i / data.length * Math.PI);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.12, ctx.currentTime);
+    ng.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    const nf = ctx.createBiquadFilter();
+    nf.type = 'bandpass';
+    nf.frequency.setValueAtTime(3000, ctx.currentTime);
+    nf.Q.setValueAtTime(2, ctx.currentTime);
+    src.connect(nf);
+    nf.connect(ng);
+    ng.connect(ctx.destination);
+    src.start();
+  },
+
+  poisonHiss() {
+    const ctx = getBgCtx();
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.6, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const f = ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.setValueAtTime(4000, ctx.currentTime);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.06, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    src.connect(f);
+    f.connect(g);
+    g.connect(ctx.destination);
+    src.start();
+  },
+
+  bearTrapSnap() {
+    const ctx = getBgCtx();
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.1);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.15, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+    // Metal clang
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(2000, ctx.currentTime);
+    const g2 = ctx.createGain();
+    g2.gain.setValueAtTime(0.08, ctx.currentTime);
+    g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    osc2.connect(g2);
+    g2.connect(ctx.destination);
+    osc2.start();
+    osc2.stop(ctx.currentTime + 0.2);
+  },
+
+  shrineActivate() {
+    const ctx = getBgCtx();
+    const notes = [261, 329, 392, 523, 659];
+    notes.forEach((f, i) => {
+      setTimeout(() => {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, ctx.currentTime);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.06, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.connect(g);
+        g.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+      }, i * 100);
+    });
+  },
+};
+
+// ============ HORROR EVENTS ============
+
+export function createHorrorEvent(): HorrorEvent | null {
+  const roll = Math.random();
+  if (roll < 0.25) return { type: 'whisper', timer: 2 };
+  if (roll < 0.4) return { type: 'flicker', timer: 0.5 };
+  if (roll < 0.55) return { type: 'shadow', timer: 3, x: Math.random() * C.dims.gw, y: Math.random() * C.dims.gh };
+  if (roll < 0.7) return { type: 'heartbeat', timer: 1.5 };
+  if (roll < 0.85) return { type: 'eyes', timer: 2.5, x: Math.random() * C.dims.gw, y: Math.random() * C.dims.gh };
+  return { type: 'scream', timer: 1 };
+}
+
+export function spawnFog(particles: Particle[], x: number, y: number) {
+  particles.push({
+    x: x + (Math.random() - 0.5) * 60,
+    y: y + (Math.random() - 0.5) * 60,
+    vx: (Math.random() - 0.5) * 3,
+    vy: (Math.random() - 0.5) * 2,
+    life: 3 + Math.random() * 3,
+    maxLife: 6,
+    size: 8 + Math.random() * 12,
+    color: 'rgba(40, 30, 50, 0.08)',
+    type: 'fog',
+  });
+}
+
+export function renderHorrorEvents(ctx: CanvasRenderingContext2D, events: HorrorEvent[], time: number, vp: Viewport) {
+  for (const evt of events) {
+    const alpha = Math.min(1, evt.timer);
+    switch (evt.type) {
+      case 'flicker': {
+        // Screen momentarily goes darker
+        ctx.fillStyle = `rgba(0, 0, 0, ${0.4 * alpha})`;
+        ctx.fillRect(-vp.gox, -vp.goy, vp.rw, vp.rh);
+        break;
+      }
+      case 'shadow': {
+        // Dark figure appears briefly at edge of vision
+        if (evt.x !== undefined && evt.y !== undefined) {
+          ctx.fillStyle = `rgba(10, 5, 15, ${0.6 * alpha})`;
+          ctx.beginPath();
+          ctx.ellipse(evt.x, evt.y, 8, 16, 0, 0, Math.PI * 2);
+          ctx.fill();
+          // Shadow eyes
+          ctx.fillStyle = `rgba(255, 0, 0, ${0.4 * alpha})`;
+          ctx.fillRect(evt.x - 3, evt.y - 8, 2, 2);
+          ctx.fillRect(evt.x + 2, evt.y - 8, 2, 2);
+        }
+        break;
+      }
+      case 'eyes': {
+        // Glowing eyes in the darkness
+        if (evt.x !== undefined && evt.y !== undefined) {
+          const blink = Math.sin(time * 8) > 0 ? 1 : 0;
+          if (blink) {
+            ctx.fillStyle = `rgba(255, 50, 0, ${0.5 * alpha})`;
+            ctx.fillRect(evt.x - 4, evt.y, 2, 2);
+            ctx.fillRect(evt.x + 3, evt.y, 2, 2);
+            // Small glow
+            const g = ctx.createRadialGradient(evt.x, evt.y, 0, evt.x, evt.y, 12);
+            g.addColorStop(0, `rgba(255, 0, 0, ${0.08 * alpha})`);
+            g.addColorStop(1, 'rgba(255, 0, 0, 0)');
+            ctx.fillStyle = g;
+            ctx.fillRect(evt.x - 12, evt.y - 12, 24, 24);
+          }
+        }
+        break;
+      }
+    }
+  }
+}
+
+// Render special room visuals
+export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: string, time: number, collected: boolean, trapType?: string) {
+  const cx = C.dims.gw / 2;
+  const cy = C.dims.gh / 2;
+  const pulse = Math.sin(time * 3) * 0.3 + 0.7;
+
+  if (roomType === 'treasure' && !collected) {
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 40);
+    glow.addColorStop(0, `rgba(255, 200, 50, ${0.15 * pulse})`);
+    glow.addColorStop(1, 'rgba(255, 200, 50, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(cx - 40, cy - 40, 80, 80);
+    ctx.fillStyle = '#664422';
+    ctx.fillRect(cx - 12, cy - 6, 24, 16);
+    ctx.fillStyle = '#553311';
+    ctx.fillRect(cx - 12, cy - 8, 24, 4);
+    ctx.fillStyle = '#ffcc00';
+    ctx.fillRect(cx - 2, cy - 2, 4, 4);
+    ctx.fillStyle = '#888844';
+    ctx.fillRect(cx - 12, cy + 2, 24, 2);
+    ctx.fillRect(cx - 12, cy + 7, 24, 2);
+    ctx.fillStyle = `rgba(255, 200, 50, ${pulse})`;
+    ctx.font = `bold 9px ${C.HUD_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('ANDE ATÉ O BAÚ', cx, cy + 26);
+    ctx.textAlign = 'left';
+  }
+
+  if (roomType === 'shrine' && !collected) {
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 45);
+    glow.addColorStop(0, `rgba(100, 50, 255, ${0.12 * pulse})`);
+    glow.addColorStop(1, 'rgba(100, 50, 255, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(cx - 45, cy - 45, 90, 90);
+    ctx.fillStyle = '#222233';
+    ctx.fillRect(cx - 14, cy, 28, 10);
+    ctx.fillStyle = '#333344';
+    ctx.fillRect(cx - 10, cy - 8, 20, 10);
+    ctx.fillStyle = `rgba(150, 100, 255, ${0.6 + pulse * 0.4})`;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 18);
+    ctx.lineTo(cx - 5, cy - 6);
+    ctx.lineTo(cx + 5, cy - 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = `rgba(150, 100, 255, ${0.4 * pulse})`;
+    ctx.fillRect(cx - 16, cy + 4, 3, 3);
+    ctx.fillRect(cx + 14, cy + 4, 3, 3);
+    ctx.fillStyle = `rgba(180, 130, 255, ${pulse})`;
+    ctx.font = `bold 9px ${C.HUD_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('SANTUÁRIO SOMBRIO', cx, cy + 26);
+    ctx.textAlign = 'left';
+  }
+
+  if (roomType === 'trap') {
+    // No visible trap indicators — traps are invisible
+    // Only show a generic warning that the room has traps
+    if (!collected) {
+      ctx.fillStyle = `rgba(255, 80, 80, ${pulse})`;
+      ctx.font = `bold 9px ${C.HUD_FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillText('⚠ CUIDADO COM O CHÃO ⚠', cx, 34);
+      ctx.textAlign = 'left';
+    }
+  }
+}
+
+// ============ BOSS INTRO SYSTEM ============
+
+import { BOSS_DATA } from './bosses';
+
+interface BossIntroState {
+  active: boolean;
+  floor: number;
+  timer: number;
+  duration: number;
+}
+
+let bossIntro: BossIntroState = { active: false, floor: 1, timer: 0, duration: 3.5 };
+
+export function triggerBossIntro(floor: number) {
+  bossIntro = { active: true, floor, timer: 3.5, duration: 3.5 };
+}
+
+export function isBossIntroActive(): boolean {
+  return bossIntro.active;
+}
+
+export function updateBossIntro(dt: number) {
+  if (!bossIntro.active) return;
+  bossIntro.timer -= dt;
+  if (bossIntro.timer <= 0) {
+    bossIntro.active = false;
+  }
+}
+
+export function renderBossIntro(ctx: CanvasRenderingContext2D, time: number, vp: Viewport) {
+  if (!bossIntro.active) return;
+  
+  const floor = bossIntro.floor;
+  const progress = 1 - (bossIntro.timer / bossIntro.duration);
+  const fadeIn = Math.min(1, progress * 3);
+  const fadeOut = Math.max(0, 1 - (progress - 0.7) * 3.33);
+  const alpha = Math.min(fadeIn, fadeOut);
+  
+  const data = BOSS_DATA[floor] || BOSS_DATA[1];
+  
+  const fx = -vp.gox;
+  const fy = -vp.goy;
+  const fw = vp.rw;
+  const fh = vp.rh;
+  
+  // Dark overlay
+  ctx.fillStyle = `rgba(0, 0, 0, ${0.9 * alpha})`;
+  ctx.fillRect(fx, fy, fw, fh);
+  
+  const cx = C.dims.gw / 2;
+  const cy = C.dims.gh / 2;
+  const silScale = 0.8 + progress * 0.2;
+  const silSize = (20 + floor * 4) * silScale;
+  const silY = cy - 15;
+  
+  // Floor-specific vignette color
+  const vignetteColors: Record<number, string> = {
+    1: `rgba(80, 0, 0, ${0.5 * alpha})`,
+    2: `rgba(100, 50, 0, ${0.5 * alpha})`,
+    3: `rgba(60, 0, 80, ${0.5 * alpha})`,
+    4: `rgba(0, 60, 60, ${0.5 * alpha})`,
+    5: `rgba(80, 40, 0, ${0.6 * alpha})`,
+    6: `rgba(60, 0, 0, ${0.7 * alpha})`,
+  };
+  const vignette = ctx.createRadialGradient(cx, cy, 20, cx, cy, C.dims.gw * 0.5);
+  vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vignette.addColorStop(1, vignetteColors[floor] || vignetteColors[1]);
+  ctx.fillStyle = vignette;
+  ctx.fillRect(fx, fy, fw, fh);
+  
+  // Floor-specific glow color
+  const glowPulse = Math.sin(time * 4) * 0.15 + 0.35;
+  const glowColors: Record<number, string> = {
+    1: `rgba(200, 0, 0, ${glowPulse * alpha})`,
+    2: `rgba(255, 120, 0, ${glowPulse * alpha})`,
+    3: `rgba(150, 0, 220, ${glowPulse * alpha})`,
+    4: `rgba(0, 200, 180, ${glowPulse * alpha})`,
+    5: `rgba(200, 100, 0, ${glowPulse * alpha})`,
+    6: `rgba(200, 0, 50, ${(glowPulse + 0.1) * alpha})`,
+  };
+  const glow = ctx.createRadialGradient(cx, silY, silSize * 0.3, cx, silY, silSize * 2);
+  glow.addColorStop(0, glowColors[floor] || glowColors[1]);
+  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(cx - silSize * 2, silY - silSize * 2, silSize * 4, silSize * 4);
+  
+  // Floor-specific silhouettes
+  ctx.fillStyle = `rgba(10, 0, 0, ${0.95 * alpha})`;
+  
+  switch (floor) {
+    case 1: // Sombra Faminta — demonic winged shape
+      ctx.beginPath();
+      ctx.moveTo(cx, silY - silSize);
+      ctx.lineTo(cx + silSize * 0.8, silY + silSize * 0.6);
+      ctx.lineTo(cx + silSize * 0.3, silY + silSize * 0.4);
+      ctx.lineTo(cx + silSize * 0.5, silY + silSize);
+      ctx.lineTo(cx, silY + silSize * 0.7);
+      ctx.lineTo(cx - silSize * 0.5, silY + silSize);
+      ctx.lineTo(cx - silSize * 0.3, silY + silSize * 0.4);
+      ctx.lineTo(cx - silSize * 0.8, silY + silSize * 0.6);
+      ctx.closePath();
+      ctx.fill();
+      // Horns
+      ctx.beginPath();
+      ctx.moveTo(cx - silSize * 0.3, silY - silSize * 0.6);
+      ctx.lineTo(cx - silSize * 0.7, silY - silSize * 1.3);
+      ctx.lineTo(cx - silSize * 0.15, silY - silSize * 0.3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(cx + silSize * 0.3, silY - silSize * 0.6);
+      ctx.lineTo(cx + silSize * 0.7, silY - silSize * 1.3);
+      ctx.lineTo(cx + silSize * 0.15, silY - silSize * 0.3);
+      ctx.closePath();
+      ctx.fill();
+      break;
+      
+    case 2: // O Caçador — sleek predator with speed lines
+      ctx.beginPath();
+      ctx.moveTo(cx, silY - silSize * 1.1);
+      ctx.lineTo(cx + silSize * 0.6, silY - silSize * 0.2);
+      ctx.lineTo(cx + silSize * 1.2, silY + silSize * 0.3);
+      ctx.lineTo(cx + silSize * 0.4, silY + silSize * 0.8);
+      ctx.lineTo(cx, silY + silSize * 0.6);
+      ctx.lineTo(cx - silSize * 0.4, silY + silSize * 0.8);
+      ctx.lineTo(cx - silSize * 1.2, silY + silSize * 0.3);
+      ctx.lineTo(cx - silSize * 0.6, silY - silSize * 0.2);
+      ctx.closePath();
+      ctx.fill();
+      // Speed lines
+      ctx.strokeStyle = `rgba(255, 120, 0, ${0.3 * alpha})`;
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 5; i++) {
+        const ly = silY - silSize + i * silSize * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(cx + silSize * 1.3, ly);
+        ctx.lineTo(cx + silSize * 2.5, ly - 3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - silSize * 1.3, ly);
+        ctx.lineTo(cx - silSize * 2.5, ly - 3);
+        ctx.stroke();
+      }
+      break;
+      
+    case 3: // O Invocador — hooded figure with floating orbs
+      ctx.beginPath();
+      ctx.arc(cx, silY - silSize * 0.4, silSize * 0.5, Math.PI, Math.PI * 2);
+      ctx.lineTo(cx + silSize * 0.7, silY + silSize);
+      ctx.lineTo(cx - silSize * 0.7, silY + silSize);
+      ctx.closePath();
+      ctx.fill();
+      // Staff
+      ctx.fillRect(cx + silSize * 0.5, silY - silSize * 1.2, 3, silSize * 2.4);
+      ctx.fillStyle = `rgba(150, 0, 220, ${0.6 * alpha})`;
+      ctx.beginPath();
+      ctx.arc(cx + silSize * 0.5 + 1, silY - silSize * 1.2, 5, 0, Math.PI * 2);
+      ctx.fill();
+      // Floating orbs
+      for (let i = 0; i < 4; i++) {
+        const oa = time * 2 + i * Math.PI / 2;
+        const ox = cx + Math.cos(oa) * silSize * 1.2;
+        const oy = silY + Math.sin(oa) * silSize * 0.6;
+        ctx.fillStyle = `rgba(200, 100, 255, ${(0.4 + Math.sin(time * 3 + i) * 0.2) * alpha})`;
+        ctx.beginPath();
+        ctx.arc(ox, oy, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+      
+    case 4: // O Fantasma — ethereal transparent form
+      ctx.fillStyle = `rgba(0, 180, 160, ${0.4 * alpha})`;
+      ctx.beginPath();
+      ctx.arc(cx, silY, silSize * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+      // Wispy tendrils
+      for (let i = 0; i < 5; i++) {
+        const tx = cx + Math.sin(time * 3 + i * 1.3) * silSize * 0.5;
+        const ty = silY + silSize * 0.5 + i * 5;
+        ctx.fillStyle = `rgba(0, 200, 180, ${(0.3 - i * 0.05) * alpha})`;
+        ctx.fillRect(tx - 3, ty, 6, 4);
+      }
+      // Phase effect
+      ctx.fillStyle = `rgba(0, 255, 220, ${0.15 * alpha * Math.abs(Math.sin(time * 5))})`;
+      ctx.beginPath();
+      ctx.arc(cx, silY, silSize * 1.2, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+      
+    case 5: // O Destruidor — massive hulking form
+      ctx.fillStyle = `rgba(10, 0, 0, ${0.95 * alpha})`;
+      // Huge body
+      ctx.fillRect(cx - silSize * 0.8, silY - silSize * 0.5, silSize * 1.6, silSize * 1.5);
+      // Shoulders
+      ctx.fillRect(cx - silSize * 1.2, silY - silSize * 0.3, silSize * 0.5, silSize * 0.8);
+      ctx.fillRect(cx + silSize * 0.7, silY - silSize * 0.3, silSize * 0.5, silSize * 0.8);
+      // Head
+      ctx.beginPath();
+      ctx.arc(cx, silY - silSize * 0.7, silSize * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      // Impact cracks on ground
+      ctx.strokeStyle = `rgba(200, 100, 0, ${0.4 * alpha * glowPulse})`;
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 6; i++) {
+        const ca = (i / 6) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, silY + silSize);
+        ctx.lineTo(cx + Math.cos(ca) * silSize * 1.5, silY + silSize + Math.sin(ca) * silSize * 0.5 + 10);
+        ctx.stroke();
+      }
+      break;
+      
+    case 6: // O Pesadelo — amorphous shifting horror
+      // Multiple overlapping forms
+      for (let i = 0; i < 4; i++) {
+        const ox = Math.sin(time * 2 + i * 1.5) * 5;
+        const oy = Math.cos(time * 1.8 + i * 1.2) * 3;
+        ctx.fillStyle = `rgba(${10 + i * 15}, 0, ${i * 10}, ${(0.6 - i * 0.1) * alpha})`;
+        ctx.beginPath();
+        ctx.arc(cx + ox, silY + oy, silSize * (0.9 - i * 0.1), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Tendrils reaching out
+      for (let i = 0; i < 8; i++) {
+        const ta = (i / 8) * Math.PI * 2 + time * 0.5;
+        const tLen = silSize * (1.2 + Math.sin(time * 3 + i) * 0.4);
+        ctx.strokeStyle = `rgba(150, 0, 30, ${0.4 * alpha})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, silY);
+        ctx.lineTo(cx + Math.cos(ta) * tLen, silY + Math.sin(ta) * tLen);
+        ctx.stroke();
+      }
+      // Multiple eyes
+      for (let i = 0; i < 6; i++) {
+        const ea = time * 1.5 + i * Math.PI / 3;
+        const er = silSize * 0.4;
+        const ex = cx + Math.cos(ea) * er;
+        const ey = silY + Math.sin(ea) * er * 0.6;
+        ctx.fillStyle = `rgba(255, 0, 30, ${(0.6 + Math.sin(time * 8 + i) * 0.3) * alpha})`;
+        ctx.fillRect(ex - 2, ey - 1, 4, 2);
+      }
+      break;
+  }
+  
+  // Eyes for floors 1, 2, 5
+  if (floor <= 2 || floor === 5) {
+    const eyeGlow = Math.sin(time * 6) * 0.2 + 0.8;
+    const eyeColor = floor === 2 ? `rgba(255, 150, 0, ${eyeGlow * alpha})` : `rgba(255, 0, 0, ${eyeGlow * alpha})`;
+    ctx.fillStyle = eyeColor;
+    ctx.fillRect(cx - silSize * 0.25, silY - silSize * 0.2, 4, 3);
+    ctx.fillRect(cx + silSize * 0.15, silY - silSize * 0.2, 4, 3);
+  }
+  
+  // Floor label
+  ctx.textAlign = 'center';
+  ctx.fillStyle = `rgba(150, 80, 80, ${0.7 * alpha})`;
+  ctx.font = `bold 9px ${C.HUD_FONT}`;
+  ctx.fillText(`— ANDAR ${floor} —`, cx, cy - 55);
+  
+  // Boss name
+  const nameShake = progress < 0.3 ? Math.sin(time * 40) * 2 * (1 - progress * 3) : 0;
+  ctx.fillStyle = data.accentColor.replace(')', `, ${alpha})`).replace('#', '');
+  // Convert hex to rgba for alpha
+  const hexToRgba = (hex: string, a: number) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  };
+  ctx.fillStyle = hexToRgba(data.accentColor, alpha);
+  ctx.font = `bold 16px ${C.HUD_FONT}`;
+  ctx.fillText(data.name, cx + nameShake, cy + 35);
+  
+  // Title
+  ctx.fillStyle = `rgba(200, 150, 150, ${0.8 * alpha})`;
+  ctx.font = `10px ${C.HUD_FONT}`;
+  ctx.fillText(data.title, cx, cy + 50);
+  
+  // Scan lines
+  for (let y = -vp.goy; y < vp.rh - vp.goy; y += 3) {
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.06 * alpha})`;
+    ctx.fillRect(-vp.gox, y, vp.rw, 1);
+  }
+  
+  ctx.textAlign = 'left';
+}
