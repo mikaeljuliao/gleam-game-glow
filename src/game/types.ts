@@ -164,7 +164,7 @@ export interface DungeonMap {
   floor: number;
 }
 
-export type UpgradeRarity = 'common' | 'rare' | 'epic';
+export type UpgradeRarity = 'common' | 'rare' | 'epic' | 'legendary';
 
 export interface Upgrade {
   id: string;

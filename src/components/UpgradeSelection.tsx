@@ -10,6 +10,7 @@ const rarityColors: Record<string, { border: string; bg: string; glow: string }>
   common: { border: '#888888', bg: 'rgba(100,100,100,0.15)', glow: 'rgba(150,150,150,0.2)' },
   rare: { border: '#4488ff', bg: 'rgba(68,136,255,0.12)', glow: 'rgba(68,136,255,0.3)' },
   epic: { border: '#bb44ff', bg: 'rgba(187,68,255,0.12)', glow: 'rgba(187,68,255,0.3)' },
+  legendary: { border: '#ffaa00', bg: 'rgba(255,170,0,0.15)', glow: 'rgba(255,170,0,0.5)' },
 };
 
 const UpgradeSelection = ({ choices, onSelect }: Props) => {
@@ -128,7 +129,7 @@ const UpgradeSelection = ({ choices, onSelect }: Props) => {
                   flexShrink: 0,
                 }}
               >
-                {upgrade.rarity === 'common' ? 'Comum' : upgrade.rarity === 'rare' ? 'Raro' : 'Épico'}
+                {upgrade.rarity === 'common' ? 'Comum' : upgrade.rarity === 'rare' ? 'Raro' : upgrade.rarity === 'epic' ? 'Épico' : '★ Lendário'}
               </span>
             </button>
           );
