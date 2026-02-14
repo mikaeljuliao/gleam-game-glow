@@ -1,6 +1,7 @@
 import { Upgrade, Synergy, PlayerState, UpgradeRarity } from './types';
 
 const UPGRADE_POOL: Omit<Upgrade, 'apply'>[] = [
+  // === EXISTING ===
   { id: 'dmg1', name: 'Lâmina Afiada', description: 'Dano corpo-a-corpo +30%', rarity: 'common', icon: '⚔️', synergyTags: ['melee', 'damage'] },
   { id: 'dmg2', name: 'Força Bruta', description: 'Todo dano +20%', rarity: 'rare', icon: '💪', synergyTags: ['damage'] },
   { id: 'spd1', name: 'Botas Sombrias', description: 'Velocidade +25%', rarity: 'common', icon: '👢', synergyTags: ['speed'] },
@@ -16,6 +17,26 @@ const UPGRADE_POOL: Omit<Upgrade, 'apply'>[] = [
   { id: 'pierce1', name: 'Perfurante', description: 'Projéteis atravessam inimigos', rarity: 'epic', icon: '🏹', synergyTags: ['ranged', 'pierce'] },
   { id: 'explode1', name: 'Explosão', description: 'Projéteis explodem no impacto', rarity: 'epic', icon: '💥', synergyTags: ['ranged', 'explosion'] },
   { id: 'regen1', name: 'Regeneração', description: 'Recupera 1 HP a cada 5s', rarity: 'common', icon: '🌿', synergyTags: ['health', 'regen'] },
+  // === NEW COMMON ===
+  { id: 'armor1', name: 'Pele de Ferro', description: 'Reduz dano recebido em 15%', rarity: 'common', icon: '🛡️', synergyTags: ['defense'] },
+  { id: 'xpboost1', name: 'Sabedoria Sombria', description: 'XP ganho +25%', rarity: 'common', icon: '📖', synergyTags: ['xp'] },
+  { id: 'crit1', name: 'Olho Crítico', description: '15% chance de dano crítico (2x)', rarity: 'common', icon: '🎯', synergyTags: ['damage', 'crit'] },
+  // === NEW RARE ===
+  { id: 'dash2', name: 'Dash Sombrio', description: 'Dash causa dano aos inimigos', rarity: 'rare', icon: '🌑', synergyTags: ['speed', 'damage', 'dodge'] },
+  { id: 'thorns1', name: 'Espinhos Malditos', description: 'Retorna 30% do dano recebido', rarity: 'rare', icon: '🌹', synergyTags: ['defense', 'damage'] },
+  { id: 'magnet1', name: 'Magnetismo', description: 'Coleta XP de muito mais longe', rarity: 'rare', icon: '🧲', synergyTags: ['xp'] },
+  { id: 'crit2', name: 'Golpe Fatal', description: '25% chance de dano crítico (3x)', rarity: 'rare', icon: '💀', synergyTags: ['damage', 'crit'] },
+  { id: 'fire2', name: 'Alma Incandescente', description: 'Inimigos próximos queimam (-3 HP/s)', rarity: 'rare', icon: '☄️', synergyTags: ['fire', 'area'] },
+  // === NEW EPIC ===
+  { id: 'shield1', name: 'Barreira Espectral', description: 'Bloqueia 1 golpe a cada 15s', rarity: 'epic', icon: '🔰', synergyTags: ['defense'] },
+  { id: 'chain1', name: 'Relâmpago em Cadeia', description: 'Projéteis ricochetam em 2 alvos', rarity: 'epic', icon: '⛓️', synergyTags: ['ranged', 'projectile'] },
+  { id: 'berserker1', name: 'Fúria Berserker', description: 'Abaixo de 30% HP: dano +80%', rarity: 'epic', icon: '🔴', synergyTags: ['damage', 'melee'] },
+  { id: 'nova1', name: 'Nova de Trevas', description: 'Ao subir de nível, explode tudo ao redor', rarity: 'epic', icon: '💫', synergyTags: ['area', 'damage'] },
+  // === NEW LEGENDARY ===
+  { id: 'doom1', name: 'Sentença de Morte', description: 'Inimigos abaixo de 15% HP morrem instantaneamente', rarity: 'legendary', icon: '☠️', synergyTags: ['damage'] },
+  { id: 'immortal1', name: 'Pacto Imortal', description: 'Revive 1 vez com vida cheia ao morrer', rarity: 'legendary', icon: '🔮', synergyTags: ['health', 'defense'] },
+  { id: 'storm1', name: 'Tempestade de Almas', description: '+4 projéteis + perfuram + explodem', rarity: 'legendary', icon: '🌪️', synergyTags: ['ranged', 'projectile', 'pierce', 'explosion'] },
+  { id: 'shadow1', name: 'Clone das Sombras', description: 'Cria um clone que luta por você', rarity: 'legendary', icon: '👤', synergyTags: ['damage', 'melee'] },
 ];
 
 function getApplyFunction(id: string): (p: PlayerState) => void {
@@ -35,6 +56,26 @@ function getApplyFunction(id: string): (p: PlayerState) => void {
     pierce1: (p) => { p.piercing = true; },
     explode1: (p) => { p.explosive = true; },
     regen1: (p) => { /* handled in engine update */ },
+    // New common
+    armor1: (p) => { p.damageMultiplier *= 1; /* flag checked in engine */ },
+    xpboost1: (p) => { /* handled in engine - xp gain multiplied */ },
+    crit1: (p) => { /* handled in engine - 15% crit x2 */ },
+    // New rare
+    dash2: (p) => { /* handled in engine - dash damages enemies */ },
+    thorns1: (p) => { /* handled in engine - reflect 30% damage */ },
+    magnet1: (p) => { /* handled in engine - xp pickup range increased */ },
+    crit2: (p) => { /* handled in engine - 25% crit x3 */ },
+    fire2: (p) => { p.projectileDamage += 3; },
+    // New epic
+    shield1: (p) => { /* handled in engine - blocks 1 hit every 15s */ },
+    chain1: (p) => { /* handled in engine - projectiles bounce */ },
+    berserker1: (p) => { /* handled in engine - low hp damage boost */ },
+    nova1: (p) => { /* handled in engine - level up explosion */ },
+    // New legendary
+    doom1: (p) => { /* handled in engine - execute below 15% */ },
+    immortal1: (p) => { /* handled in engine - revive once */ },
+    storm1: (p) => { p.projectileCount += 4; p.piercing = true; p.explosive = true; },
+    shadow1: (p) => { /* handled in engine - shadow clone */ },
   };
   return fns[id] || (() => {});
 }
@@ -46,7 +87,7 @@ export function getRandomUpgrades(count: number, ownedIds: string[]): Upgrade[] 
   // Weighted by rarity
   const weighted: typeof available = [];
   for (const u of available) {
-    const copies = u.rarity === 'common' ? 4 : u.rarity === 'rare' ? 2 : 1;
+    const copies = u.rarity === 'common' ? 4 : u.rarity === 'rare' ? 2 : u.rarity === 'epic' ? 1 : 1;
     for (let i = 0; i < copies; i++) weighted.push(u);
   }
 
