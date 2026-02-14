@@ -57,25 +57,25 @@ function getApplyFunction(id: string): (p: PlayerState) => void {
     explode1: (p) => { p.explosive = true; },
     regen1: (p) => { /* handled in engine update */ },
     // New common
-    armor1: (p) => { p.damageMultiplier *= 1; /* flag checked in engine */ },
-    xpboost1: (p) => { /* handled in engine - xp gain multiplied */ },
-    crit1: (p) => { /* handled in engine - 15% crit x2 */ },
+    armor1: (p) => { p.armor *= 0.85; },
+    xpboost1: (p) => { p.xpMultiplier *= 1.25; },
+    crit1: (p) => { p.critChance = Math.min(1, p.critChance + 0.15); p.critMultiplier = Math.max(p.critMultiplier, 2); },
     // New rare
-    dash2: (p) => { /* handled in engine - dash damages enemies */ },
-    thorns1: (p) => { /* handled in engine - reflect 30% damage */ },
-    magnet1: (p) => { /* handled in engine - xp pickup range increased */ },
-    crit2: (p) => { /* handled in engine - 25% crit x3 */ },
-    fire2: (p) => { p.projectileDamage += 3; },
+    dash2: (p) => { p.dashDamage = true; },
+    thorns1: (p) => { p.thorns += 0.3; },
+    magnet1: (p) => { p.xpMagnetRange += 80; },
+    crit2: (p) => { p.critChance = Math.min(1, p.critChance + 0.25); p.critMultiplier = Math.max(p.critMultiplier, 3); },
+    fire2: (p) => { p.fireAura = true; p.fireAuraDPS += 3; },
     // New epic
-    shield1: (p) => { /* handled in engine - blocks 1 hit every 15s */ },
-    chain1: (p) => { /* handled in engine - projectiles bounce */ },
-    berserker1: (p) => { /* handled in engine - low hp damage boost */ },
-    nova1: (p) => { /* handled in engine - level up explosion */ },
+    shield1: (p) => { p.shieldReady = true; p.shieldCooldown = 0; },
+    chain1: (p) => { p.chainBounces += 2; },
+    berserker1: (p) => { p.berserker = true; },
+    nova1: (p) => { /* triggered on level up in engine */ },
     // New legendary
     doom1: (p) => { /* handled in engine - execute below 15% */ },
-    immortal1: (p) => { /* handled in engine - revive once */ },
+    immortal1: (p) => { p.hasRevive = true; },
     storm1: (p) => { p.projectileCount += 4; p.piercing = true; p.explosive = true; },
-    shadow1: (p) => { /* handled in engine - shadow clone */ },
+    shadow1: (p) => { p.shadowClone = true; },
   };
   return fns[id] || (() => {});
 }

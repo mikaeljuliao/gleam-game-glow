@@ -49,6 +49,26 @@ export interface PlayerState {
   idleTime: number;
   // XP glow burst timer
   xpGlowTimer: number;
+  // New upgrade fields
+  armor: number;           // damage reduction multiplier (0.85 = 15% reduction)
+  critChance: number;      // 0-1
+  critMultiplier: number;  // damage multiplier on crit
+  xpMultiplier: number;    // xp gain multiplier
+  dashDamage: boolean;     // dash damages enemies
+  thorns: number;          // fraction of damage reflected
+  xpMagnetRange: number;   // extra xp pickup range (unused visually but for magnet)
+  fireAura: boolean;       // damages nearby enemies per second
+  fireAuraDPS: number;
+  shieldCooldown: number;  // time until shield recharges
+  shieldReady: boolean;    // can block next hit
+  chainBounces: number;    // projectile bounces to nearby targets
+  berserker: boolean;      // low hp damage boost
+  hasRevive: boolean;      // one-time revive
+  reviveUsed: boolean;
+  shadowClone: boolean;    // shadow clone active
+  shadowCloneX: number;
+  shadowCloneY: number;
+  shadowCloneAngle: number;
 }
 
 export type EnemyType = 'chaser' | 'shooter' | 'tank' | 'boss' | 'wraith' | 'bomber' | 'swarm' | 'necromancer' | 'stalker' | 'phantom' | 'flash_hunter' | 'distortion' | 'flicker_fiend' | 'warper' | 'accelerator';
