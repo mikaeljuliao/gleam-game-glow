@@ -51,6 +51,9 @@ export class GameEngine {
   gameOffsetX = 0;
   gameOffsetY = 0;
   soulParticleTimer = 0;
+  fireAuraTimer = 0;
+  shieldRechargeTimer = 0;
+  shadowCloneAttackTimer = 0;
 
   constructor(displayCanvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     this.displayCanvas = displayCanvas;
@@ -460,17 +463,26 @@ export class GameEngine {
 
       // Contact damage
       if (this.circleCollide(this.player.x, this.player.y, this.player.width / 2, enemy.x, enemy.y, enemy.width / 2)) {
-        const prevHp = this.player.hp;
-        const died = damagePlayer(this.player, enemy.damage);
-        if (prevHp !== this.player.hp) {
-          this.stats.damageTaken += enemy.damage;
+        const rawDmg = enemy.damage;
+        const result = this.applyDamageToPlayer(rawDmg);
+        if (result.died) { this.gameOver(); return; }
+        if (result.damaged) {
           this.addEffect('shake', 4, 0.15);
           this.addEffect('flash', 1, 0.12, 'rgb(255, 0, 0)');
-          spawnDamageText(this.particles, this.player.x, this.player.y, `-${enemy.damage}`, C.COLORS.damageText);
+          spawnDamageText(this.particles, this.player.x, this.player.y, `-${result.actualDmg}`, C.COLORS.damageText);
           spawnSpark(this.particles, this.player.x, this.player.y, '#ff4444', 4);
           SFX.playerHit();
+          // Thorns
+          if (this.player.thorns > 0) {
+            const thornsDmg = Math.floor(rawDmg * this.player.thorns);
+            const dead = damageEnemy(enemy, thornsDmg, 0, 0);
+            spawnDamageText(this.particles, enemy.x, enemy.y, `${thornsDmg}`, '#ff88ff');
+            if (dead) {
+              this.onEnemyKilled(enemy);
+              deadEnemySet.add(enemy);
+            }
+          }
         }
-        if (died) { this.gameOver(); return; }
       }
     }
     
@@ -521,7 +533,16 @@ export class GameEngine {
           if (projDeadEnemies.has(e)) continue;
           if (e.spawnTimer > 0) continue;
           if (this.circleCollide(p.x, p.y, p.size, e.x, e.y, e.width / 2)) {
-            const dmg = Math.floor(p.damage * this.player.damageMultiplier);
+            let dmg = Math.floor(p.damage * this.player.damageMultiplier);
+            // Berserker
+            if (this.player.berserker && this.player.hp / this.player.maxHp < 0.3) {
+              dmg = Math.floor(dmg * 1.8);
+            }
+            // Crit
+            if (this.player.critChance > 0 && Math.random() < this.player.critChance) {
+              dmg = Math.floor(dmg * this.player.critMultiplier);
+              spawnDamageText(this.particles, e.x, e.y - 8, 'CRIT!', '#ffff00');
+            }
             const dx = e.x - p.x, dy = e.y - p.y;
             const dist = Math.sqrt(dx * dx + dy * dy) || 1;
             const dead = damageEnemy(e, dmg, (dx / dist) * 3, (dy / dist) * 3);
@@ -530,6 +551,12 @@ export class GameEngine {
             spawnBlood(this.particles, e.x, e.y, 4);
             SFX.enemyHit();
             
+            
+            // Chain lightning
+            if (this.player.chainBounces > 0 && dead === false) {
+              this.doChainBounce(e, dmg, this.player.chainBounces, projDeadEnemies);
+            }
+
             if (dead) {
               this.onEnemyKilled(e);
               projDeadEnemies.add(e);
@@ -557,16 +584,14 @@ export class GameEngine {
         }
       } else {
         if (this.circleCollide(p.x, p.y, p.size, this.player.x, this.player.y, this.player.width / 2)) {
-          const prevHp = this.player.hp;
-          const died = damagePlayer(this.player, p.damage);
-          if (prevHp !== this.player.hp) {
-            this.stats.damageTaken += p.damage;
+          const result = this.applyDamageToPlayer(p.damage);
+          if (result.damaged) {
             this.addEffect('shake', 3, 0.1);
             this.addEffect('flash', 1, 0.1, 'rgb(255, 0, 0)');
-            spawnDamageText(this.particles, this.player.x, this.player.y, `-${p.damage}`, C.COLORS.damageText);
+            spawnDamageText(this.particles, this.player.x, this.player.y, `-${result.actualDmg}`, C.COLORS.damageText);
             SFX.playerHit();
           }
-          if (died) { this.gameOver(); return false; }
+          if (result.died) { this.gameOver(); return false; }
           return false;
         }
       }
@@ -652,6 +677,87 @@ export class GameEngine {
       if (this.regenTimer >= 5) {
         this.regenTimer = 0;
         this.player.hp = Math.min(this.player.maxHp, this.player.hp + 1);
+      }
+    }
+
+    // Shield recharge
+    if (this.player.upgrades.includes('shield1') && !this.player.shieldReady) {
+      this.shieldRechargeTimer += dt;
+      if (this.shieldRechargeTimer >= 15) {
+        this.shieldRechargeTimer = 0;
+        this.player.shieldReady = true;
+        spawnDamageText(this.particles, this.player.x, this.player.y - 15, '🔰 ESCUDO', '#44ffff');
+        spawnSpark(this.particles, this.player.x, this.player.y, '#44ffff', 8);
+      }
+    }
+
+    // Fire aura - damage nearby enemies
+    if (this.player.fireAura && this.player.fireAuraDPS > 0) {
+      this.fireAuraTimer += dt;
+      if (this.fireAuraTimer >= 0.5) {
+        this.fireAuraTimer = 0;
+        const fireDeadSet = new Set<EnemyState>();
+        for (const e of this.enemies) {
+          if (fireDeadSet.has(e)) continue;
+          const dx = e.x - this.player.x, dy = e.y - this.player.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 50) {
+            const fireDmg = Math.floor(this.player.fireAuraDPS * 0.5);
+            const dead = damageEnemy(e, fireDmg, 0, 0);
+            spawnDamageText(this.particles, e.x, e.y, `${fireDmg}`, '#ff6600');
+            spawnEmbers(this.particles, e.x, e.y, 2);
+            if (dead) {
+              this.onEnemyKilled(e);
+              fireDeadSet.add(e);
+            }
+          }
+        }
+        if (fireDeadSet.size > 0) {
+          this.enemies = this.enemies.filter(e => !fireDeadSet.has(e));
+        }
+      }
+    }
+
+    // Dash damage
+    if (this.player.isDashing && this.player.dashDamage) {
+      const dashDeadSet = new Set<EnemyState>();
+      for (const e of this.enemies) {
+        if (e.spawnTimer > 0) continue;
+        if (this.circleCollide(this.player.x, this.player.y, this.player.width, e.x, e.y, e.width / 2)) {
+          const dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier * 0.5);
+          const dead = damageEnemy(e, dmg, 0, 0);
+          spawnDamageText(this.particles, e.x, e.y, `${dmg}`, '#aaaaff');
+          spawnSpark(this.particles, e.x, e.y, '#8888ff', 4);
+          if (dead) {
+            this.onEnemyKilled(e);
+            dashDeadSet.add(e);
+          }
+        }
+      }
+      if (dashDeadSet.size > 0) {
+        this.enemies = this.enemies.filter(e => !dashDeadSet.has(e));
+      }
+    }
+
+    // Shadow clone AI
+    if (this.player.shadowClone) {
+      this.updateShadowClone(dt);
+    }
+
+    // Doom execute - check all enemies below 15% HP
+    if (this.player.upgrades.includes('doom1')) {
+      const doomDeadSet = new Set<EnemyState>();
+      for (const e of this.enemies) {
+        if (e.type === 'boss') continue; // don't execute bosses
+        if (e.hp > 0 && e.hp / e.maxHp < 0.15) {
+          spawnExplosion(this.particles, e.x, e.y, 12);
+          spawnDamageText(this.particles, e.x, e.y, '☠️ EXECUTE', '#ff0000');
+          this.onEnemyKilled(e);
+          doomDeadSet.add(e);
+        }
+      }
+      if (doomDeadSet.size > 0) {
+        this.enemies = this.enemies.filter(e => !doomDeadSet.has(e));
       }
     }
 
@@ -748,7 +854,16 @@ export class GameEngine {
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
       if (Math.abs(angleDiff) > C.MELEE_ARC / 2) continue;
 
-      const dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier);
+      let dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier);
+      // Berserker
+      if (this.player.berserker && this.player.hp / this.player.maxHp < 0.3) {
+        dmg = Math.floor(dmg * 1.8);
+      }
+      // Crit
+      if (this.player.critChance > 0 && Math.random() < this.player.critChance) {
+        dmg = Math.floor(dmg * this.player.critMultiplier);
+        spawnDamageText(this.particles, e.x, e.y - 8, 'CRIT!', '#ffff00');
+      }
       const nx = dist > 0 ? dx / dist : 0;
       const ny = dist > 0 ? dy / dist : 0;
       const dead = damageEnemy(e, dmg, nx * 5, ny * 5);
@@ -807,13 +922,35 @@ export class GameEngine {
     }
 
     SFX.xpPickup();
-    this.player.xpGlowTimer = 1.0; // 1 second XP glow burst
-    const leveledUp = addXP(this.player, xpAmount);
+    this.player.xpGlowTimer = 1.0;
+    const xpGain = Math.floor(xpAmount * this.player.xpMultiplier);
+    const leveledUp = addXP(this.player, xpGain);
     if (leveledUp) this.handleLevelUp();
   }
 
   private handleLevelUp() {
     this.stats.level = this.player.level;
+
+    // Nova explosion on level up
+    if (this.player.upgrades.includes('nova1')) {
+      const novaDeadSet = new Set<EnemyState>();
+      const novaDmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier * 2);
+      for (const e of this.enemies) {
+        const dx = e.x - this.player.x, dy = e.y - this.player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 100) {
+          const dead = damageEnemy(e, novaDmg, dx / (dist || 1) * 5, dy / (dist || 1) * 5);
+          spawnDamageText(this.particles, e.x, e.y, `${novaDmg}`, '#bb44ff');
+          if (dead) { this.onEnemyKilled(e); novaDeadSet.add(e); }
+        }
+      }
+      if (novaDeadSet.size > 0) this.enemies = this.enemies.filter(e => !novaDeadSet.has(e));
+      spawnExplosion(this.particles, this.player.x, this.player.y, 30);
+      this.addEffect('shake', 8, 0.3);
+      this.addEffect('flash', 1, 0.2, 'rgb(180, 60, 255)');
+      SFX.explosion();
+    }
+
     this.pause();
     const choices = getRandomUpgrades(3, this.player.upgrades);
     if (choices.length > 0) {
@@ -882,14 +1019,119 @@ export class GameEngine {
   }
 
   private gameOver() {
+    // Immortal revive
+    if (this.player.hasRevive && !this.player.reviveUsed) {
+      this.player.reviveUsed = true;
+      this.player.hp = this.player.maxHp;
+      this.player.invincibleTime = 2;
+      spawnExplosion(this.particles, this.player.x, this.player.y, 25);
+      spawnDamageText(this.particles, this.player.x, this.player.y - 15, '🔮 REVIVIDO!', '#ffaa00');
+      this.addEffect('flash', 1, 0.5, 'rgb(255, 200, 50)');
+      this.addEffect('shake', 10, 0.4);
+      SFX.levelUp();
+      return;
+    }
     this.running = false;
     SFX.playerDeath();
-    clearSave(); // Clear save on death
+    clearSave();
     this.callbacks.onGameOver(this.stats);
   }
 
   private addEffect(type: 'shake' | 'flash' | 'slowmo', intensity: number, duration: number, color?: string) {
     this.effects.push({ type, intensity, duration, timer: duration, color });
+  }
+
+  private applyDamageToPlayer(rawDmg: number): { damaged: boolean; died: boolean; actualDmg: number } {
+    if (this.player.invincibleTime > 0) return { damaged: false, died: false, actualDmg: 0 };
+    // Shield blocks hit
+    if (this.player.shieldReady) {
+      this.player.shieldReady = false;
+      this.shieldRechargeTimer = 0;
+      spawnDamageText(this.particles, this.player.x, this.player.y - 10, '🔰 BLOQUEADO!', '#44ffff');
+      spawnSpark(this.particles, this.player.x, this.player.y, '#44ffff', 10);
+      this.player.invincibleTime = 0.3;
+      return { damaged: false, died: false, actualDmg: 0 };
+    }
+    // Apply armor reduction
+    const actualDmg = Math.max(1, Math.floor(rawDmg * this.player.armor));
+    const prevHp = this.player.hp;
+    const died = damagePlayer(this.player, actualDmg);
+    if (prevHp === this.player.hp) return { damaged: false, died: false, actualDmg: 0 };
+    this.stats.damageTaken += actualDmg;
+    if (died) {
+      // gameOver handles immortal check
+      return { damaged: true, died: true, actualDmg };
+    }
+    return { damaged: true, died: false, actualDmg };
+  }
+
+  private doChainBounce(hitEnemy: EnemyState, baseDmg: number, bounces: number, deadSet: Set<EnemyState>) {
+    let lastX = hitEnemy.x, lastY = hitEnemy.y;
+    const hit = new Set<EnemyState>([hitEnemy]);
+    for (let i = 0; i < bounces; i++) {
+      let closest: EnemyState | null = null;
+      let closestDist = 80; // max chain range
+      for (const e of this.enemies) {
+        if (hit.has(e) || deadSet.has(e)) continue;
+        const dx = e.x - lastX, dy = e.y - lastY;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < closestDist) { closestDist = d; closest = e; }
+      }
+      if (!closest) break;
+      hit.add(closest);
+      const chainDmg = Math.floor(baseDmg * 0.6);
+      const dead = damageEnemy(closest, chainDmg, 0, 0);
+      spawnDamageText(this.particles, closest.x, closest.y, `⚡${chainDmg}`, '#44aaff');
+      spawnSpark(this.particles, closest.x, closest.y, '#44aaff', 4);
+      if (dead) { this.onEnemyKilled(closest); deadSet.add(closest); }
+      lastX = closest.x; lastY = closest.y;
+    }
+  }
+
+  private updateShadowClone(dt: number) {
+    const p = this.player;
+    // Clone orbits around player
+    p.shadowCloneAngle += dt * 2;
+    const orbitDist = 35;
+    p.shadowCloneX = p.x + Math.cos(p.shadowCloneAngle) * orbitDist;
+    p.shadowCloneY = p.y + Math.sin(p.shadowCloneAngle) * orbitDist;
+    // Clone attacks nearby enemies
+    this.shadowCloneAttackTimer -= dt;
+    if (this.shadowCloneAttackTimer <= 0) {
+      this.shadowCloneAttackTimer = 0.8;
+      let closestEnemy: EnemyState | null = null;
+      let closestDist = 60;
+      for (const e of this.enemies) {
+        if (e.spawnTimer > 0) continue;
+        const dx = e.x - p.shadowCloneX, dy = e.y - p.shadowCloneY;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < closestDist) { closestDist = d; closestEnemy = e; }
+      }
+      if (closestEnemy) {
+        const dmg = Math.floor(p.baseDamage * p.damageMultiplier * 0.6);
+        const dead = damageEnemy(closestEnemy, dmg, 0, 0);
+        spawnDamageText(this.particles, closestEnemy.x, closestEnemy.y, `${dmg}`, '#8888ff');
+        spawnSpark(this.particles, p.shadowCloneX, p.shadowCloneY, '#8888ff', 3);
+        if (dead) {
+          this.onEnemyKilled(closestEnemy);
+          this.enemies = this.enemies.filter(e => e !== closestEnemy);
+        }
+      }
+    }
+    // Ghost particles for clone
+    if (Math.random() < 0.3) {
+      this.particles.push({
+        x: p.shadowCloneX + (Math.random() - 0.5) * 6,
+        y: p.shadowCloneY + Math.random() * 4,
+        vx: (Math.random() - 0.5) * 4,
+        vy: -6 - Math.random() * 6,
+        life: 0.4,
+        maxLife: 0.4,
+        size: 1 + Math.random(),
+        color: 'rgba(100, 100, 255, 0.5)',
+        type: 'ghost',
+      });
+    }
   }
 
   private bossKillSequence() {
@@ -1108,6 +1350,27 @@ export class GameEngine {
     for (const p of this.projectiles) renderProjectile(ctx, p, this.gameTime);
     for (const e of this.enemies) renderEnemy(ctx, e, this.gameTime);
     renderPlayer(ctx, this.player, this.gameTime);
+    // Shadow clone render
+    if (this.player.shadowClone) {
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      const cx = this.player.shadowCloneX;
+      const cy = this.player.shadowCloneY;
+      const s = this.player.width / 2;
+      ctx.fillStyle = '#5566cc';
+      ctx.beginPath();
+      ctx.arc(cx, cy, s, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#3344aa';
+      ctx.beginPath();
+      ctx.arc(cx, cy - 1, s * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+      // Eyes
+      ctx.fillStyle = '#aabbff';
+      ctx.fillRect(cx - 2, cy - 2, 2, 2);
+      ctx.fillRect(cx + 1, cy - 2, 2, 2);
+      ctx.restore();
+    }
     renderParticles(ctx, this.particles);
 
     // Lighting
