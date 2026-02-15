@@ -2,6 +2,41 @@ import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, Dungeon
 import { HiddenTrap } from './traps';
 import * as C from './constants';
 
+/** Draw text with letter-spacing by rendering each character individually */
+function drawSpacedText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, spacing: number, stroke = false) {
+  let cx = x;
+  const align = ctx.textAlign;
+  if (align === 'center') {
+    let totalW = 0;
+    for (const ch of text) totalW += ctx.measureText(ch).width + spacing;
+    totalW -= spacing;
+    cx = x - totalW / 2;
+  } else if (align === 'right') {
+    let totalW = 0;
+    for (const ch of text) totalW += ctx.measureText(ch).width + spacing;
+    totalW -= spacing;
+    cx = x - totalW;
+  }
+  const savedAlign = ctx.textAlign;
+  ctx.textAlign = 'left';
+  for (const ch of text) {
+    if (stroke) ctx.strokeText(ch, cx, y);
+    else ctx.fillText(ch, cx, y);
+    cx += ctx.measureText(ch).width + spacing;
+  }
+  ctx.textAlign = savedAlign;
+}
+
+/** Outlined text: subtle 1px outline + letter spacing, no shadow/glow */
+function drawHudText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, spacing = 0.8) {
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth = 1;
+  ctx.lineJoin = 'round';
+  drawSpacedText(ctx, text, x, y, spacing, true);
+  ctx.fillStyle = color;
+  drawSpacedText(ctx, text, x, y, spacing, false);
+}
+
 // Render dungeon atmosphere in the viewport margins (beyond the 640x400 game area)
 // This fills the "black bars" with stone wall textures so the arena feels immersive
 export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: number, vp: Viewport) {
@@ -1226,13 +1261,8 @@ export function renderParticles(ctx: CanvasRenderingContext2D, particles: Partic
     if (p.type === 'text' && p.text) {
       ctx.globalAlpha = alpha;
       ctx.font = `500 ${p.size}px ${C.HUD_FONT}`;
-      // Black outline for contrast
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.lineWidth = 1.5;
-      ctx.lineJoin = 'round';
-      ctx.strokeText(p.text, Math.floor(p.x), Math.floor(p.y));
-      ctx.fillStyle = p.color;
-      ctx.fillText(p.text, Math.floor(p.x), Math.floor(p.y));
+      ctx.textAlign = 'left';
+      drawHudText(ctx, p.text, Math.floor(p.x), Math.floor(p.y), p.color, 0.5);
       ctx.globalAlpha = 1;
     } else if (p.type === 'shockwave' && p.radius !== undefined) {
       ctx.strokeStyle = p.color;
@@ -1310,13 +1340,9 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   ctx.strokeStyle = '#555';
   ctx.lineWidth = 1;
   ctx.strokeRect(hpX + 2, hpY + 2, hpW, hpH);
-  ctx.fillStyle = C.COLORS.white;
   ctx.font = `500 ${Math.round(11 * ms)}px ${C.HUD_FONT}`;
-  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-  ctx.lineWidth = 1.5;
-  ctx.lineJoin = 'round';
-  ctx.strokeText(`${player.hp}/${player.maxHp}`, hpX + 5, hpY + 2 + Math.round(hpH * 0.75));
-  ctx.fillText(`${player.hp}/${player.maxHp}`, hpX + 5, hpY + 2 + Math.round(hpH * 0.75));
+  ctx.textAlign = 'left';
+  drawHudText(ctx, `${player.hp}/${player.maxHp}`, hpX + 5, hpY + 2 + Math.round(hpH * 0.75), C.COLORS.white);
 
   // --- XP Bar ---
   const xpY = hpY + hpH + 6;
@@ -1340,9 +1366,9 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   ctx.strokeStyle = '#5599ff';
   ctx.lineWidth = 1;
   ctx.strokeRect(lvlX, hpY, lvlW, lvlH);
-  ctx.fillStyle = '#aaccff';
   ctx.font = `500 ${Math.round(11 * ms)}px ${C.HUD_FONT}`;
-  ctx.fillText(`Nv.${player.level}`, lvlX + 4, hpY + Math.round(lvlH * 0.7));
+  ctx.textAlign = 'left';
+  drawHudText(ctx, `Nv.${player.level}`, lvlX + 4, hpY + Math.round(lvlH * 0.7), '#aaccff');
 
   // --- Floor indicator (top-right) ---
   const floorW = Math.round(84 * ms);
@@ -1353,12 +1379,8 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   ctx.lineWidth = 1;
   ctx.strokeRect(visRight - floorW - 6, hpY, floorW, floorH);
   ctx.font = `500 ${Math.round(12 * ms)}px ${C.HUD_FONT}`;
-  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-  ctx.lineWidth = 1.5;
-  ctx.lineJoin = 'round';
-  ctx.strokeText(`Andar ${dungeon.floor}`, visRight - floorW - 2, hpY + Math.round(floorH * 0.72));
-  ctx.fillStyle = '#ffddaa';
-  ctx.fillText(`Andar ${dungeon.floor}`, visRight - floorW - 2, hpY + Math.round(floorH * 0.72));
+  ctx.textAlign = 'left';
+  drawHudText(ctx, `Andar ${dungeon.floor}`, visRight - floorW - 2, hpY + Math.round(floorH * 0.72), '#ffddaa');
 
   // --- Enemy counter ---
   const ecY = hpY + floorH + 2;
@@ -1367,20 +1389,12 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   ctx.fillRect(visRight - floorW - 6, ecY, floorW, ecH);
   if (enemyCount > 0) {
     ctx.font = `500 ${Math.round(11 * ms)}px ${C.HUD_FONT}`;
-    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = 'round';
-    ctx.strokeText(`${enemyCount} inimigos`, visRight - floorW - 2, ecY + Math.round(ecH * 0.75));
-    ctx.fillStyle = '#ff6644';
-    ctx.fillText(`${enemyCount} inimigos`, visRight - floorW - 2, ecY + Math.round(ecH * 0.75));
+    ctx.textAlign = 'left';
+    drawHudText(ctx, `${enemyCount} inimigos`, visRight - floorW - 2, ecY + Math.round(ecH * 0.75), '#ff6644');
   } else {
     ctx.font = `500 ${Math.round(11 * ms)}px ${C.HUD_FONT}`;
-    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = 'round';
-    ctx.strokeText(`Sala limpa!`, visRight - floorW - 2, ecY + Math.round(ecH * 0.75));
-    ctx.fillStyle = '#44ff66';
-    ctx.fillText(`Sala limpa!`, visRight - floorW - 2, ecY + Math.round(ecH * 0.75));
+    ctx.textAlign = 'left';
+    drawHudText(ctx, `Sala limpa!`, visRight - floorW - 2, ecY + Math.round(ecH * 0.75), '#44ff66');
   }
 
   // --- Objective text (center top, big and clear) ---
@@ -1397,12 +1411,8 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(C.dims.gw / 2 - objW / 2, 4, objW, objBarH);
     ctx.font = `500 ${objFontSize}px ${C.HUD_FONT}`;
-    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = 'round';
-    ctx.strokeText(objText, C.dims.gw / 2, 4 + Math.round(objBarH * 0.75));
-    ctx.fillStyle = objColor;
-    ctx.fillText(objText, C.dims.gw / 2, 4 + Math.round(objBarH * 0.75));
+    ctx.textAlign = 'center';
+    drawHudText(ctx, objText, C.dims.gw / 2, 4 + Math.round(objBarH * 0.75), objColor);
   } else if (room.cleared) {
     const pulse = Math.sin(time * 5) * 0.3 + 0.7;
     if (room.type === 'shrine' && !room.shrineUsed) {
