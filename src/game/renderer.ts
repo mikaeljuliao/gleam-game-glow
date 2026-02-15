@@ -1265,7 +1265,17 @@ export function renderParticles(ctx: CanvasRenderingContext2D, particles: Partic
   }
 }
 
-export function renderLighting(ctx: CanvasRenderingContext2D, px: number, py: number, radius: number, vp: Viewport) {
+export function renderLighting(ctx: CanvasRenderingContext2D, px: number, py: number, radius: number, vp: Viewport, isVendorRoom: boolean = false) {
+  if (isVendorRoom) {
+    // Vendor room: very bright, warm light
+    const gradient = ctx.createRadialGradient(px, py, radius * 0.5, px, py, radius * 1.5);
+    gradient.addColorStop(0, 'rgba(5, 3, 10, 0)');
+    gradient.addColorStop(0.6, 'rgba(5, 3, 10, 0.1)');
+    gradient.addColorStop(1, 'rgba(5, 3, 10, 0.4)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(-vp.gox, -vp.goy, vp.rw, vp.rh);
+    return;
+  }
   const gradient = ctx.createRadialGradient(px, py, radius * 0.15, px, py, radius);
   gradient.addColorStop(0, 'rgba(5, 3, 10, 0)');
   gradient.addColorStop(0.3, 'rgba(5, 3, 10, 0.3)');

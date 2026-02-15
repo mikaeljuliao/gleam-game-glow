@@ -286,6 +286,56 @@ export function getCombatIntensity(): number {
   return combatIntensity;
 }
 
+// ── Vendor room ambient (calm, safe) ─────────────────────
+let vendorAmbienceActive = false;
+let vendorOsc: OscillatorNode | null = null;
+let vendorGain: GainNode | null = null;
+let vendorOsc2: OscillatorNode | null = null;
+let vendorGain2: GainNode | null = null;
+
+export function startVendorAmbience() {
+  if (vendorAmbienceActive) return;
+  vendorAmbienceActive = true;
+  const ctx = getBgCtx();
+  // Soft pad chord — C major with gentle filter
+  vendorOsc = ctx.createOscillator();
+  vendorGain = ctx.createGain();
+  vendorOsc.type = 'sine';
+  vendorOsc.frequency.setValueAtTime(261.6, ctx.currentTime); // C4
+  vendorGain.gain.setValueAtTime(0, ctx.currentTime);
+  vendorGain.gain.linearRampToValueAtTime(0.04, ctx.currentTime + 1);
+  vendorOsc.connect(vendorGain);
+  vendorGain.connect(ctx.destination);
+  vendorOsc.start();
+  // Second voice — E4
+  vendorOsc2 = ctx.createOscillator();
+  vendorGain2 = ctx.createGain();
+  vendorOsc2.type = 'sine';
+  vendorOsc2.frequency.setValueAtTime(329.6, ctx.currentTime);
+  vendorGain2.gain.setValueAtTime(0, ctx.currentTime);
+  vendorGain2.gain.linearRampToValueAtTime(0.025, ctx.currentTime + 1.5);
+  vendorOsc2.connect(vendorGain2);
+  vendorGain2.connect(ctx.destination);
+  vendorOsc2.start();
+}
+
+export function stopVendorAmbience() {
+  vendorAmbienceActive = false;
+  const ctx = getBgCtx();
+  if (vendorGain) vendorGain.gain.setTargetAtTime(0, ctx.currentTime, 0.5);
+  if (vendorGain2) vendorGain2.gain.setTargetAtTime(0, ctx.currentTime, 0.5);
+  setTimeout(() => {
+    try { vendorOsc?.stop(); } catch {}
+    try { vendorOsc2?.stop(); } catch {}
+    vendorOsc = null; vendorGain = null;
+    vendorOsc2 = null; vendorGain2 = null;
+  }, 2000);
+}
+
+export function isVendorAmbienceActive(): boolean {
+  return vendorAmbienceActive;
+}
+
 // ── Public API (same names so engine.ts doesn't break) ───
 
 export function startBackgroundMusic() {
@@ -624,7 +674,63 @@ export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: strin
   const cy = C.dims.gh / 2;
   const pulse = Math.sin(time * 3) * 0.3 + 0.7;
 
+  if (roomType === 'vendor') {
+    // Warm ambient glow for vendor room
+    const warmGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 120);
+    warmGlow.addColorStop(0, `rgba(255, 220, 150, ${0.08 * pulse})`);
+    warmGlow.addColorStop(0.5, `rgba(200, 170, 80, ${0.04 * pulse})`);
+    warmGlow.addColorStop(1, 'rgba(200, 170, 80, 0)');
+    ctx.fillStyle = warmGlow;
+    ctx.fillRect(cx - 120, cy - 120, 240, 240);
+
+    // NPC body — hooded merchant figure
+    const nFloat = Math.sin(time * 2) * 1;
+    // Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 12, 8, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Robe
+    ctx.fillStyle = '#3a3020';
+    ctx.fillRect(cx - 7, cy - 4 + nFloat, 14, 16);
+    // Hood
+    ctx.fillStyle = '#4a3828';
+    ctx.beginPath();
+    ctx.arc(cx, cy - 6 + nFloat, 8, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#2a1e14';
+    ctx.beginPath();
+    ctx.arc(cx, cy - 6 + nFloat, 6, Math.PI, Math.PI * 2);
+    ctx.fill();
+    // Eyes — warm gold
+    const eyePulse = Math.sin(time * 4) * 0.2 + 0.8;
+    ctx.fillStyle = `rgba(255, 200, 80, ${eyePulse})`;
+    ctx.fillRect(cx - 3, cy - 8 + nFloat, 2, 2);
+    ctx.fillRect(cx + 2, cy - 8 + nFloat, 2, 2);
+    // Lantern
+    ctx.fillStyle = '#553311';
+    ctx.fillRect(cx + 9, cy - 10 + nFloat, 2, 12);
+    const lanternGlow = Math.sin(time * 5) * 0.15 + 0.85;
+    ctx.fillStyle = `rgba(255, 200, 80, ${0.8 * lanternGlow})`;
+    ctx.fillRect(cx + 8, cy - 12 + nFloat, 4, 4);
+    // Lantern light
+    const lg = ctx.createRadialGradient(cx + 10, cy - 10 + nFloat, 0, cx + 10, cy - 10 + nFloat, 20);
+    lg.addColorStop(0, `rgba(255, 200, 80, ${0.2 * lanternGlow})`);
+    lg.addColorStop(1, 'rgba(255, 200, 80, 0)');
+    ctx.fillStyle = lg;
+    ctx.fillRect(cx - 10, cy - 30 + nFloat, 40, 40);
+
+    // "Approach" text
+    ctx.fillStyle = `rgba(230, 200, 130, ${pulse})`;
+    ctx.font = `bold 9px ${C.HUD_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('MERCADOR', cx, cy + 28);
+    ctx.textAlign = 'left';
+    return;
+  }
+
   if (roomType === 'treasure' && !collected) {
+    // ... keep existing code
     const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 40);
     glow.addColorStop(0, `rgba(255, 200, 50, ${0.15 * pulse})`);
     glow.addColorStop(1, 'rgba(255, 200, 50, 0)');
@@ -647,6 +753,7 @@ export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: strin
   }
 
   if (roomType === 'shrine' && !collected) {
+    // ... keep existing code
     const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 45);
     glow.addColorStop(0, `rgba(100, 50, 255, ${0.12 * pulse})`);
     glow.addColorStop(1, 'rgba(100, 50, 255, 0)');
@@ -674,8 +781,6 @@ export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: strin
   }
 
   if (roomType === 'trap') {
-    // No visible trap indicators — traps are invisible
-    // Only show a generic warning that the room has traps
     if (!collected) {
       ctx.fillStyle = `rgba(255, 80, 80, ${pulse})`;
       ctx.font = `bold 9px ${C.HUD_FONT}`;

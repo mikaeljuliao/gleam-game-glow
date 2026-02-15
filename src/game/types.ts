@@ -69,6 +69,7 @@ export interface PlayerState {
   shadowCloneX: number;
   shadowCloneY: number;
   shadowCloneAngle: number;
+  coins: number;
 }
 
 export type EnemyType = 'chaser' | 'shooter' | 'tank' | 'boss' | 'wraith' | 'bomber' | 'swarm' | 'necromancer' | 'stalker' | 'phantom' | 'flash_hunter' | 'distortion' | 'flicker_fiend' | 'warper' | 'accelerator';
@@ -154,7 +155,7 @@ export interface DungeonRoom {
   cleared: boolean;
   visited: boolean;
   isBossRoom: boolean;
-  type: 'normal' | 'boss' | 'start' | 'treasure' | 'trap' | 'shrine';
+  type: 'normal' | 'boss' | 'start' | 'treasure' | 'trap' | 'shrine' | 'vendor';
   // Special room state
   treasureCollected?: boolean;
   trapTriggered?: boolean;
@@ -225,9 +226,17 @@ export interface ScreenEffect {
   color?: string;
 }
 
+export interface ShopItem {
+  upgrade: Upgrade;
+  cost: number;
+  sold: boolean;
+}
+
 export interface GameCallbacks {
   onLevelUp: (choices: Upgrade[]) => void;
   onGameOver: (stats: GameStats) => void;
   onSynergyActivated: (synergy: Synergy) => void;
   onFloorChange: (floor: number) => void;
+  onShopOpen: (items: ShopItem[], coins: number) => void;
+  onShopClose: () => void;
 }

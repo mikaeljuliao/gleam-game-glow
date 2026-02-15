@@ -21,6 +21,7 @@ interface SaveData {
     lifesteal: number;
     piercing: boolean;
     explosive: boolean;
+    coins: number;
   };
   dungeon: {
     floor: number;
@@ -84,6 +85,7 @@ export function saveGame(player: PlayerState, dungeon: DungeonMap, stats: GameSt
         lifesteal: player.lifesteal,
         piercing: player.piercing,
         explosive: player.explosive,
+        coins: player.coins,
       },
       dungeon: {
         floor: dungeon.floor,
@@ -143,6 +145,7 @@ export function restorePlayerState(player: PlayerState, saved: SaveData['player'
   player.lifesteal = saved.lifesteal;
   player.piercing = saved.piercing;
   player.explosive = saved.explosive;
+  player.coins = (saved as any).coins || 0;
 }
 
 export function restoreDungeon(saved: SaveData['dungeon']): DungeonMap {

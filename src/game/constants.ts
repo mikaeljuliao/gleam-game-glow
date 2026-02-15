@@ -133,7 +133,34 @@ export const DOOR_WIDTH = 28;
 
 // Light - dark but enemies should be visible
 export const LIGHT_RADIUS = 130;
+export const VENDOR_LIGHT_RADIUS = 300;
 
+// Coin drops per enemy type
+export const COIN_DROPS: Record<string, [number, number]> = {
+  swarm: [1, 2],
+  chaser: [2, 4],
+  shooter: [2, 4],
+  wraith: [3, 5],
+  bomber: [3, 5],
+  tank: [4, 6],
+  necromancer: [5, 8],
+  stalker: [4, 7],
+  flash_hunter: [3, 5],
+  distortion: [5, 8],
+  flicker_fiend: [3, 5],
+  warper: [3, 6],
+  accelerator: [4, 6],
+  phantom: [2, 3],
+  boss: [20, 35],
+};
+
+// Shop prices by rarity
+export const SHOP_PRICES: Record<string, number> = {
+  common: 15,
+  rare: 30,
+  epic: 60,
+  legendary: 120,
+};
 export const COLORS = {
   bg: '#08080f',
   floor1: '#121218',

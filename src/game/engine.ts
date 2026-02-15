@@ -1,4 +1,4 @@
-import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, GameStats, GameCallbacks, ScreenEffect, Upgrade, DungeonRoom, HorrorEvent } from './types';
+import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, GameStats, GameCallbacks, ScreenEffect, Upgrade, DungeonRoom, HorrorEvent, ShopItem } from './types';
 import { InputManager } from './input';
 import { createPlayer, updatePlayer, tryDash, tryMelee, canRangedAttack, doRangedAttack, addXP, damagePlayer } from './player';
 import { createEnemy, updateEnemy, damageEnemy, scaleEnemyForFloor, getXPForEnemy, createBossForFloor, consumeBossAction, setBossFloor } from './enemies';
@@ -8,7 +8,7 @@ import { createParticles, updateParticles, spawnBlood, spawnDamageText, spawnXPP
 import { getRandomUpgrades, checkSynergies, getOwnedTags, SYNERGIES } from './upgrades';
 import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins } from './renderer';
 import { SFX, initAudio } from './audio';
-import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro } from './horror';
+import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive } from './horror';
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
 import { checkTrapCollision, activateTrap, updateTrapEffects, resetTrapEffects, getLightsOutTimer, getPanicTimer, getDoorsLockedTimer, hasEffect } from './traps';
 import * as C from './constants';
@@ -54,6 +54,10 @@ export class GameEngine {
   fireAuraTimer = 0;
   shieldRechargeTimer = 0;
   shadowCloneAttackTimer = 0;
+  inVendorRoom = false;
+  shopOpen = false;
+  shopItems: ShopItem[] = [];
+  vendorInteractCooldown = 0;
 
   constructor(displayCanvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     this.displayCanvas = displayCanvas;
@@ -164,6 +168,54 @@ export class GameEngine {
     this.resume();
   }
 
+  // Shop methods
+  openShop() {
+    if (this.shopOpen) return;
+    this.shopOpen = true;
+    this.pause();
+    // Generate shop items from existing upgrade pool
+    const items = getRandomUpgrades(4, this.player.upgrades);
+    this.shopItems = items.map(u => ({
+      upgrade: u,
+      cost: C.SHOP_PRICES[u.rarity] || 30,
+      sold: false,
+    }));
+    this.callbacks.onShopOpen(this.shopItems, this.player.coins);
+  }
+
+  closeShop() {
+    this.shopOpen = false;
+    this.vendorInteractCooldown = 1.5;
+    this.resume();
+  }
+
+  buyShopItem(index: number): boolean {
+    const item = this.shopItems[index];
+    if (!item || item.sold || this.player.coins < item.cost) return false;
+    this.player.coins -= item.cost;
+    item.sold = true;
+    item.upgrade.apply(this.player);
+    this.player.upgrades.push(item.upgrade.id);
+    this.stats.upgradesCollected++;
+    SFX.shopBuy();
+    
+    // Check synergies
+    const tags = getOwnedTags([], this.player.upgrades);
+    const newSynergies = checkSynergies(tags);
+    for (const s of newSynergies) {
+      s.apply(this.player);
+      s.applied = true;
+      this.stats.synergiesActivated++;
+      this.callbacks.onSynergyActivated(s);
+    }
+    return true;
+  }
+
+  private getCoinsForEnemy(type: string): number {
+    const range = C.COIN_DROPS[type] || [1, 3];
+    return range[0] + Math.floor(Math.random() * (range[1] - range[0] + 1));
+  }
+
   private loop = () => {
     if (!this.running) return;
     const now = performance.now();
@@ -206,6 +258,18 @@ export class GameEngine {
     this.enemies = [];
     this.bossWasSpawned = false;
     resetTrapEffects();
+    
+    // Handle vendor room ambient
+    const wasInVendor = this.inVendorRoom;
+    this.inVendorRoom = room.type === 'vendor';
+    if (this.inVendorRoom && !wasInVendor) {
+      stopBackgroundMusic();
+      startVendorAmbience();
+    } else if (!this.inVendorRoom && wasInVendor) {
+      stopVendorAmbience();
+      startBackgroundMusic();
+    }
+    
     if (!room.cleared) {
       for (const spawn of room.enemies) {
         if (spawn.type === 'boss') {
@@ -841,6 +905,12 @@ export class GameEngine {
     const xpAmount = getXPForEnemy(e.type);
     spawnXPParticle(this.particles, e.x, e.y, 4);
     
+    // Coin drop
+    const coinAmount = this.getCoinsForEnemy(e.type);
+    this.player.coins += coinAmount;
+    spawnDamageText(this.particles, e.x, e.y + 10, `+${coinAmount} 🪙`, '#ffd700');
+    SFX.coinPickup();
+    
     if (e.type === 'boss') {
       // BOSS KILL IMPACT — massive explosion + slow-mo
       this.slowMoTimer = 1.2;
@@ -1186,7 +1256,16 @@ export class GameEngine {
 
     // Old single-trap center trigger removed — hidden trap system handles all trap room mechanics now
     if (room.type === 'trap' && !room.trapTriggered) {
-      room.trapTriggered = true; // Mark as triggered so the warning text disappears
+      room.trapTriggered = true;
+    }
+
+    // Vendor room interaction
+    if (room.type === 'vendor' && !this.shopOpen) {
+      if (this.vendorInteractCooldown > 0) {
+        this.vendorInteractCooldown -= 0.016;
+      } else if (dist < 30) {
+        this.openShop();
+      }
     }
   }
 
@@ -1306,9 +1385,10 @@ export class GameEngine {
 
     // Lighting
     let lightRadius = C.LIGHT_RADIUS;
+    if (this.inVendorRoom) lightRadius = C.VENDOR_LIGHT_RADIUS;
     if (hasEffect('blindness')) lightRadius = 40;
     if (getLightsOutTimer() > 0) lightRadius = 15;
-    renderLighting(ctx, this.player.x, this.player.y, lightRadius, vp);
+    renderLighting(ctx, this.player.x, this.player.y, lightRadius, vp, this.inVendorRoom);
 
     // Horror events overlay
     renderHorrorEvents(ctx, this.horrorEvents, this.gameTime, vp);
