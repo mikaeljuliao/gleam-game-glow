@@ -9,14 +9,13 @@ function roomKey(x: number, y: number): string {
   return `${x},${y}`;
 }
 
-const ROOM_TYPE_CONFIG: Record<string, { color: string; border: string; icon: string; label: string }> = {
-  start: { color: 'rgba(60, 130, 200, 0.25)', border: 'rgba(100, 170, 240, 0.6)', icon: '🏠', label: 'Início' },
-  boss: { color: 'rgba(200, 50, 50, 0.3)', border: 'rgba(255, 100, 100, 0.8)', icon: '💀', label: 'Boss' },
-  vendor: { color: 'rgba(50, 160, 100, 0.3)', border: 'rgba(100, 240, 160, 0.8)', icon: '💰', label: 'Mercador' },
-  treasure: { color: 'rgba(200, 170, 40, 0.25)', border: 'rgba(255, 220, 80, 0.7)', icon: '◆', label: 'Tesouro' },
-  trap: { color: 'rgba(200, 70, 50, 0.25)', border: 'rgba(255, 120, 90, 0.7)', icon: '⚠', label: 'Armadilha' },
-  shrine: { color: 'rgba(140, 70, 220, 0.25)', border: 'rgba(200, 130, 255, 0.7)', icon: '✦', label: 'Santuário' },
-  normal: { color: 'rgba(60, 65, 90, 0.3)', border: 'rgba(100, 110, 150, 0.5)', icon: '', label: 'Sala' },
+const ROOM_TYPE_CONFIG: Record<string, { color: string; border: string; glow: string; icon: string; label: string }> = {
+  start: { color: 'rgba(60, 130, 200, 0.3)', border: 'rgba(100, 170, 240, 0.7)', glow: 'rgba(80, 150, 255, 0.3)', icon: '🏠', label: 'Início' },
+  boss: { color: 'rgba(200, 40, 40, 0.35)', border: 'rgba(255, 80, 80, 0.9)', glow: 'rgba(255, 60, 60, 0.4)', icon: '💀', label: 'Boss' },
+  vendor: { color: 'rgba(50, 160, 100, 0.3)', border: 'rgba(100, 240, 160, 0.8)', glow: 'rgba(80, 220, 140, 0.3)', icon: '💰', label: 'Mercador + Santuário' },
+  treasure: { color: 'rgba(200, 170, 40, 0.3)', border: 'rgba(255, 220, 80, 0.8)', glow: 'rgba(255, 200, 50, 0.3)', icon: '◆', label: 'Tesouro' },
+  trap: { color: 'rgba(200, 70, 50, 0.3)', border: 'rgba(255, 120, 90, 0.8)', glow: 'rgba(255, 100, 70, 0.3)', icon: '⚠', label: 'Armadilha' },
+  normal: { color: 'rgba(50, 55, 80, 0.35)', border: 'rgba(90, 100, 140, 0.5)', glow: 'none', icon: '', label: 'Sala' },
 };
 
 const CartographerMap = ({ dungeon, onClose }: CartographerMapProps) => {
@@ -31,23 +30,21 @@ const CartographerMap = ({ dungeon, onClose }: CartographerMapProps) => {
 
   const cols = maxGX - minGX + 1;
   const rows = maxGY - minGY + 1;
-  const cellSize = Math.min(72, Math.floor(Math.min(500 / cols, 400 / rows)));
-  const gap = Math.max(4, Math.floor(cellSize * 0.15));
+  const cellSize = Math.min(72, Math.floor(Math.min(520 / cols, 420 / rows)));
+  const gap = Math.max(6, Math.floor(cellSize * 0.18));
 
   // Build connection lines
-  const connections: { x1: number; y1: number; x2: number; y2: number; visited: boolean }[] = [];
+  const connections: { x1: number; y1: number; x2: number; y2: number }[] = [];
   for (const room of dungeon.rooms.values()) {
     const rx = (room.gridX - minGX) * (cellSize + gap) + cellSize / 2;
     const ry = (room.gridY - minGY) * (cellSize + gap) + cellSize / 2;
     if (room.doors.east && dungeon.rooms.has(roomKey(room.gridX + 1, room.gridY))) {
       const nx = rx + cellSize + gap;
-      const neighbor = dungeon.rooms.get(roomKey(room.gridX + 1, room.gridY))!;
-      connections.push({ x1: rx + cellSize / 2, y1: ry, x2: nx - cellSize / 2, y2: ry, visited: room.visited && neighbor.visited });
+      connections.push({ x1: rx + cellSize / 2, y1: ry, x2: nx - cellSize / 2, y2: ry });
     }
     if (room.doors.south && dungeon.rooms.has(roomKey(room.gridX, room.gridY + 1))) {
       const ny = ry + cellSize + gap;
-      const neighbor = dungeon.rooms.get(roomKey(room.gridX, room.gridY + 1))!;
-      connections.push({ x1: rx, y1: ry + cellSize / 2, x2: rx, y2: ny - cellSize / 2, visited: room.visited && neighbor.visited });
+      connections.push({ x1: rx, y1: ry + cellSize / 2, x2: rx, y2: ny - cellSize / 2 });
     }
   }
 
@@ -59,38 +56,51 @@ const CartographerMap = ({ dungeon, onClose }: CartographerMapProps) => {
   return (
     <div
       className="absolute inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0, 0, 0, 0.92)', backdropFilter: 'blur(6px)' }}
+      style={{ background: 'rgba(0, 0, 0, 0.94)', backdropFilter: 'blur(8px)' }}
       onClick={onClose}
     >
       <div
-        className="relative flex flex-col items-center max-w-[90vw] max-h-[90vh]"
+        className="relative flex flex-col items-center max-w-[92vw] max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Title */}
-        <div className="flex items-center gap-3 mb-4">
-          <span style={{ fontSize: 24 }}>🗺️</span>
-          <h2
-            style={{
-              color: '#b8d4e8',
+        <div className="flex items-center gap-3 mb-5">
+          <span style={{ fontSize: 28 }}>🗺️</span>
+          <div>
+            <h2
+              style={{
+                color: '#c8ddf0',
+                fontFamily: "'Montserrat', sans-serif",
+                fontSize: 20,
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                margin: 0,
+                textShadow: '0 0 20px rgba(80, 140, 255, 0.3)',
+              }}
+            >
+              Mapa do Andar {dungeon.floor}
+            </h2>
+            <p style={{
+              color: '#6888aa',
               fontFamily: "'Montserrat', sans-serif",
-              fontSize: 18,
-              fontWeight: 600,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              margin: 0,
-            }}
-          >
-            Mapa do Andar {dungeon.floor}
-          </h2>
+              fontSize: 11,
+              margin: '2px 0 0',
+              letterSpacing: '0.08em',
+            }}>
+              Amuleto do Cartógrafo — visão completa
+            </p>
+          </div>
         </div>
 
         {/* Map container */}
         <div
-          className="relative overflow-auto rounded-lg border p-6"
+          className="relative overflow-auto rounded-xl border p-7"
           style={{
-            background: 'linear-gradient(180deg, rgba(10, 14, 28, 0.98) 0%, rgba(6, 10, 22, 0.99) 100%)',
-            borderColor: 'rgba(80, 130, 200, 0.25)',
-            maxHeight: '70vh',
+            background: 'linear-gradient(180deg, rgba(8, 12, 24, 0.98) 0%, rgba(4, 8, 18, 0.99) 100%)',
+            borderColor: 'rgba(60, 110, 180, 0.3)',
+            boxShadow: 'inset 0 0 40px rgba(40, 80, 160, 0.08), 0 0 60px rgba(40, 80, 160, 0.1)',
+            maxHeight: '68vh',
             maxWidth: '85vw',
           }}
         >
@@ -98,8 +108,14 @@ const CartographerMap = ({ dungeon, onClose }: CartographerMapProps) => {
           <svg
             width={totalW}
             height={totalH}
-            style={{ position: 'absolute', top: 24, left: 24, pointerEvents: 'none' }}
+            style={{ position: 'absolute', top: 28, left: 28, pointerEvents: 'none' }}
           >
+            <defs>
+              <linearGradient id="connGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="rgba(80, 130, 200, 0.6)" />
+                <stop offset="100%" stopColor="rgba(80, 130, 200, 0.3)" />
+              </linearGradient>
+            </defs>
             {connections.map((c, i) => (
               <line
                 key={i}
@@ -107,9 +123,10 @@ const CartographerMap = ({ dungeon, onClose }: CartographerMapProps) => {
                 y1={c.y1}
                 x2={c.x2}
                 y2={c.y2}
-                stroke={c.visited ? 'rgba(100, 140, 200, 0.5)' : 'rgba(60, 80, 120, 0.25)'}
+                stroke="url(#connGrad)"
                 strokeWidth={3}
                 strokeLinecap="round"
+                strokeDasharray="6 4"
               />
             ))}
           </svg>
@@ -136,40 +153,58 @@ const CartographerMap = ({ dungeon, onClose }: CartographerMapProps) => {
               }
 
               const current = isCurrent(room);
-              const config = ROOM_TYPE_CONFIG[room.type] || ROOM_TYPE_CONFIG.normal;
+              // Use room.type directly - no shrine type anymore, vendor includes sanctuary
+              const roomType = room.type === 'shrine' ? 'vendor' : room.type;
+              const config = ROOM_TYPE_CONFIG[roomType] || ROOM_TYPE_CONFIG.normal;
               const visited = room.visited;
               const cleared = room.cleared;
 
               return (
                 <div
                   key={idx}
-                  className="relative flex flex-col items-center justify-center rounded transition-all"
+                  className="relative flex flex-col items-center justify-center rounded-lg transition-all"
                   style={{
                     width: cellSize,
                     height: cellSize,
                     background: current
-                      ? 'rgba(60, 120, 220, 0.35)'
-                      : visited
-                      ? config.color
-                      : 'rgba(25, 30, 45, 0.4)',
-                    border: `2px solid ${current ? 'rgba(120, 180, 255, 0.9)' : visited ? config.border : 'rgba(50, 60, 80, 0.3)'}`,
+                      ? 'rgba(50, 110, 220, 0.4)'
+                      : config.color,
+                    border: `2px solid ${current ? 'rgba(100, 170, 255, 1)' : config.border}`,
                     boxShadow: current
-                      ? '0 0 12px rgba(80, 150, 255, 0.4), inset 0 0 8px rgba(80, 150, 255, 0.15)'
-                      : 'none',
+                      ? '0 0 16px rgba(80, 150, 255, 0.5), inset 0 0 10px rgba(80, 150, 255, 0.2), 0 0 30px rgba(80, 150, 255, 0.2)'
+                      : config.glow !== 'none'
+                      ? `0 0 10px ${config.glow}`
+                      : 'inset 0 1px 2px rgba(255,255,255,0.03)',
                     animation: current ? 'pulse 2s ease-in-out infinite' : 'none',
-                    opacity: visited ? 1 : 0.35,
+                    opacity: 1,
                   }}
                 >
-                  {/* Room icon */}
-                  {visited && config.icon && (
+                  {/* Room icon — always visible (cartographer reveals all) */}
+                  {config.icon && (
                     <span
                       style={{
-                        fontSize: cellSize > 50 ? 18 : 14,
-                        filter: cleared ? 'none' : 'saturate(1.5)',
-                        opacity: cleared && room.type !== 'vendor' ? 0.5 : 1,
+                        fontSize: cellSize > 50 ? 20 : 15,
+                        filter: cleared ? 'grayscale(0.3)' : 'none',
+                        opacity: cleared && roomType !== 'vendor' && roomType !== 'boss' ? 0.6 : 1,
                       }}
                     >
                       {config.icon}
+                    </span>
+                  )}
+
+                  {/* Room label for special rooms */}
+                  {cellSize > 55 && roomType !== 'normal' && (
+                    <span style={{
+                      fontSize: 7,
+                      color: config.border,
+                      fontFamily: "'Montserrat', sans-serif",
+                      fontWeight: 600,
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      marginTop: 1,
+                      opacity: 0.8,
+                    }}>
+                      {roomType === 'boss' ? 'BOSS' : roomType === 'vendor' ? 'MERCADOR' : roomType === 'trap' ? 'PERIGO' : roomType === 'treasure' ? 'TESOURO' : ''}
                     </span>
                   )}
 
@@ -187,28 +222,26 @@ const CartographerMap = ({ dungeon, onClose }: CartographerMapProps) => {
                         fontWeight: 700,
                         letterSpacing: '0.1em',
                         textTransform: 'uppercase',
+                        textShadow: '0 0 6px rgba(80, 150, 255, 0.6)',
                       }}
                     >
                       AQUI
                     </div>
                   )}
 
-                  {/* Not visited indicator */}
-                  {!visited && (
-                    <span
-                      style={{
-                        color: 'rgba(100, 120, 160, 0.5)',
-                        fontSize: cellSize > 50 ? 16 : 12,
-                        fontWeight: 300,
-                      }}
-                    >
-                      ?
-                    </span>
+                  {/* Visited check */}
+                  {visited && cleared && !current && roomType === 'normal' && (
+                    <span style={{ color: 'rgba(100, 200, 130, 0.7)', fontSize: 13, fontWeight: 700 }}>✓</span>
                   )}
 
-                  {/* Cleared check */}
-                  {visited && cleared && !current && room.type === 'normal' && (
-                    <span style={{ color: 'rgba(100, 200, 130, 0.7)', fontSize: 12 }}>✓</span>
+                  {/* Not visited — show faded but still identifiable */}
+                  {!visited && roomType === 'normal' && !config.icon && (
+                    <span style={{
+                      color: 'rgba(80, 100, 140, 0.4)',
+                      fontSize: cellSize > 50 ? 14 : 10,
+                    }}>
+                      •
+                    </span>
                   )}
                 </div>
               );
@@ -218,28 +251,30 @@ const CartographerMap = ({ dungeon, onClose }: CartographerMapProps) => {
 
         {/* Legend */}
         <div
-          className="flex flex-wrap items-center justify-center gap-4 mt-4 px-4"
+          className="flex flex-wrap items-center justify-center gap-5 mt-5 px-4"
           style={{
-            color: '#8899aa',
+            color: '#7899bb',
             fontFamily: "'Montserrat', sans-serif",
             fontSize: 11,
+            fontWeight: 500,
           }}
         >
           {Object.entries(ROOM_TYPE_CONFIG)
             .filter(([key]) => key !== 'normal')
             .map(([key, cfg]) => (
-              <div key={key} className="flex items-center gap-1.5">
+              <div key={key} className="flex items-center gap-2">
                 <div
-                  className="rounded"
+                  className="rounded-sm"
                   style={{
-                    width: 12,
-                    height: 12,
+                    width: 14,
+                    height: 14,
                     background: cfg.color,
-                    border: `1.5px solid ${cfg.border}`,
+                    border: `2px solid ${cfg.border}`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: 8,
+                    boxShadow: cfg.glow !== 'none' ? `0 0 6px ${cfg.glow}` : 'none',
                   }}
                 >
                   {cfg.icon}
@@ -249,18 +284,19 @@ const CartographerMap = ({ dungeon, onClose }: CartographerMapProps) => {
             ))}
         </div>
 
-        {/* Close hint */}
+        {/* Close button */}
         <button
           onClick={onClose}
-          className="mt-4 px-6 py-2 rounded transition-all hover:brightness-110"
+          className="mt-5 px-8 py-2.5 rounded-lg transition-all hover:brightness-125"
           style={{
-            background: 'rgba(40, 60, 100, 0.4)',
-            color: '#88aacc',
-            border: '1px solid rgba(80, 140, 220, 0.25)',
+            background: 'linear-gradient(135deg, rgba(40, 60, 100, 0.5), rgba(30, 50, 80, 0.4))',
+            color: '#99bbdd',
+            border: '1px solid rgba(80, 140, 220, 0.3)',
             fontFamily: "'Montserrat', sans-serif",
             fontSize: 12,
-            fontWeight: 500,
-            letterSpacing: '0.1em',
+            fontWeight: 600,
+            letterSpacing: '0.12em',
+            boxShadow: '0 2px 12px rgba(40, 80, 160, 0.15)',
           }}
         >
           Fechar [M]

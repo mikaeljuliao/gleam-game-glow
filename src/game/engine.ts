@@ -925,25 +925,32 @@ export class GameEngine {
     // === AMULET TICK EFFECTS ===
     // War Rhythm: apply attack speed bonus from stacks, decay when not killing
     if (isAmuletEquipped(this.amuletInventory, 'war_rhythm')) {
-      // Apply War Rhythm attack speed bonus: reset base then add bonus
       const warBonus = 1 + this.warRhythm.stacks * this.warRhythm.bonusPerStack;
-      // We store the war rhythm multiplier separately and apply each frame
       this.player.attackSpeedMult = this.getBaseAttackSpeedMult() * warBonus;
 
       if (this.warRhythm.stacks > 0) {
         this.warRhythm.decayTimer -= dt;
         if (this.warRhythm.decayTimer <= 0) {
-          this.warRhythm.stacks = Math.max(0, this.warRhythm.stacks - 1);
-          this.warRhythm.decayTimer = 1;
+          // All stacks gone at once after 5s without kill
+          this.warRhythm.stacks = 0;
+          this.warRhythm.decayTimer = 0;
         }
+      }
+    } else {
+      // Not equipped — ensure no War Rhythm bonus persists
+      if (this.warRhythm.stacks > 0) {
+        this.warRhythm.stacks = 0;
+        this.player.attackSpeedMult = this.getBaseAttackSpeedMult();
       }
     }
 
     // Soul Collector: apply speed bonus based on souls
     if (isAmuletEquipped(this.amuletInventory, 'soul_collector')) {
       const speedBonus = getSoulCollectorSpeedBonus(this.player.souls);
-      // Apply as a multiplier on top of base move speed
       this.player.moveSpeedMult = this._baseMoveSpeedMult * (1 + speedBonus);
+    } else {
+      // Not equipped — reset to base speed
+      this.player.moveSpeedMult = this._baseMoveSpeedMult;
     }
 
     // Doom execute - check all enemies below 15% HP
@@ -1130,6 +1137,8 @@ export class GameEngine {
         this.callbacks.onAmuletDrop(amuletId);
         spawnDamageText(this.particles, e.x, e.y - 20, '🔮 AMULETO!', '#cc88ff');
       }
+      // Boss kill auto-level: force level up with guaranteed legendary
+      this.handleBossLevelUp();
     } else {
       spawnExplosion(this.particles, e.x, e.y, 10);
       SFX.enemyDeath();
@@ -1166,17 +1175,28 @@ export class GameEngine {
     if (leveledUp) this.handleLevelUp();
   }
 
-  private handleLevelUp() {
+  private handleLevelUp(guaranteeLegendary = false) {
     this.stats.level = this.player.level;
 
     this.pause();
-    const choices = getRandomUpgrades(3, this.player.upgrades);
+    const choices = getRandomUpgrades(3, this.player.upgrades, guaranteeLegendary);
     if (choices.length > 0) {
       SFX.levelUp();
       this.callbacks.onLevelUp(choices);
     } else {
       this.resume();
     }
+  }
+
+  private handleBossLevelUp() {
+    // Auto level-up regardless of XP
+    this.player.level++;
+    this.player.xp = 0;
+    this.player.xpToNext = Math.floor(C.XP_BASE * Math.pow(C.XP_MULTIPLIER, this.player.level - 1));
+    // Delay to let boss kill effects play out
+    setTimeout(() => {
+      this.handleLevelUp(true); // guarantee at least 1 legendary
+    }, 1500);
   }
 
   private checkDoorTransition(room: DungeonRoom) {
