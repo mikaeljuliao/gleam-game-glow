@@ -3,12 +3,13 @@ import TitleScreen from '@/components/TitleScreen';
 import GameCanvas from '@/components/GameCanvas';
 import UpgradeSelection from '@/components/UpgradeSelection';
 import GameOverScreen from '@/components/GameOverScreen';
+import ShopOverlay from '@/components/ShopOverlay';
 import { GameEngine } from '@/game/engine';
 import { initAudio } from '@/game/audio';
-import { Upgrade, Synergy, GameStats } from '@/game/types';
+import { Upgrade, Synergy, GameStats, ShopItem } from '@/game/types';
 import { hasSave, clearSave } from '@/game/save';
 
-type GameState = 'title' | 'playing' | 'upgrading' | 'gameOver';
+type GameState = 'title' | 'playing' | 'upgrading' | 'gameOver' | 'shopping';
 
 const Index = () => {
   const [gameState, setGameState] = useState<GameState>('title');
@@ -19,6 +20,8 @@ const Index = () => {
   const [gameKey, setGameKey] = useState(0);
   const [loadSave, setLoadSave] = useState(false);
   const engineRef = useRef<GameEngine | null>(null);
+  const [shopItems, setShopItems] = useState<ShopItem[]>([]);
+  const [shopCoins, setShopCoins] = useState(0);
 
   useEffect(() => {
     document.title = 'Dungeon of Shadows';
@@ -69,6 +72,28 @@ const Index = () => {
     setTimeout(() => setFloorNotif(null), 2500);
   }, []);
 
+  const handleShopOpen = useCallback((items: ShopItem[], coins: number) => {
+    setShopItems(items);
+    setShopCoins(coins);
+    setGameState('shopping');
+  }, []);
+
+  const handleShopClose = useCallback(() => {
+    setGameState('playing');
+    engineRef.current?.closeShop();
+  }, []);
+
+  const handleShopBuy = useCallback((index: number) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const success = engine.buyShopItem(index);
+    if (success) {
+      // Update local state
+      setShopCoins(engine.player.coins);
+      setShopItems(prev => prev.map((item, i) => i === index ? { ...item, sold: true } : item));
+    }
+  }, []);
+
   const handleRestart = useCallback(() => {
     setGameState('title');
   }, []);
@@ -91,7 +116,7 @@ const Index = () => {
         <TitleScreen onStart={handleStart} onStartFloor={handleStartFloor} hasSave={hasSave()} />
       )}
 
-      {(gameState === 'playing' || gameState === 'upgrading') && (
+      {(gameState === 'playing' || gameState === 'upgrading' || gameState === 'shopping') && (
         <div className="relative w-full h-full flex flex-col items-center justify-center">
           <div className="relative w-full h-[64vh] md:h-full">
             <GameCanvas
@@ -100,12 +125,22 @@ const Index = () => {
               onGameOver={handleGameOver}
               onSynergyActivated={handleSynergy}
               onFloorChange={handleFloorChange}
+              onShopOpen={handleShopOpen}
+              onShopClose={handleShopClose}
               engineRef={engineRef}
             />
             {gameState === 'upgrading' && upgradeChoices.length > 0 && (
               <UpgradeSelection
                 choices={upgradeChoices}
                 onSelect={handleUpgradeSelect}
+              />
+            )}
+            {gameState === 'shopping' && shopItems.length > 0 && (
+              <ShopOverlay
+                items={shopItems}
+                coins={shopCoins}
+                onBuy={handleShopBuy}
+                onClose={handleShopClose}
               />
             )}
             {synergyNotif && (

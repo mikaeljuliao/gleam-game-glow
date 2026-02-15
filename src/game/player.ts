@@ -56,6 +56,7 @@ export function createPlayer(): PlayerState {
     shadowCloneX: 0,
     shadowCloneY: 0,
     shadowCloneAngle: 0,
+    coins: 0,
   };
 }
 

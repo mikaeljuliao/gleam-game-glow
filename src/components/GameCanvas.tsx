@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { GameEngine } from '@/game/engine';
-import { GameCallbacks, Upgrade, Synergy, GameStats } from '@/game/types';
+import { GameCallbacks, Upgrade, Synergy, GameStats, ShopItem } from '@/game/types';
 import MobileHUD from './MobileHUD';
 
 interface GameCanvasProps {
@@ -8,10 +8,12 @@ interface GameCanvasProps {
   onGameOver: (stats: GameStats) => void;
   onSynergyActivated: (synergy: Synergy) => void;
   onFloorChange: (floor: number) => void;
+  onShopOpen: (items: ShopItem[], coins: number) => void;
+  onShopClose: () => void;
   engineRef: React.MutableRefObject<GameEngine | null>;
 }
 
-const GameCanvas = ({ onLevelUp, onGameOver, onSynergyActivated, onFloorChange, engineRef }: GameCanvasProps) => {
+const GameCanvas = ({ onLevelUp, onGameOver, onSynergyActivated, onFloorChange, onShopOpen, onShopClose, engineRef }: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -23,6 +25,8 @@ const GameCanvas = ({ onLevelUp, onGameOver, onSynergyActivated, onFloorChange, 
       onGameOver,
       onSynergyActivated,
       onFloorChange,
+      onShopOpen,
+      onShopClose,
     };
 
     const engine = new GameEngine(canvas, callbacks);

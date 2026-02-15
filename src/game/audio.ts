@@ -67,6 +67,18 @@ function playFreqSweep(startFreq: number, endFreq: number, duration: number, typ
 }
 
 export const SFX = {
+  coinPickup() {
+    playTone(1200, 0.06, 'sine', 0.06);
+    setTimeout(() => playTone(1600, 0.06, 'sine', 0.05), 50);
+  },
+
+  shopBuy() {
+    const notes = [600, 800, 1000, 1200];
+    notes.forEach((freq, i) => {
+      setTimeout(() => playTone(freq, 0.12, 'sine', 0.07), i * 50);
+    });
+  },
+
   meleeSwing() {
     playFreqSweep(400, 80, 0.14, 'sawtooth', 0.12);
     playNoise(0.1, 0.09, 2500);

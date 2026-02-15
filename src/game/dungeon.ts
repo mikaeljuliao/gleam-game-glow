@@ -151,10 +151,12 @@ export function generateDungeon(floor: number): DungeonMap {
   }
 
   // Assign special room types to some rooms
-  const specialTypes: Array<'treasure' | 'trap' | 'shrine'> = [];
+  const specialTypes: Array<'treasure' | 'trap' | 'shrine' | 'vendor'> = [];
   if (path.length > 4) specialTypes.push('treasure');
   if (path.length > 5) specialTypes.push('trap');
   if (path.length > 6) specialTypes.push('shrine');
+  // Always add a vendor room
+  specialTypes.push('vendor');
   if (path.length > 8) specialTypes.push('trap');
   
   // Pick random non-start, non-boss rooms for specials
@@ -163,7 +165,7 @@ export function generateDungeon(floor: number): DungeonMap {
     .filter(({ pos }) => !(pos.x === center && pos.y === center) && !(pos.x === bossPos.x && pos.y === bossPos.y));
   
   const shuffled = normalIndices.sort(() => Math.random() - 0.5);
-  const specialAssign = new Map<number, 'treasure' | 'trap' | 'shrine'>();
+  const specialAssign = new Map<number, 'treasure' | 'trap' | 'shrine' | 'vendor'>();
   for (let i = 0; i < Math.min(specialTypes.length, shuffled.length); i++) {
     specialAssign.set(shuffled[i].i, specialTypes[i]);
   }
@@ -199,7 +201,11 @@ export function generateDungeon(floor: number): DungeonMap {
     // Generate hidden traps for trap rooms
     room.hiddenTraps = generateHiddenTraps(roomType, floor);
     // Treasure and shrine rooms have fewer enemies, trap rooms have more
-    if (roomType === 'treasure') {
+    // Vendor rooms are safe — no enemies at all
+    if (roomType === 'vendor') {
+      room.enemies = [];
+      room.cleared = true;
+    } else if (roomType === 'treasure') {
       room.enemies = generateEnemySpawns({ ...room, type: 'normal' } as DungeonRoom, floor).slice(0, 3);
     } else if (roomType === 'shrine') {
       room.enemies = []; // Shrine is peaceful... until used
