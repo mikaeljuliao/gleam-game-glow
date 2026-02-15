@@ -74,7 +74,7 @@ const GameOverScreen = ({ stats, onRestart }: Props) => {
           <h2
             className="font-bold tracking-wider"
             style={{
-              fontFamily: "'Georgia', serif",
+              fontFamily: "'Cinzel', serif",
               color: '#cc2222',
               textShadow: '0 0 30px rgba(200, 30, 30, 0.5), 0 0 60px rgba(150, 10, 10, 0.3)',
               fontSize: compact ? '24px' : '40px',
@@ -99,14 +99,14 @@ const GameOverScreen = ({ stats, onRestart }: Props) => {
                 RANK UP!
               </p>
               <div className="flex items-center justify-center gap-3">
-                <span style={{ color: prevRank.color, fontFamily: "'Georgia', serif", fontSize: compact ? '11px' : '13px' }}>
+                <span style={{ color: prevRank.color, fontFamily: "'Cinzel', serif", fontSize: compact ? '11px' : '13px' }}>
                   {prevRank.icon} {prevRank.name}
                 </span>
                 <span style={{ color: '#666677' }}>→</span>
                 <span
                   style={{
                     color: rank.color,
-                    fontFamily: "'Georgia', serif",
+                    fontFamily: "'Cinzel', serif",
                     fontSize: compact ? '12px' : '15px',
                     fontWeight: 'bold',
                     textShadow: `0 0 12px ${rank.glowColor}`,
@@ -134,7 +134,7 @@ const GameOverScreen = ({ stats, onRestart }: Props) => {
               <span style={{ fontSize: compact ? '12px' : '14px' }}>{rank.icon}</span>
               <span
                 className="font-bold tracking-widest"
-                style={{ color: rank.color, fontFamily: "'Georgia', serif", textShadow: `0 0 8px ${rank.glowColor}`, fontSize: compact ? '10px' : '12px' }}
+                style={{ color: rank.color, fontFamily: "'Cinzel', serif", textShadow: `0 0 8px ${rank.glowColor}`, fontSize: compact ? '10px' : '12px' }}
               >
                 {rank.name.toUpperCase()}
               </span>
@@ -196,7 +196,7 @@ const GameOverScreen = ({ stats, onRestart }: Props) => {
             onClick={onRestart}
             className="font-bold tracking-widest border-2 transition-all duration-300"
             style={{
-              fontFamily: "'Georgia', serif",
+              fontFamily: "'Cinzel', serif",
               color: '#ddcccc',
               background: 'rgba(150, 30, 30, 0.3)',
               borderColor: '#883333',

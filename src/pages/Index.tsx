@@ -167,7 +167,7 @@ const Index = () => {
                   background: 'rgba(200, 150, 50, 0.3)',
                   borderColor: '#aa8833',
                   color: '#ffddaa',
-                  fontFamily: "'Georgia', serif",
+                  fontFamily: "'Cinzel', serif",
                   fontSize: '18px',
                   textShadow: '0 0 15px rgba(255, 200, 100, 0.5)',
                   animation: 'fadeIn 0.3s ease-out',

@@ -101,7 +101,7 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
             className="text-lg font-bold"
             style={{
               color: '#e8d5a0',
-              fontFamily: "'Georgia', serif",
+              fontFamily: "'Cinzel', serif",
               textShadow: '0 0 10px rgba(200, 170, 80, 0.3)',
             }}
           >
@@ -115,7 +115,7 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
           style={{
             background: 'rgba(0, 0, 0, 0.3)',
             color: '#c8b888',
-            fontFamily: "'Georgia', serif",
+            fontFamily: "'Cinzel', serif",
             fontSize: '13px',
             minHeight: '36px',
             borderLeft: '2px solid rgba(180, 150, 80, 0.3)',

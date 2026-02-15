@@ -37,7 +37,7 @@ const UpgradeSelection = ({ choices, onSelect }: Props) => {
       <h2
         className="font-bold tracking-wider"
         style={{
-          fontFamily: "'Georgia', serif",
+          fontFamily: "'Cinzel', serif",
           color: '#ffcc00',
           textShadow: '0 0 20px rgba(255, 200, 0, 0.4), 0 0 40px rgba(255, 150, 0, 0.2)',
           fontSize: isSmall ? '18px' : isLandscape && isMobile ? '22px' : '32px',
@@ -99,7 +99,7 @@ const UpgradeSelection = ({ choices, onSelect }: Props) => {
                 <span
                   style={{
                     color: rc.border,
-                    fontFamily: "'Georgia', serif",
+                    fontFamily: "'Cinzel', serif",
                     fontWeight: 'bold',
                     fontSize: isSmall ? '12px' : '13px',
                     display: 'block',
