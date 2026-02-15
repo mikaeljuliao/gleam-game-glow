@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ShopItem } from '@/game/types';
+import { SFX } from '@/game/audio';
 
 const VENDOR_DIALOGUES = [
   "Você sobreviveu... impressionante.",
@@ -68,8 +69,12 @@ const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) 
 
   const handleBuy = (index: number) => {
     const item = items[index];
-    if (item.sold || souls < item.cost) return;
+    if (item.sold || souls < item.cost) {
+      SFX.actionBlocked();
+      return;
+    }
     onBuy(index);
+    SFX.shopBuy();
     setBuyFlash(index);
     setTimeout(() => setBuyFlash(null), 300);
     const newDialogue = [
@@ -199,7 +204,7 @@ const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) 
                 return (
                   <button
                     key={idx}
-                    onClick={() => setSelectedIndex(isSelected ? null : idx)}
+                    onClick={() => { SFX.shopSelect(); setSelectedIndex(isSelected ? null : idx); }}
                     className="flex flex-col items-center p-3 rounded transition-all text-center"
                     style={{
                       background: isSold
@@ -437,7 +442,7 @@ const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) 
           }}
         >
           <button
-            onClick={onClose}
+            onClick={() => { SFX.uiClose(); onClose(); }}
             className="px-6 py-2 rounded font-medium transition-all hover:brightness-110"
             style={{
               background: 'rgba(80, 60, 30, 0.4)',

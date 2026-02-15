@@ -53,6 +53,7 @@ export class GameEngine {
   gameOffsetX = 0;
   gameOffsetY = 0;
   soulParticleTimer = 0;
+  _footstepTimer = 0;
   fireAuraTimer = 0;
   shieldRechargeTimer = 0;
   shadowCloneAttackTimer = 0;
@@ -545,6 +546,16 @@ export class GameEngine {
       }
     }
 
+    // Footstep sounds
+    if (isPlayerMoving && !this.player.isDashing) {
+      if (!this._footstepTimer) this._footstepTimer = 0;
+      this._footstepTimer -= dt;
+      if (this._footstepTimer <= 0) {
+        this._footstepTimer = 0.28 + Math.random() * 0.06;
+        SFX.footstep();
+      }
+    }
+
     // Dash trail particles
     if (this.player.isDashing) {
       spawnTrail(this.particles, this.player.x, this.player.y, C.COLORS.playerTrail);
@@ -778,6 +789,7 @@ export class GameEngine {
             if (this.player.critChance > 0 && Math.random() < this.player.critChance) {
               dmg = Math.floor(dmg * this.player.critMultiplier);
               spawnDamageText(this.particles, e.x, e.y - 8, 'CRIT!', '#ffff00');
+              SFX.criticalHit();
             }
             const dx = e.x - p.x, dy = e.y - p.y;
             const dist = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -1072,6 +1084,7 @@ export class GameEngine {
       if (this.player.critChance > 0 && Math.random() < this.player.critChance) {
         dmg = Math.floor(dmg * this.player.critMultiplier);
         spawnDamageText(this.particles, e.x, e.y - 8, 'CRIT!', '#ffff00');
+        SFX.criticalHit();
       }
       // Stronger knockback for melee
       const nx = dist > 0 ? dx / dist : 0;
@@ -1100,6 +1113,8 @@ export class GameEngine {
       this.addEffect('flash', 0.4, 0.06, 'rgb(200, 220, 255)');
       // Melee hit reduces dash cooldown
       this.player.dashCooldown = Math.max(0, this.player.dashCooldown - 0.25);
+    } else {
+      SFX.meleeWhiff();
     }
   }
 
@@ -1112,7 +1127,7 @@ export class GameEngine {
     this.player.souls += soulAmount;
     spawnSoulCollectParticle(this.particles, e.x, e.y, this.player.x, this.player.y, soulAmount);
     spawnDamageText(this.particles, e.x, e.y + 10, `+${soulAmount}`, '#66aaff');
-    SFX.coinPickup();
+    SFX.soulCollect();
     
     if (e.type === 'boss') {
       // BOSS KILL IMPACT — massive explosion + slow-mo
@@ -1231,6 +1246,8 @@ export class GameEngine {
         this.player.trail = [];
         this.projectiles = [];
         this.stats.roomsExplored++;
+        SFX.roomEnter();
+        this.spawnRoomEnemies();
         this.spawnRoomEnemies();
         // Auto-save on room transition
         saveGame(this.player, this.dungeon, this.stats);
@@ -1266,7 +1283,7 @@ export class GameEngine {
       spawnDamageText(this.particles, this.player.x, this.player.y - 15, '🔮 REVIVIDO!', '#ffaa00');
       this.addEffect('flash', 1, 0.5, 'rgb(255, 200, 50)');
       this.addEffect('shake', 10, 0.4);
-      SFX.levelUp();
+      SFX.revive();
       return;
     }
     this.running = false;
@@ -1398,6 +1415,7 @@ export class GameEngine {
     if (!trap) return;
 
     // Massive impact feedback
+    SFX.trapActivate();
     HorrorSFX.trapSpring();
     this.addEffect('shake', 10, 0.5);
     this.addEffect('flash', 1, 0.3, 'rgb(255, 0, 0)');
@@ -1443,6 +1461,7 @@ export class GameEngine {
 
     if (room.type === 'treasure' && !room.treasureCollected && room.cleared && dist < 25) {
       room.treasureCollected = true;
+      SFX.chestOpen();
       HorrorSFX.chestOpen();
       const heal = Math.floor(p.maxHp * 0.3);
       p.hp = Math.min(p.maxHp, p.hp + heal);
@@ -1554,6 +1573,7 @@ export class GameEngine {
     spawnDamageText(this.particles, p.x, p.y - 25, `-${healCost} Almas`, '#6688cc');
     spawnExplosion(this.particles, shrineX, shrineY, 10);
     this.addEffect('flash', 0.6, 0.2, 'rgb(80, 200, 150)');
+    SFX.sanctuaryHeal();
     HorrorSFX.shrineActivate();
     this.shrineCooldown = true;
     setTimeout(() => { this.shrineCooldown = false; }, 2000);

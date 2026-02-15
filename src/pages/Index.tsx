@@ -84,6 +84,7 @@ const Index = () => {
   const handleShopOpen = useCallback((items: ShopItem[], souls: number) => {
     setShopItems(items);
     setShopCoins(souls);
+    SFX.uiOpen();
     setGameState('shopping');
   }, []);
 
@@ -116,6 +117,7 @@ const Index = () => {
   }, []);
 
   const handleInventoryOpen = useCallback(() => {
+    SFX.uiOpen();
     setGameState(prev => {
       setPrevGameState(prev);
       return 'inventory';
@@ -123,6 +125,7 @@ const Index = () => {
   }, []);
 
   const handleInventoryClose = useCallback(() => {
+    SFX.uiClose();
     setGameState('playing');
     engineRef.current?.resume();
   }, []);
