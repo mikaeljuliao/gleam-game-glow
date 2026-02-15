@@ -27,12 +27,8 @@ function drawSpacedText(ctx: CanvasRenderingContext2D, text: string, x: number, 
   ctx.textAlign = savedAlign;
 }
 
-/** Outlined text: subtle 1px outline + letter spacing, no shadow/glow */
+/** Clean text: just color + letter spacing, no outline/shadow/glow */
 function drawHudText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, spacing = 0.8) {
-  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-  ctx.lineWidth = 1;
-  ctx.lineJoin = 'round';
-  drawSpacedText(ctx, text, x, y, spacing, true);
   ctx.fillStyle = color;
   drawSpacedText(ctx, text, x, y, spacing, false);
 }

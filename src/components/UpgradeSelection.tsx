@@ -40,7 +40,6 @@ const UpgradeSelection = ({ choices, onSelect }: Props) => {
           fontFamily: "'Cinzel', serif",
           color: '#d4b44a',
           letterSpacing: '0.12em',
-          WebkitTextStroke: '0.5px rgba(0,0,0,0.3)',
           fontSize: isSmall ? '18px' : isLandscape && isMobile ? '22px' : '32px',
           marginBottom: isSmall ? '4px' : '8px',
         }}
