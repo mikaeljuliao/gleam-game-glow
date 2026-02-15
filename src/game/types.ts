@@ -134,7 +134,7 @@ export interface Particle {
   maxLife: number;
   size: number;
   color: string;
-  type: 'blood' | 'dust' | 'xp' | 'text' | 'explosion' | 'spark' | 'trail' | 'shockwave' | 'ember' | 'ghost' | 'fog' | 'horror';
+  type: 'blood' | 'dust' | 'xp' | 'text' | 'explosion' | 'spark' | 'trail' | 'shockwave' | 'ember' | 'ghost' | 'fog' | 'horror' | 'soul';
   text?: string;
   radius?: number;
 }

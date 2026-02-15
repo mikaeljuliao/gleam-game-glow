@@ -52,6 +52,49 @@ export function spawnXPParticle(particles: Particle[], x: number, y: number, cou
   }
 }
 
+// Soul collection animation — elegant blue energy particles that fly toward the player
+export function spawnSoulCollectParticle(particles: Particle[], fromX: number, fromY: number, toX: number, toY: number, amount: number) {
+  const count = Math.min(Math.max(2, amount), 6);
+  for (let i = 0; i < count; i++) {
+    // Compute velocity toward player with some spread
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const speed = 120 + Math.random() * 60;
+    // Add lateral spread for elegance
+    const spread = (Math.random() - 0.5) * 80;
+    const perpX = -dy / dist;
+    const perpY = dx / dist;
+    
+    const hue = 210 + Math.random() * 30; // blue range
+    const lightness = 55 + Math.random() * 25;
+    
+    particles.push({
+      x: fromX + (Math.random() - 0.5) * 8,
+      y: fromY + (Math.random() - 0.5) * 8,
+      vx: (dx / dist) * speed + perpX * spread,
+      vy: (dy / dist) * speed + perpY * spread - 15,
+      life: 0.5 + Math.random() * 0.3,
+      maxLife: 0.8,
+      size: 2 + Math.random() * 1.5,
+      color: `hsl(${hue}, 80%, ${lightness}%)`,
+      type: 'soul',
+    });
+  }
+  // Central bright spark
+  particles.push({
+    x: fromX,
+    y: fromY,
+    vx: 0,
+    vy: -20,
+    life: 0.3,
+    maxLife: 0.3,
+    size: 4,
+    color: 'hsl(220, 90%, 75%)',
+    type: 'soul',
+  });
+}
+
 export function spawnExplosion(particles: Particle[], x: number, y: number, count = 16) {
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
@@ -182,6 +225,12 @@ export function updateParticles(particles: Particle[], dt: number): Particle[] {
     }
     if (p.type === 'dust' || p.type === 'ember') {
       p.vy -= 3 * dt;
+    }
+    if (p.type === 'soul') {
+      // Soul particles decelerate and fade gracefully
+      p.vx *= 0.96;
+      p.vy *= 0.96;
+      p.vy -= 8 * dt; // slight float upward
     }
     if (p.type === 'shockwave' && p.radius !== undefined) {
       p.radius += 150 * dt;

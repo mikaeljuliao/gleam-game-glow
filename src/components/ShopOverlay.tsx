@@ -127,19 +127,22 @@ const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) 
 
         {/* Souls */}
         <div
-          className="flex items-center gap-2 mb-4 px-4 py-1 rounded"
+          className="flex items-center gap-2 mb-4 px-4 py-1.5 rounded"
           style={{
-            background: 'rgba(100, 180, 255, 0.08)',
-            border: '1px solid rgba(100, 180, 255, 0.2)',
+            background: 'rgba(40, 80, 160, 0.12)',
+            border: '1px solid rgba(60, 120, 200, 0.25)',
           }}
         >
-          <span style={{ fontSize: '18px' }}>👻</span>
+          <svg width="16" height="16" viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
+            <polygon points="7,1 12,7 7,13 2,7" fill="#5599dd" />
+            <polygon points="7,3 10,7 7,11 4,7" fill="#88ccff" />
+          </svg>
           <span
             style={{
               color: '#88ccff',
               fontFamily: "'Montserrat', sans-serif",
-              fontSize: '16px',
-              fontWeight: 500,
+              fontSize: '15px',
+              fontWeight: 600,
               letterSpacing: '0.08em',
             }}
           >
@@ -218,7 +221,7 @@ const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) 
                   </span>
                 </div>
                 <div
-                  className="flex items-center gap-1 px-2 py-1 rounded"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded"
                   style={{
                     background: 'rgba(0, 0, 0, 0.3)',
                     color: isSold ? '#555' : canAfford ? '#88ccff' : '#cc5555',
@@ -227,7 +230,11 @@ const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) 
                     fontWeight: 500,
                   }}
                 >
-                  👻 {item.cost}
+                  <svg width="12" height="12" viewBox="0 0 14 14">
+                    <polygon points="7,1 12,7 7,13 2,7" fill={isSold ? '#555' : canAfford ? '#5599dd' : '#aa4444'} />
+                    <polygon points="7,3 10,7 7,11 4,7" fill={isSold ? '#666' : canAfford ? '#88ccff' : '#cc5555'} />
+                  </svg>
+                  {item.cost}
                 </div>
               </button>
             );

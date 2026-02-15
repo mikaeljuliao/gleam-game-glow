@@ -4,14 +4,14 @@ import { createPlayer, updatePlayer, tryDash, tryMelee, canRangedAttack, doRange
 import { createEnemy, updateEnemy, damageEnemy, scaleEnemyForFloor, getXPForEnemy, createBossForFloor, consumeBossAction, setBossFloor } from './enemies';
 import { createPlayerProjectile, updateProjectile } from './projectiles';
 import { generateDungeon, getCurrentRoom, moveToRoom } from './dungeon';
-import { createParticles, updateParticles, spawnBlood, spawnDamageText, spawnXPParticle, spawnExplosion, spawnSpark, spawnDust, spawnTrail, spawnEmbers, spawnGhostParticle, spawnBomberExplosion } from './particles';
+import { createParticles, updateParticles, spawnBlood, spawnDamageText, spawnXPParticle, spawnExplosion, spawnSpark, spawnDust, spawnTrail, spawnEmbers, spawnGhostParticle, spawnBomberExplosion, spawnSoulCollectParticle } from './particles';
 import { getRandomUpgrades, checkSynergies, getOwnedTags, SYNERGIES } from './upgrades';
 import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins } from './renderer';
 import { SFX, initAudio } from './audio';
 import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive } from './horror';
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
 import { checkTrapCollision, activateTrap, updateTrapEffects, resetTrapEffects, getLightsOutTimer, getPanicTimer, getDoorsLockedTimer, hasEffect } from './traps';
-import { AmuletInventory, createAmuletInventory, getRandomBossAmuletDrop, isAmuletEquipped, WarRhythmState, createWarRhythmState, getSoulCollectorBonus, AMULET_DEFS, addAmulet } from './amulets';
+import { AmuletInventory, createAmuletInventory, getRandomBossAmuletDrop, isAmuletEquipped, WarRhythmState, createWarRhythmState, getSoulCollectorBonus, getSoulCollectorSpeedBonus, AMULET_DEFS, addAmulet } from './amulets';
 import * as C from './constants';
 
 export class GameEngine {
@@ -57,6 +57,7 @@ export class GameEngine {
   shieldRechargeTimer = 0;
   shadowCloneAttackTimer = 0;
   inVendorRoom = false;
+  shrineCooldown = false;
   shopOpen = false;
   shopItems: ShopItem[] = [];
   vendorInteractCooldown = 0;
@@ -143,6 +144,7 @@ export class GameEngine {
     this.player.attackSpeedMult = 1 + (floor - 1) * 0.15;
     this._baseAttackSpeedMult = this.player.attackSpeedMult;
     this.player.moveSpeedMult = 1 + (floor - 1) * 0.1;
+    this._baseMoveSpeedMult = this.player.moveSpeedMult;
     this.player.damageMultiplier = 1 + (floor - 1) * 0.3;
     this.player.projectileCount = Math.min(1 + Math.floor((floor - 1) / 2), 4);
     if (floor >= 3) this.player.piercing = true;
@@ -173,8 +175,9 @@ export class GameEngine {
     upgrade.apply(this.player);
     this.player.upgrades.push(upgrade.id);
     this.stats.upgradesCollected++;
-    // Track base attack speed for War Rhythm
+    // Track base speeds for amulet bonuses
     this._baseAttackSpeedMult = this.player.attackSpeedMult;
+    this._baseMoveSpeedMult = this.player.moveSpeedMult;
     
     const tags = getOwnedTags([], this.player.upgrades);
     const newSynergies = checkSynergies(tags);
@@ -185,8 +188,9 @@ export class GameEngine {
       this.callbacks.onSynergyActivated(s);
       SFX.synergyActivated();
     }
-    // Update base attack speed after synergies too
+    // Update base speeds after synergies too
     this._baseAttackSpeedMult = this.player.attackSpeedMult;
+    this._baseMoveSpeedMult = this.player.moveSpeedMult;
     this.resume();
   }
 
@@ -935,6 +939,13 @@ export class GameEngine {
       }
     }
 
+    // Soul Collector: apply speed bonus based on souls
+    if (isAmuletEquipped(this.amuletInventory, 'soul_collector')) {
+      const speedBonus = getSoulCollectorSpeedBonus(this.player.souls);
+      // Apply as a multiplier on top of base move speed
+      this.player.moveSpeedMult = this._baseMoveSpeedMult * (1 + speedBonus);
+    }
+
     // Doom execute - check all enemies below 15% HP
     if (this.player.upgrades.includes('doom1')) {
       const doomDeadSet = new Set<EnemyState>();
@@ -1088,12 +1099,12 @@ export class GameEngine {
   private onEnemyKilled(e: EnemyState, byMelee = false) {
     this.stats.enemiesDefeated++;
     const xpAmount = getXPForEnemy(e.type);
-    spawnXPParticle(this.particles, e.x, e.y, 4);
     
-    // Soul drop
+    // Soul drop — elegant blue energy animation flying to player
     const soulAmount = this.getSoulsForEnemy(e.type);
     this.player.souls += soulAmount;
-    spawnDamageText(this.particles, e.x, e.y + 10, `+${soulAmount} 👻`, '#88ccff');
+    spawnSoulCollectParticle(this.particles, e.x, e.y, this.player.x, this.player.y, soulAmount);
+    spawnDamageText(this.particles, e.x, e.y + 10, `+${soulAmount}`, '#66aaff');
     SFX.coinPickup();
     
     if (e.type === 'boss') {
@@ -1457,11 +1468,33 @@ export class GameEngine {
     }
 
     // Vendor room interaction — dialogue first, then shop
+    // Also includes SANCTUARY: interact to heal for souls
     if (room.type === 'vendor' && !this.shopOpen && !this.vendorDialogueActive) {
       if (this.vendorInteractCooldown > 0) {
         this.vendorInteractCooldown -= 0.016;
       } else if (dist < 30) {
         this.startVendorDialogue();
+      }
+      // Sanctuary interaction — heal at a shrine within vendor room
+      // Shrine is at the left side of the room
+      const shrineX = C.dims.gw * 0.18;
+      const shrineY = C.dims.gh * 0.5;
+      const shrineDist = Math.sqrt((p.x - shrineX) ** 2 + (p.y - shrineY) ** 2);
+      if (shrineDist < 25 && !this.shrineCooldown) {
+        const healCost = 50 + this.dungeon.floor * 10;
+        if (p.souls >= healCost && p.hp < p.maxHp) {
+          p.souls -= healCost;
+          const healAmount = Math.floor(p.maxHp * 0.25);
+          p.hp = Math.min(p.maxHp, p.hp + healAmount);
+          spawnDamageText(this.particles, p.x, p.y - 10, `+${healAmount} HP`, C.COLORS.healText);
+          spawnDamageText(this.particles, p.x, p.y - 25, `-${healCost} Almas`, '#6688cc');
+          spawnSoulCollectParticle(this.particles, shrineX, shrineY, p.x, p.y, 4);
+          spawnExplosion(this.particles, shrineX, shrineY, 10);
+          this.addEffect('flash', 0.6, 0.2, 'rgb(80, 150, 255)');
+          SFX.levelUp();
+          this.shrineCooldown = true;
+          setTimeout(() => { this.shrineCooldown = false; }, 2000);
+        }
       }
     }
   }
@@ -1755,6 +1788,7 @@ export class GameEngine {
 
   // Base attack speed (without War Rhythm bonus)
   private _baseAttackSpeedMult = 1;
+  private _baseMoveSpeedMult = 1;
   getBaseAttackSpeedMult(): number {
     return this._baseAttackSpeedMult;
   }
