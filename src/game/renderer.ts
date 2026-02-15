@@ -1503,9 +1503,9 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
 }
 
 function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMobile: boolean = false, vp: Viewport = { gox: 0, goy: 0, rw: C.dims.gw, rh: C.dims.gh }) {
-  const cellSize = 14;
-  const gap = 6;
-  const connW = 4; // corridor width
+  const cellSize = 18;
+  const gap = 8;
+  const connW = 5;
   const step = cellSize + gap;
   const visRight = vp.rw - vp.gox;
   const visBottom = vp.rh - vp.goy;
@@ -1523,46 +1523,46 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
   const rows = maxGY - minGY + 1;
   const mapW = cols * step - gap;
   const mapH = rows * step - gap;
-  const pad = 6;
-  // On mobile landscape, move minimap to bottom-left to avoid button overlap
-  const ox = isMobile ? visLeft + pad + 6 : visRight - mapW - pad - 6;
-  const oy = visBottom - mapH - pad - (isMobile ? 38 : 22);
+  const pad = 8;
+  const ox = isMobile ? visLeft + pad + 6 : visRight - mapW - pad - 8;
+  const oy = visBottom - mapH - pad - (isMobile ? 42 : 28);
 
-  // Background panel
-  ctx.fillStyle = 'rgba(5, 5, 15, 0.82)';
+  // Background panel — brighter, more visible
+  ctx.fillStyle = 'rgba(20, 22, 35, 0.92)';
   const panelX = ox - pad;
-  const panelY = oy - pad - 12;
+  const panelY = oy - pad - 16;
   const panelW = mapW + pad * 2;
-  const panelH = mapH + pad * 2 + 12;
+  const panelH = mapH + pad * 2 + 16;
   ctx.beginPath();
-  roundRect(ctx, panelX, panelY, panelW, panelH, 4);
+  roundRect(ctx, panelX, panelY, panelW, panelH, 5);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(80, 80, 120, 0.45)';
+  ctx.strokeStyle = 'rgba(120, 130, 180, 0.5)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  roundRect(ctx, panelX, panelY, panelW, panelH, 4);
+  roundRect(ctx, panelX, panelY, panelW, panelH, 5);
   ctx.stroke();
 
-  // Title
-  ctx.fillStyle = 'rgba(160, 160, 200, 0.7)';
-  ctx.font = `500 7px ${C.HUD_FONT}`;
+  // Title — bigger, brighter
+  ctx.fillStyle = 'rgba(200, 205, 230, 0.85)';
+  ctx.font = `600 9px ${C.HUD_FONT}`;
   ctx.textAlign = 'center';
-  ctx.fillText(`ANDAR ${dungeon.floor}`, panelX + panelW / 2, panelY + 9);
+  ctx.fillText(`MAPA — ANDAR ${dungeon.floor}`, panelX + panelW / 2, panelY + 12);
   ctx.textAlign = 'left';
 
-  // Draw corridors first (connections between rooms)
+  // Draw corridors (connections between rooms) — brighter
   ctx.lineWidth = connW;
+  ctx.lineCap = 'round';
   for (const [, room] of dungeon.rooms) {
     const rx = ox + (room.gridX - minGX) * step + cellSize / 2;
     const ry = oy + (room.gridY - minGY) * step + cellSize / 2;
     const visited = room.visited;
-    ctx.strokeStyle = visited ? 'rgba(60, 60, 90, 0.7)' : 'rgba(40, 40, 60, 0.3)';
 
     if (room.doors.east && dungeon.rooms.has(roomKey(room.gridX + 1, room.gridY))) {
       const neighbor = dungeon.rooms.get(roomKey(room.gridX + 1, room.gridY))!;
       const show = visited || neighbor.visited;
       if (show) {
-        ctx.strokeStyle = (visited && neighbor.visited) ? 'rgba(60, 60, 90, 0.7)' : 'rgba(40, 40, 60, 0.3)';
+        const both = visited && neighbor.visited;
+        ctx.strokeStyle = both ? 'rgba(100, 110, 150, 0.8)' : 'rgba(70, 75, 100, 0.4)';
         ctx.beginPath();
         ctx.moveTo(rx + cellSize / 2, ry);
         ctx.lineTo(rx + cellSize / 2 + gap, ry);
@@ -1573,7 +1573,8 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
       const neighbor = dungeon.rooms.get(roomKey(room.gridX, room.gridY + 1))!;
       const show = visited || neighbor.visited;
       if (show) {
-        ctx.strokeStyle = (visited && neighbor.visited) ? 'rgba(60, 60, 90, 0.7)' : 'rgba(40, 40, 60, 0.3)';
+        const both = visited && neighbor.visited;
+        ctx.strokeStyle = both ? 'rgba(100, 110, 150, 0.8)' : 'rgba(70, 75, 100, 0.4)';
         ctx.beginPath();
         ctx.moveTo(rx, ry + cellSize / 2);
         ctx.lineTo(rx, ry + cellSize / 2 + gap);
@@ -1581,8 +1582,9 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
       }
     }
   }
+  ctx.lineCap = 'butt';
 
-  // Draw rooms
+  // Draw rooms — brighter fills and clearer borders
   for (const [key, room] of dungeon.rooms) {
     const isCurrent = key === dungeon.currentRoomKey;
     const rx = ox + (room.gridX - minGX) * step;
@@ -1591,7 +1593,7 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
     const cy = ry + cellSize / 2;
 
     if (!room.visited) {
-      // Show adjacent-to-visited rooms as dim outlines (fog of war reveal)
+      // Adjacent-to-visited rooms: brighter fog of war
       let adjacentVisited = false;
       const dirs = [{dx:0,dy:-1},{dx:0,dy:1},{dx:-1,dy:0},{dx:1,dy:0}];
       for (const d of dirs) {
@@ -1600,117 +1602,115 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
         if (nr && nr.visited) { adjacentVisited = true; break; }
       }
       if (adjacentVisited) {
-        ctx.strokeStyle = 'rgba(80, 80, 110, 0.35)';
+        ctx.strokeStyle = 'rgba(130, 135, 170, 0.45)';
         ctx.lineWidth = 1;
-        ctx.setLineDash([2, 2]);
+        ctx.setLineDash([3, 2]);
         ctx.strokeRect(rx + 1, ry + 1, cellSize - 2, cellSize - 2);
         ctx.setLineDash([]);
-        // Question mark
-        ctx.fillStyle = 'rgba(120, 120, 160, 0.4)';
-        ctx.font = `500 8px ${C.HUD_FONT}`;
+        ctx.fillStyle = 'rgba(160, 165, 200, 0.5)';
+        ctx.font = `600 10px ${C.HUD_FONT}`;
         ctx.textAlign = 'center';
-        ctx.fillText('?', cx, cy + 3);
+        ctx.fillText('?', cx, cy + 4);
         ctx.textAlign = 'left';
       }
       continue;
     }
 
-    // Room fill color based on type & status
+    // Room fill color — much brighter and more distinct
     let fillColor: string;
     let borderColor: string;
     if (isCurrent) {
-      fillColor = 'rgba(85, 153, 255, 0.55)';
-      borderColor = 'rgba(120, 180, 255, 0.9)';
+      fillColor = 'rgba(90, 150, 255, 0.7)';
+      borderColor = 'rgba(140, 190, 255, 1)';
     } else if (room.isBossRoom) {
-      fillColor = room.cleared ? 'rgba(100, 40, 40, 0.5)' : 'rgba(200, 50, 50, 0.45)';
-      borderColor = 'rgba(255, 80, 80, 0.7)';
+      fillColor = room.cleared ? 'rgba(140, 60, 60, 0.6)' : 'rgba(220, 70, 70, 0.65)';
+      borderColor = 'rgba(255, 110, 110, 0.9)';
     } else if (room.type === 'treasure') {
-      fillColor = room.treasureCollected ? 'rgba(80, 70, 30, 0.4)' : 'rgba(200, 170, 50, 0.45)';
-      borderColor = 'rgba(255, 210, 60, 0.7)';
+      fillColor = room.treasureCollected ? 'rgba(120, 100, 50, 0.5)' : 'rgba(230, 195, 60, 0.6)';
+      borderColor = 'rgba(255, 225, 80, 0.9)';
     } else if (room.type === 'shrine') {
-      fillColor = room.shrineUsed ? 'rgba(50, 30, 70, 0.4)' : 'rgba(130, 60, 200, 0.45)';
-      borderColor = 'rgba(170, 100, 255, 0.7)';
+      fillColor = room.shrineUsed ? 'rgba(80, 50, 100, 0.5)' : 'rgba(160, 90, 230, 0.6)';
+      borderColor = 'rgba(200, 140, 255, 0.9)';
     } else if (room.type === 'vendor') {
-      fillColor = 'rgba(60, 120, 80, 0.45)';
-      borderColor = 'rgba(100, 220, 140, 0.7)';
+      fillColor = 'rgba(70, 160, 110, 0.6)';
+      borderColor = 'rgba(120, 240, 170, 0.9)';
     } else if (room.type === 'trap') {
-      fillColor = room.trapTriggered ? 'rgba(80, 30, 30, 0.4)' : 'rgba(200, 60, 50, 0.4)';
-      borderColor = 'rgba(255, 100, 80, 0.6)';
+      fillColor = room.trapTriggered ? 'rgba(110, 50, 50, 0.5)' : 'rgba(220, 80, 60, 0.55)';
+      borderColor = 'rgba(255, 130, 100, 0.8)';
     } else if (room.cleared) {
-      fillColor = 'rgba(40, 80, 45, 0.45)';
-      borderColor = 'rgba(70, 140, 80, 0.5)';
+      fillColor = 'rgba(60, 130, 75, 0.6)';
+      borderColor = 'rgba(100, 200, 120, 0.7)';
     } else {
-      fillColor = 'rgba(60, 60, 80, 0.45)';
-      borderColor = 'rgba(100, 100, 130, 0.5)';
+      fillColor = 'rgba(85, 90, 120, 0.6)';
+      borderColor = 'rgba(140, 145, 180, 0.7)';
     }
 
     // Fill
     ctx.fillStyle = fillColor;
     ctx.beginPath();
-    roundRect(ctx, rx, ry, cellSize, cellSize, 2);
+    roundRect(ctx, rx, ry, cellSize, cellSize, 3);
     ctx.fill();
 
     // Border
     ctx.strokeStyle = borderColor;
-    ctx.lineWidth = isCurrent ? 2 : 1;
+    ctx.lineWidth = isCurrent ? 2.5 : 1.5;
     ctx.beginPath();
-    roundRect(ctx, rx, ry, cellSize, cellSize, 2);
+    roundRect(ctx, rx, ry, cellSize, cellSize, 3);
     ctx.stroke();
 
-    // Room icon
+    // Room icon — bigger and clearer
     ctx.textAlign = 'center';
-    ctx.font = `8px ${C.HUD_FONT}`;
+    ctx.font = `600 10px ${C.HUD_FONT}`;
     if (isCurrent) {
       // Player dot (pulsing)
-      const pulse = Math.sin(Date.now() / 200) * 1.5 + 3.5;
-      ctx.fillStyle = 'rgba(150, 200, 255, 0.9)';
+      const pulse = Math.sin(Date.now() / 200) * 2 + 4;
+      ctx.fillStyle = 'rgba(170, 210, 255, 0.95)';
       ctx.beginPath();
       ctx.arc(cx, cy, pulse, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 2, 0, Math.PI * 2);
       ctx.fill();
     } else if (room.isBossRoom) {
-      ctx.fillStyle = room.cleared ? 'rgba(200, 100, 100, 0.5)' : 'rgba(255, 100, 80, 0.9)';
-      ctx.fillText('💀', cx, cy + 3);
+      ctx.fillStyle = room.cleared ? 'rgba(220, 130, 130, 0.6)' : 'rgba(255, 120, 100, 1)';
+      ctx.fillText('💀', cx, cy + 4);
     } else if (room.type === 'treasure') {
-      ctx.fillStyle = 'rgba(255, 220, 80, 0.9)';
-      ctx.fillText(room.treasureCollected ? '·' : '◆', cx, cy + 3);
+      ctx.fillStyle = 'rgba(255, 230, 100, 1)';
+      ctx.fillText(room.treasureCollected ? '·' : '◆', cx, cy + 4);
     } else if (room.type === 'shrine') {
-      ctx.fillStyle = 'rgba(180, 120, 255, 0.9)';
-      ctx.fillText(room.shrineUsed ? '·' : '✦', cx, cy + 3);
+      ctx.fillStyle = 'rgba(200, 150, 255, 1)';
+      ctx.fillText(room.shrineUsed ? '·' : '✦', cx, cy + 4);
     } else if (room.type === 'vendor') {
-      ctx.fillStyle = 'rgba(100, 255, 180, 0.9)';
-      ctx.fillText('$', cx, cy + 3);
+      ctx.fillStyle = 'rgba(130, 255, 200, 1)';
+      ctx.fillText('$', cx, cy + 4);
     } else if (room.type === 'trap') {
-      ctx.fillStyle = 'rgba(255, 100, 70, 0.9)';
-      ctx.fillText(room.trapTriggered ? '·' : '⚠', cx, cy + 3);
+      ctx.fillStyle = 'rgba(255, 130, 90, 1)';
+      ctx.fillText(room.trapTriggered ? '·' : '⚠', cx, cy + 4);
     } else if (room.cleared) {
-      // Checkmark for cleared
-      ctx.fillStyle = 'rgba(100, 200, 110, 0.6)';
-      ctx.fillText('✓', cx, cy + 3);
+      ctx.fillStyle = 'rgba(130, 220, 145, 0.8)';
+      ctx.fillText('✓', cx, cy + 4);
     }
     ctx.textAlign = 'left';
   }
 
-  // Legend at the bottom of the panel
-  const legendY = panelY + panelH + 2;
-  ctx.font = `5px ${C.HUD_FONT}`;
+  // Legend — bigger, brighter, easier to read
+  const legendY = panelY + panelH + 4;
+  ctx.font = `500 7px ${C.HUD_FONT}`;
   const legends = [
-    { color: 'rgba(85, 153, 255, 0.8)', label: 'VOCÊ' },
-    { color: 'rgba(70, 140, 80, 0.8)', label: 'LIMPA' },
-    { color: 'rgba(255, 80, 80, 0.8)', label: 'BOSS' },
-    { color: 'rgba(255, 210, 60, 0.8)', label: 'TESOURO' },
-    { color: 'rgba(100, 220, 140, 0.8)', label: 'LOJA' },
+    { color: 'rgba(120, 170, 255, 0.95)', label: 'VOCÊ' },
+    { color: 'rgba(100, 200, 120, 0.95)', label: 'LIMPA' },
+    { color: 'rgba(255, 110, 110, 0.95)', label: 'BOSS' },
+    { color: 'rgba(255, 225, 80, 0.95)', label: 'TESOURO' },
+    { color: 'rgba(120, 240, 170, 0.95)', label: 'LOJA' },
   ];
   let lx = panelX;
   for (const l of legends) {
     ctx.fillStyle = l.color;
-    ctx.fillRect(lx, legendY, 4, 4);
-    ctx.fillStyle = 'rgba(150, 150, 180, 0.6)';
-    ctx.fillText(l.label, lx + 6, legendY + 4);
-    lx += ctx.measureText(l.label).width + 10;
+    ctx.fillRect(lx, legendY, 6, 6);
+    ctx.fillStyle = 'rgba(190, 195, 220, 0.8)';
+    ctx.fillText(l.label, lx + 8, legendY + 6);
+    lx += ctx.measureText(l.label).width + 14;
   }
 }
 
