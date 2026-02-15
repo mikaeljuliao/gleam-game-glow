@@ -680,64 +680,6 @@ export class GameEngine {
       }
     }
 
-    // Shield recharge
-    if (this.player.upgrades.includes('shield1') && !this.player.shieldReady) {
-      this.shieldRechargeTimer += dt;
-      if (this.shieldRechargeTimer >= 15) {
-        this.shieldRechargeTimer = 0;
-        this.player.shieldReady = true;
-        spawnDamageText(this.particles, this.player.x, this.player.y - 15, '🔰 ESCUDO', '#44ffff');
-        spawnSpark(this.particles, this.player.x, this.player.y, '#44ffff', 8);
-      }
-    }
-
-    // Fire aura - damage nearby enemies
-    if (this.player.fireAura && this.player.fireAuraDPS > 0) {
-      this.fireAuraTimer += dt;
-      if (this.fireAuraTimer >= 0.5) {
-        this.fireAuraTimer = 0;
-        const fireDeadSet = new Set<EnemyState>();
-        for (const e of this.enemies) {
-          if (fireDeadSet.has(e)) continue;
-          const dx = e.x - this.player.x, dy = e.y - this.player.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 50) {
-            const fireDmg = Math.floor(this.player.fireAuraDPS * 0.5);
-            const dead = damageEnemy(e, fireDmg, 0, 0);
-            spawnDamageText(this.particles, e.x, e.y, `${fireDmg}`, '#ff6600');
-            spawnEmbers(this.particles, e.x, e.y, 2);
-            if (dead) {
-              this.onEnemyKilled(e);
-              fireDeadSet.add(e);
-            }
-          }
-        }
-        if (fireDeadSet.size > 0) {
-          this.enemies = this.enemies.filter(e => !fireDeadSet.has(e));
-        }
-      }
-    }
-
-    // Dash damage
-    if (this.player.isDashing && this.player.dashDamage) {
-      const dashDeadSet = new Set<EnemyState>();
-      for (const e of this.enemies) {
-        if (e.spawnTimer > 0) continue;
-        if (this.circleCollide(this.player.x, this.player.y, this.player.width, e.x, e.y, e.width / 2)) {
-          const dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier * 0.5);
-          const dead = damageEnemy(e, dmg, 0, 0);
-          spawnDamageText(this.particles, e.x, e.y, `${dmg}`, '#aaaaff');
-          spawnSpark(this.particles, e.x, e.y, '#8888ff', 4);
-          if (dead) {
-            this.onEnemyKilled(e);
-            dashDeadSet.add(e);
-          }
-        }
-      }
-      if (dashDeadSet.size > 0) {
-        this.enemies = this.enemies.filter(e => !dashDeadSet.has(e));
-      }
-    }
 
     // Shadow clone AI
     if (this.player.shadowClone) {
@@ -931,26 +873,6 @@ export class GameEngine {
   private handleLevelUp() {
     this.stats.level = this.player.level;
 
-    // Nova explosion on level up
-    if (this.player.upgrades.includes('nova1')) {
-      const novaDeadSet = new Set<EnemyState>();
-      const novaDmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier * 2);
-      for (const e of this.enemies) {
-        const dx = e.x - this.player.x, dy = e.y - this.player.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 100) {
-          const dead = damageEnemy(e, novaDmg, dx / (dist || 1) * 5, dy / (dist || 1) * 5);
-          spawnDamageText(this.particles, e.x, e.y, `${novaDmg}`, '#bb44ff');
-          if (dead) { this.onEnemyKilled(e); novaDeadSet.add(e); }
-        }
-      }
-      if (novaDeadSet.size > 0) this.enemies = this.enemies.filter(e => !novaDeadSet.has(e));
-      spawnExplosion(this.particles, this.player.x, this.player.y, 30);
-      this.addEffect('shake', 8, 0.3);
-      this.addEffect('flash', 1, 0.2, 'rgb(180, 60, 255)');
-      SFX.explosion();
-    }
-
     this.pause();
     const choices = getRandomUpgrades(3, this.player.upgrades);
     if (choices.length > 0) {
@@ -1043,15 +965,6 @@ export class GameEngine {
 
   private applyDamageToPlayer(rawDmg: number): { damaged: boolean; died: boolean; actualDmg: number } {
     if (this.player.invincibleTime > 0) return { damaged: false, died: false, actualDmg: 0 };
-    // Shield blocks hit
-    if (this.player.shieldReady) {
-      this.player.shieldReady = false;
-      this.shieldRechargeTimer = 0;
-      spawnDamageText(this.particles, this.player.x, this.player.y - 10, '🔰 BLOQUEADO!', '#44ffff');
-      spawnSpark(this.particles, this.player.x, this.player.y, '#44ffff', 10);
-      this.player.invincibleTime = 0.3;
-      return { damaged: false, died: false, actualDmg: 0 };
-    }
     // Apply armor reduction
     const actualDmg = Math.max(1, Math.floor(rawDmg * this.player.armor));
     const prevHp = this.player.hp;

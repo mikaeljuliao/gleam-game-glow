@@ -22,16 +22,12 @@ const UPGRADE_POOL: Omit<Upgrade, 'apply'>[] = [
   { id: 'xpboost1', name: 'Sabedoria Sombria', description: 'XP ganho +25%', rarity: 'common', icon: '📖', synergyTags: ['xp'] },
   { id: 'crit1', name: 'Olho Crítico', description: '15% chance de dano crítico (2x)', rarity: 'common', icon: '🎯', synergyTags: ['damage', 'crit'] },
   // === NEW RARE ===
-  { id: 'dash2', name: 'Dash Sombrio', description: 'Dash causa dano aos inimigos', rarity: 'rare', icon: '🌑', synergyTags: ['speed', 'damage', 'dodge'] },
+  { id: 'dash2', name: 'Dash Sombrio', description: 'Dash mais rápido, maior distância e atravessa inimigos', rarity: 'rare', icon: '🌑', synergyTags: ['speed', 'dodge'] },
   { id: 'thorns1', name: 'Espinhos Malditos', description: 'Retorna 30% do dano recebido', rarity: 'rare', icon: '🌹', synergyTags: ['defense', 'damage'] },
-  { id: 'magnet1', name: 'Magnetismo', description: 'Coleta XP de muito mais longe', rarity: 'rare', icon: '🧲', synergyTags: ['xp'] },
   { id: 'crit2', name: 'Golpe Fatal', description: '25% chance de dano crítico (3x)', rarity: 'rare', icon: '💀', synergyTags: ['damage', 'crit'] },
-  { id: 'fire2', name: 'Alma Incandescente', description: 'Inimigos próximos queimam (-3 HP/s)', rarity: 'rare', icon: '☄️', synergyTags: ['fire', 'area'] },
   // === NEW EPIC ===
-  { id: 'shield1', name: 'Barreira Espectral', description: 'Bloqueia 1 golpe a cada 15s', rarity: 'epic', icon: '🔰', synergyTags: ['defense'] },
   { id: 'chain1', name: 'Relâmpago em Cadeia', description: 'Projéteis ricochetam em 2 alvos', rarity: 'epic', icon: '⛓️', synergyTags: ['ranged', 'projectile'] },
   { id: 'berserker1', name: 'Fúria Berserker', description: 'Abaixo de 30% HP: dano +80%', rarity: 'epic', icon: '🔴', synergyTags: ['damage', 'melee'] },
-  { id: 'nova1', name: 'Nova de Trevas', description: 'Ao subir de nível, explode tudo ao redor', rarity: 'epic', icon: '💫', synergyTags: ['area', 'damage'] },
   // === NEW LEGENDARY ===
   { id: 'doom1', name: 'Sentença de Morte', description: 'Inimigos abaixo de 15% HP morrem instantaneamente', rarity: 'legendary', icon: '☠️', synergyTags: ['damage'] },
   { id: 'immortal1', name: 'Pacto Imortal', description: 'Revive 1 vez com vida cheia ao morrer', rarity: 'legendary', icon: '🔮', synergyTags: ['health', 'defense'] },
@@ -61,16 +57,12 @@ function getApplyFunction(id: string): (p: PlayerState) => void {
     xpboost1: (p) => { p.xpMultiplier *= 1.25; },
     crit1: (p) => { p.critChance = Math.min(1, p.critChance + 0.15); p.critMultiplier = Math.max(p.critMultiplier, 2); },
     // New rare
-    dash2: (p) => { p.dashDamage = true; },
+    dash2: (p) => { p.dashEnhanced = true; },
     thorns1: (p) => { p.thorns += 0.3; },
-    magnet1: (p) => { p.xpMagnetRange += 80; },
     crit2: (p) => { p.critChance = Math.min(1, p.critChance + 0.25); p.critMultiplier = Math.max(p.critMultiplier, 3); },
-    fire2: (p) => { p.fireAura = true; p.fireAuraDPS += 3; },
     // New epic
-    shield1: (p) => { p.shieldReady = true; p.shieldCooldown = 0; },
     chain1: (p) => { p.chainBounces += 2; },
     berserker1: (p) => { p.berserker = true; },
-    nova1: (p) => { /* triggered on level up in engine */ },
     // New legendary
     doom1: (p) => { /* handled in engine - execute below 15% */ },
     immortal1: (p) => { p.hasRevive = true; },

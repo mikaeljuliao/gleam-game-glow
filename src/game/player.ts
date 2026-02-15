@@ -41,7 +41,7 @@ export function createPlayer(): PlayerState {
     critChance: 0,
     critMultiplier: 2,
     xpMultiplier: 1,
-    dashDamage: false,
+    dashEnhanced: false,
     thorns: 0,
     xpMagnetRange: 0,
     fireAura: false,
@@ -74,7 +74,8 @@ export function updatePlayer(p: PlayerState, moveDir: Vec2, dt: number) {
     if (p.dashTimer <= 0) p.isDashing = false;
   }
 
-  const speed = p.isDashing ? C.PLAYER_DASH_SPEED : p.speed * p.moveSpeedMult;
+  const dashSpeed = p.dashEnhanced ? C.PLAYER_DASH_SPEED * 1.5 : C.PLAYER_DASH_SPEED;
+  const speed = p.isDashing ? dashSpeed : p.speed * p.moveSpeedMult;
   p.x += moveDir.x * speed * dt;
   p.y += moveDir.y * speed * dt;
 
@@ -90,8 +91,9 @@ export function updatePlayer(p: PlayerState, moveDir: Vec2, dt: number) {
 export function tryDash(p: PlayerState): boolean {
   if (p.dashCooldown <= 0 && !p.isDashing) {
     p.isDashing = true;
-    p.dashTimer = C.PLAYER_DASH_DURATION;
-    p.invincibleTime = C.PLAYER_DASH_DURATION;
+    const durationMult = p.dashEnhanced ? 1.8 : 1;
+    p.dashTimer = C.PLAYER_DASH_DURATION * durationMult;
+    p.invincibleTime = C.PLAYER_DASH_DURATION * durationMult;
     p.dashCooldown = C.PLAYER_DASH_COOLDOWN;
     return true;
   }
