@@ -1406,6 +1406,23 @@ export class GameEngine {
     ctx.textAlign = 'left';
   }
 
+  private wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let current = '';
+    for (const word of words) {
+      const test = current ? `${current} ${word}` : word;
+      if (ctx.measureText(test).width > maxWidth && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    }
+    if (current) lines.push(current);
+    return lines;
+  }
+
   private renderVendorDialogue(ctx: CanvasRenderingContext2D) {
     const cx = C.dims.gw / 2;
     const cy = C.dims.gh / 2;
@@ -1414,12 +1431,26 @@ export class GameEngine {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.fillRect(0, 0, C.dims.gw, C.dims.gh);
 
-    // Dialogue box
+    // Measure wrapped text to determine box height
     const boxW = 280;
-    const boxH = 60;
+    const padding = 12;
+    const textMaxW = boxW - padding * 2;
+    const lineHeight = 14;
+
+    const line = this.vendorDialogueLines[this.vendorDialogueIndex] || '';
+    const displayed = line.slice(0, this.vendorDialogueCharIndex);
+
+    ctx.font = `11px ${C.HUD_FONT}`;
+    const wrappedFull = this.wrapText(ctx, `"${displayed}"`, textMaxW);
+    const headerH = 20;
+    const promptH = 18;
+    const textH = Math.max(1, wrappedFull.length) * lineHeight;
+    const boxH = headerH + textH + promptH + padding;
+
     const boxX = cx - boxW / 2;
     const boxY = cy + 30;
 
+    // Box background
     ctx.fillStyle = 'rgba(25, 20, 15, 0.95)';
     ctx.strokeStyle = 'rgba(180, 150, 80, 0.5)';
     ctx.lineWidth = 1;
@@ -1432,21 +1463,23 @@ export class GameEngine {
     ctx.fillStyle = '#e8d5a0';
     ctx.font = `bold 10px ${C.HUD_FONT}`;
     ctx.textAlign = 'left';
-    ctx.fillText('🧙 Mercador das Sombras', boxX + 8, boxY + 14);
+    ctx.fillText('🧙 O Mercador', boxX + padding, boxY + 14);
 
-    // Current dialogue line (typewriter)
-    const line = this.vendorDialogueLines[this.vendorDialogueIndex] || '';
-    const displayed = line.slice(0, this.vendorDialogueCharIndex);
+    // Wrapped dialogue text
     ctx.fillStyle = '#c8b888';
     ctx.font = `11px ${C.HUD_FONT}`;
-    ctx.fillText(`"${displayed}"`, boxX + 10, boxY + 34);
+    for (let i = 0; i < wrappedFull.length; i++) {
+      ctx.fillText(wrappedFull[i], boxX + padding, boxY + headerH + 8 + i * lineHeight);
+    }
 
-    // Cursor blink
+    // Cursor blink on last line
     if (this.vendorDialogueCharIndex < line.length) {
       const blink = Math.sin(Date.now() / 200) > 0;
-      if (blink) {
+      if (blink && wrappedFull.length > 0) {
+        const lastLine = wrappedFull[wrappedFull.length - 1];
+        const lastLineY = boxY + headerH + 8 + (wrappedFull.length - 1) * lineHeight;
         ctx.fillStyle = '#c8b888';
-        ctx.fillText('▌', boxX + 10 + ctx.measureText(`"${displayed}"`).width + 2, boxY + 34);
+        ctx.fillText('▌', boxX + padding + ctx.measureText(lastLine).width + 2, lastLineY);
       }
     }
 
