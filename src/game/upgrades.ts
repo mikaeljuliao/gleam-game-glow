@@ -32,7 +32,7 @@ const UPGRADE_POOL: Omit<Upgrade, 'apply'>[] = [
   { id: 'doom1', name: 'Sentença de Morte', description: 'Inimigos abaixo de 15% HP morrem instantaneamente', rarity: 'legendary', icon: '☠️', synergyTags: ['damage'] },
   { id: 'immortal1', name: 'Pacto Imortal', description: 'Revive 1 vez com vida cheia ao morrer', rarity: 'legendary', icon: '🔮', synergyTags: ['health', 'defense'] },
   { id: 'storm1', name: 'Tempestade de Almas', description: '+4 projéteis + perfuram + explodem', rarity: 'legendary', icon: '🌪️', synergyTags: ['ranged', 'projectile', 'pierce', 'explosion'] },
-  { id: 'shadow1', name: 'Clone das Sombras', description: 'Cria um clone que luta por você', rarity: 'legendary', icon: '👤', synergyTags: ['damage', 'melee'] },
+  { id: 'disciple1', name: 'Discípulo', description: 'Invoca um aprendiz que luta ao seu lado', rarity: 'legendary', icon: '🧑‍🎓', synergyTags: ['damage', 'summon'] },
 ];
 
 function getApplyFunction(id: string): (p: PlayerState) => void {
@@ -67,7 +67,7 @@ function getApplyFunction(id: string): (p: PlayerState) => void {
     doom1: (p) => { /* handled in engine - execute below 15% */ },
     immortal1: (p) => { p.hasRevive = true; },
     storm1: (p) => { p.projectileCount += 4; p.piercing = true; p.explosive = true; },
-    shadow1: (p) => { p.shadowClone = true; },
+    disciple1: (p) => { p.hasDisciple = true; },
   };
   return fns[id] || (() => {});
 }

@@ -546,12 +546,12 @@ export class GameEngine {
       }
     }
 
-    // Footstep sounds
+    // Footstep sounds — softer, less frequent
     if (isPlayerMoving && !this.player.isDashing) {
       if (!this._footstepTimer) this._footstepTimer = 0;
       this._footstepTimer -= dt;
       if (this._footstepTimer <= 0) {
-        this._footstepTimer = 0.28 + Math.random() * 0.06;
+        this._footstepTimer = 0.38 + Math.random() * 0.12;
         SFX.footstep();
       }
     }
@@ -929,8 +929,12 @@ export class GameEngine {
     }
 
 
-    // Shadow clone AI
-    if (this.player.shadowClone) {
+    // Disciple companion AI
+    if (this.player.hasDisciple) {
+      this.updateDisciple(dt);
+    }
+    // Legacy shadow clone compat
+    else if (this.player.shadowClone) {
       this.updateShadowClone(dt);
     }
 
@@ -1146,11 +1150,16 @@ export class GameEngine {
       setTimeout(() => this.addEffect('flash', 0.8, 0.3, 'rgb(255, 200, 100)'), 200);
       setTimeout(() => this.addEffect('flash', 0.6, 0.2, 'rgb(255, 100, 50)'), 400);
       SFX.bossKill(this.bossKillFloor);
-      // Drop amulet
+      // Drop amulet with dramatic reveal
       const amuletId = getRandomBossAmuletDrop(this.amuletInventory);
       if (amuletId) {
         this.callbacks.onAmuletDrop(amuletId);
         spawnDamageText(this.particles, e.x, e.y - 20, '🔮 AMULETO!', '#cc88ff');
+        // Trigger dramatic reveal sequence
+        this.pause();
+        setTimeout(() => {
+          this.callbacks.onAmuletReveal(amuletId);
+        }, 800);
       }
       // Boss kill auto-level: force level up with guaranteed legendary
       this.handleBossLevelUp();
@@ -1335,46 +1344,85 @@ export class GameEngine {
   }
 
   private updateShadowClone(dt: number) {
+    // Legacy compat — redirect to disciple
+    this.updateDisciple(dt);
+  }
+
+  private discipleAttackTimer = 0;
+
+  private updateDisciple(dt: number) {
     const p = this.player;
-    // Clone orbits around player
-    p.shadowCloneAngle += dt * 2;
-    const orbitDist = 35;
-    p.shadowCloneX = p.x + Math.cos(p.shadowCloneAngle) * orbitDist;
-    p.shadowCloneY = p.y + Math.sin(p.shadowCloneAngle) * orbitDist;
-    // Clone attacks nearby enemies
-    this.shadowCloneAttackTimer -= dt;
-    if (this.shadowCloneAttackTimer <= 0) {
-      this.shadowCloneAttackTimer = 0.8;
+    // Disciple follows player at an offset, slightly behind
+    const targetX = p.x - p.facing.x * 25 + Math.sin(this.gameTime * 1.5) * 8;
+    const targetY = p.y - p.facing.y * 25 + Math.cos(this.gameTime * 1.8) * 6;
+    const dx = targetX - p.discipleX;
+    const dy = targetY - p.discipleY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const speed = 120;
+    if (dist > 2) {
+      p.discipleX += (dx / dist) * speed * dt;
+      p.discipleY += (dy / dist) * speed * dt;
+    }
+    // Clamp to game area
+    const margin = C.TILE_SIZE + 8;
+    p.discipleX = Math.max(margin, Math.min(C.dims.gw - margin, p.discipleX));
+    p.discipleY = Math.max(margin, Math.min(C.dims.gh - margin, p.discipleY));
+
+    // Disciple attacks nearby enemies
+    const hasAmulet = isAmuletEquipped(this.amuletInventory, 'disciple');
+    const atkInterval = hasAmulet ? 0.5 : 0.8;
+    const dmgMult = hasAmulet ? 0.8 : 0.5;
+    const projCount = hasAmulet ? 2 : 1;
+    const healOnHit = hasAmulet ? 1 : 0;
+
+    this.discipleAttackTimer -= dt;
+    if (this.discipleAttackTimer <= 0) {
+      this.discipleAttackTimer = atkInterval;
       let closestEnemy: EnemyState | null = null;
-      let closestDist = 60;
+      let closestDist = 80;
       for (const e of this.enemies) {
         if (e.spawnTimer > 0) continue;
-        const dx = e.x - p.shadowCloneX, dy = e.y - p.shadowCloneY;
-        const d = Math.sqrt(dx * dx + dy * dy);
+        const edx = e.x - p.discipleX, edy = e.y - p.discipleY;
+        const d = Math.sqrt(edx * edx + edy * edy);
         if (d < closestDist) { closestDist = d; closestEnemy = e; }
       }
       if (closestEnemy) {
-        const dmg = Math.floor(p.baseDamage * p.damageMultiplier * 0.6);
-        const dead = damageEnemy(closestEnemy, dmg, 0, 0);
-        spawnDamageText(this.particles, closestEnemy.x, closestEnemy.y, `${dmg}`, '#8888ff');
-        spawnSpark(this.particles, p.shadowCloneX, p.shadowCloneY, '#8888ff', 3);
-        if (dead) {
-          this.onEnemyKilled(closestEnemy);
-          this.enemies = this.enemies.filter(e => e !== closestEnemy);
+        const baseDmg = Math.floor(p.baseDamage * p.damageMultiplier * dmgMult);
+        // Fire projectile(s) toward enemy
+        const edx = closestEnemy.x - p.discipleX;
+        const edy = closestEnemy.y - p.discipleY;
+        const eDist = Math.sqrt(edx * edx + edy * edy) || 1;
+        const nx = edx / eDist, ny = edy / eDist;
+        for (let pi = 0; pi < projCount; pi++) {
+          const spread = projCount > 1 ? (pi - 0.5) * 0.3 : 0;
+          const cos = Math.cos(spread), sin = Math.sin(spread);
+          const vx = (nx * cos - ny * sin) * 180;
+          const vy = (nx * sin + ny * cos) * 180;
+          this.projectiles.push({
+            x: p.discipleX, y: p.discipleY,
+            vx, vy, size: 3, damage: baseDmg,
+            isPlayerOwned: true, lifetime: 0.8,
+            piercing: false, explosive: false, trail: [],
+          });
+        }
+        spawnSpark(this.particles, p.discipleX, p.discipleY, '#66cc88', 3);
+        // Heal on hit
+        if (healOnHit > 0) {
+          p.hp = Math.min(p.maxHp, p.hp + healOnHit);
         }
       }
     }
-    // Ghost particles for clone
-    if (Math.random() < 0.3) {
+    // Subtle particles
+    if (Math.random() < 0.15) {
       this.particles.push({
-        x: p.shadowCloneX + (Math.random() - 0.5) * 6,
-        y: p.shadowCloneY + Math.random() * 4,
+        x: p.discipleX + (Math.random() - 0.5) * 6,
+        y: p.discipleY + Math.random() * 4,
         vx: (Math.random() - 0.5) * 4,
-        vy: -6 - Math.random() * 6,
+        vy: -5 - Math.random() * 5,
         life: 0.4,
         maxLife: 0.4,
         size: 1 + Math.random(),
-        color: 'rgba(100, 100, 255, 0.5)',
+        color: hasAmulet ? 'rgba(80, 220, 140, 0.5)' : 'rgba(100, 180, 120, 0.4)',
         type: 'ghost',
       });
     }
@@ -1519,6 +1567,8 @@ export class GameEngine {
 
   // Public method for sanctuary heal — triggered by [T] key
   trySanctuaryHeal() {
+    // Guard: don't heal during dialogue, shop, or paused states
+    if (this.vendorDialogueActive || this.shopOpen) return;
     const room = getCurrentRoom(this.dungeon);
     if (room.type !== 'vendor') return;
     const p = this.player;
@@ -1755,25 +1805,49 @@ export class GameEngine {
     for (const p of this.projectiles) renderProjectile(ctx, p, this.gameTime);
     for (const e of this.enemies) renderEnemy(ctx, e, this.gameTime);
     renderPlayer(ctx, this.player, this.gameTime);
-    // Shadow clone render
-    if (this.player.shadowClone) {
+    // Disciple / shadow clone render
+    if (this.player.hasDisciple || this.player.shadowClone) {
+      const hasAmulet = isAmuletEquipped(this.amuletInventory, 'disciple');
       ctx.save();
-      ctx.globalAlpha = 0.5;
-      const cx = this.player.shadowCloneX;
-      const cy = this.player.shadowCloneY;
-      const s = this.player.width / 2;
-      ctx.fillStyle = '#5566cc';
+      const dx = this.player.discipleX;
+      const dy = this.player.discipleY;
+      // Drop shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
       ctx.beginPath();
-      ctx.arc(cx, cy, s, 0, Math.PI * 2);
+      ctx.ellipse(dx, dy + 6, 5, 2, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#3344aa';
+      // Body — smaller, humbler than player
+      const bob = Math.sin(this.gameTime * 3) * 0.8;
+      ctx.fillStyle = hasAmulet ? '#2a4a3a' : '#2a3a2a';
       ctx.beginPath();
-      ctx.arc(cx, cy - 1, s * 0.6, 0, Math.PI * 2);
+      ctx.ellipse(dx, dy + bob, 4.5, 6, 0, 0, Math.PI * 2);
       ctx.fill();
-      // Eyes
-      ctx.fillStyle = '#aabbff';
-      ctx.fillRect(cx - 2, cy - 2, 2, 2);
-      ctx.fillRect(cx + 1, cy - 2, 2, 2);
+      // Cloak
+      ctx.fillStyle = hasAmulet ? '#1a3a2a' : '#1a2a1a';
+      ctx.fillRect(dx - 4, dy + 2 + bob, 8, 5);
+      // Head
+      ctx.fillStyle = hasAmulet ? '#2a5a3a' : '#2a4a2a';
+      ctx.beginPath();
+      ctx.arc(dx, dy - 5 + bob, 4, Math.PI, Math.PI * 2);
+      ctx.fill();
+      // Hood
+      ctx.fillStyle = '#152515';
+      ctx.beginPath();
+      ctx.arc(dx, dy - 5 + bob, 3, Math.PI * 0.8, Math.PI * 2.2);
+      ctx.fill();
+      // Eyes — small, green
+      const eyeGlow = hasAmulet ? 'rgba(100, 255, 150, 0.9)' : 'rgba(80, 200, 120, 0.7)';
+      ctx.fillStyle = eyeGlow;
+      ctx.fillRect(dx - 2, dy - 6 + bob, 1.5, 1.5);
+      ctx.fillRect(dx + 1, dy - 6 + bob, 1.5, 1.5);
+      // Amulet glow effect
+      if (hasAmulet) {
+        const g = ctx.createRadialGradient(dx, dy + bob, 0, dx, dy + bob, 15);
+        g.addColorStop(0, `rgba(80, 220, 140, ${0.15 + Math.sin(this.gameTime * 3) * 0.05})`);
+        g.addColorStop(1, 'rgba(80, 220, 140, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(dx - 15, dy - 15 + bob, 30, 30);
+      }
       ctx.restore();
     }
     renderParticles(ctx, this.particles);
