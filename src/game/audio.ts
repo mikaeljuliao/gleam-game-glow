@@ -68,14 +68,16 @@ function playFreqSweep(startFreq: number, endFreq: number, duration: number, typ
 
 export const SFX = {
   meleeSwing() {
-    playFreqSweep(300, 100, 0.12, 'sawtooth', 0.08);
-    playNoise(0.08, 0.06, 2000);
+    playFreqSweep(400, 80, 0.14, 'sawtooth', 0.12);
+    playNoise(0.1, 0.09, 2500);
+    playTone(60, 0.08, 'sine', 0.06);
   },
 
   meleeHit() {
-    playTone(150, 0.1, 'square', 0.12);
-    playNoise(0.06, 0.1, 4000);
-    playTone(80, 0.15, 'sine', 0.08);
+    playTone(100, 0.15, 'square', 0.18);
+    playNoise(0.1, 0.15, 5000);
+    playTone(50, 0.2, 'sine', 0.12);
+    playFreqSweep(200, 40, 0.12, 'sawtooth', 0.08);
   },
 
   rangedShoot() {
