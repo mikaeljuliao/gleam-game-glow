@@ -779,7 +779,7 @@ export class GameEngine {
   private doMeleeHit() {
     const range = C.MELEE_RANGE * this.player.areaMultiplier;
     const angle = this.player.meleeAngle;
-    this.addEffect('shake', 2, 0.08);
+    this.addEffect('shake', 5, 0.12);
     let hitAny = false;
     const meleeDeadSet = new Set<EnemyState>();
     
@@ -806,17 +806,19 @@ export class GameEngine {
         dmg = Math.floor(dmg * this.player.critMultiplier);
         spawnDamageText(this.particles, e.x, e.y - 8, 'CRIT!', '#ffff00');
       }
+      // Stronger knockback for melee
       const nx = dist > 0 ? dx / dist : 0;
       const ny = dist > 0 ? dy / dist : 0;
-      const dead = damageEnemy(e, dmg, nx * 5, ny * 5);
+      const dead = damageEnemy(e, dmg, nx * 8, ny * 8);
       this.stats.damageDealt += dmg;
       spawnDamageText(this.particles, e.x, e.y, `${dmg}`);
-      spawnBlood(this.particles, e.x, e.y, 6);
-      spawnSpark(this.particles, e.x, e.y, C.COLORS.playerLight, 5);
+      spawnBlood(this.particles, e.x, e.y, 8);
+      spawnSpark(this.particles, e.x, e.y, C.COLORS.playerLight, 8);
+      spawnSpark(this.particles, e.x, e.y, '#ffffff', 4);
       hitAny = true;
 
       if (dead) {
-        this.onEnemyKilled(e);
+        this.onEnemyKilled(e, true);
         meleeDeadSet.add(e);
       }
     }
@@ -827,11 +829,14 @@ export class GameEngine {
 
     if (hitAny) {
       SFX.meleeHit();
-      this.addEffect('shake', 4, 0.12);
+      this.addEffect('shake', 6, 0.15);
+      this.addEffect('flash', 0.4, 0.06, 'rgb(200, 220, 255)');
+      // Melee hit reduces dash cooldown
+      this.player.dashCooldown = Math.max(0, this.player.dashCooldown - 0.25);
     }
   }
 
-  private onEnemyKilled(e: EnemyState) {
+  private onEnemyKilled(e: EnemyState, byMelee = false) {
     this.stats.enemiesDefeated++;
     const xpAmount = getXPForEnemy(e.type);
     spawnXPParticle(this.particles, e.x, e.y, 4);
@@ -856,6 +861,19 @@ export class GameEngine {
     } else {
       spawnExplosion(this.particles, e.x, e.y, 10);
       SFX.enemyDeath();
+    }
+
+    // Melee kill reward: small heal + brief speed boost
+    if (byMelee) {
+      const healAmt = 3;
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + healAmt);
+      spawnDamageText(this.particles, this.player.x, this.player.y - 14, `+${healAmt}`, C.COLORS.healText);
+      // Temporary speed burst for 0.8s
+      this.player.moveSpeedMult *= 1.15;
+      setTimeout(() => { this.player.moveSpeedMult /= 1.15; }, 800);
+      // Brief slow-mo on melee kill for impact feel
+      this.slowMoTimer = Math.max(this.slowMoTimer, 0.08);
+      this.slowMoFactor = Math.min(this.slowMoFactor, 0.4);
     }
 
     if (this.player.lifesteal > 0) {
