@@ -54,13 +54,13 @@ export interface PlayerState {
   critChance: number;      // 0-1
   critMultiplier: number;  // damage multiplier on crit
   xpMultiplier: number;    // xp gain multiplier
-  dashDamage: boolean;     // dash damages enemies
+  dashEnhanced: boolean;   // enhanced dash (faster, longer, phases through enemies)
   thorns: number;          // fraction of damage reflected
-  xpMagnetRange: number;   // extra xp pickup range (unused visually but for magnet)
-  fireAura: boolean;       // damages nearby enemies per second
+  xpMagnetRange: number;   // extra xp pickup range
+  fireAura: boolean;       // kept for save compat
   fireAuraDPS: number;
-  shieldCooldown: number;  // time until shield recharges
-  shieldReady: boolean;    // can block next hit
+  shieldCooldown: number;  // kept for save compat
+  shieldReady: boolean;    // kept for save compat
   chainBounces: number;    // projectile bounces to nearby targets
   berserker: boolean;      // low hp damage boost
   hasRevive: boolean;      // one-time revive
