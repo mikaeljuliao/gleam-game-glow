@@ -48,6 +48,7 @@ export class GameEngine {
   offsetY = 0;
   renderWidth = C.GAME_WIDTH;
   renderHeight = C.GAME_HEIGHT;
+  dpr = 1;
   gameOffsetX = 0;
   gameOffsetY = 0;
   soulParticleTimer = 0;
@@ -68,14 +69,16 @@ export class GameEngine {
   constructor(displayCanvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     this.displayCanvas = displayCanvas;
     this.displayCtx = displayCanvas.getContext('2d')!;
+    this.dpr = window.devicePixelRatio || 1;
     
     // Set active game dimensions based on screen aspect ratio BEFORE creating game content
     C.setActiveDimensions(displayCanvas.clientWidth, displayCanvas.clientHeight);
     
     this.gameCanvas = document.createElement('canvas');
-    this.gameCanvas.width = C.dims.gw;
-    this.gameCanvas.height = C.dims.gh;
+    this.gameCanvas.width = C.dims.gw * this.dpr;
+    this.gameCanvas.height = C.dims.gh * this.dpr;
     this.gameCtx = this.gameCanvas.getContext('2d')!;
+    this.gameCtx.scale(this.dpr, this.dpr);
     this.gameCtx.imageSmoothingEnabled = false;
     this.displayCtx.imageSmoothingEnabled = false;
 
@@ -1595,16 +1598,19 @@ export class GameEngine {
     const scaledW = Math.round(rw * this.scale);
     const scaledH = Math.round(rh * this.scale);
     dCtx.fillStyle = '#000';
-    dCtx.fillRect(0, 0, this.displayCanvas.width, this.displayCanvas.height);
-    dCtx.drawImage(this.gameCanvas, 0, 0, rw, rh, this.offsetX, this.offsetY, scaledW, scaledH);
+    dCtx.fillRect(0, 0, this.displayCanvas.width / this.dpr, this.displayCanvas.height / this.dpr);
+    dCtx.drawImage(this.gameCanvas, this.offsetX, this.offsetY, scaledW, scaledH);
   }
 
   private updateDisplaySize() {
     const dw = this.displayCanvas.clientWidth;
     const dh = this.displayCanvas.clientHeight;
-    if (this.displayCanvas.width !== dw || this.displayCanvas.height !== dh) {
-      this.displayCanvas.width = dw;
-      this.displayCanvas.height = dh;
+    const physW = Math.round(dw * this.dpr);
+    const physH = Math.round(dh * this.dpr);
+    if (this.displayCanvas.width !== physW || this.displayCanvas.height !== physH) {
+      this.displayCanvas.width = physW;
+      this.displayCanvas.height = physH;
+      this.displayCtx.scale(this.dpr, this.dpr);
       this.displayCtx.imageSmoothingEnabled = false;
     }
 
@@ -1615,9 +1621,12 @@ export class GameEngine {
     this.gameOffsetY = 0;
     
     // Resize game canvas if needed
-    if (this.gameCanvas.width !== this.renderWidth || this.gameCanvas.height !== this.renderHeight) {
-      this.gameCanvas.width = this.renderWidth;
-      this.gameCanvas.height = this.renderHeight;
+    const physGW = Math.round(this.renderWidth * this.dpr);
+    const physGH = Math.round(this.renderHeight * this.dpr);
+    if (this.gameCanvas.width !== physGW || this.gameCanvas.height !== physGH) {
+      this.gameCanvas.width = physGW;
+      this.gameCanvas.height = physGH;
+      this.gameCtx.scale(this.dpr, this.dpr);
       this.gameCtx.imageSmoothingEnabled = false;
     }
     

@@ -44,7 +44,7 @@ const GameCanvas = ({ onLevelUp, onGameOver, onSynergyActivated, onFloorChange, 
       <canvas
         ref={canvasRef}
         className="w-full h-full block cursor-crosshair"
-        style={{ imageRendering: 'pixelated', background: '#000', touchAction: 'none' }}
+        style={{ background: '#000', touchAction: 'none' }}
         tabIndex={0}
       />
       <MobileHUD engineRef={engineRef} />
