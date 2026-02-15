@@ -147,12 +147,12 @@ const Index = () => {
               <div
                 className="absolute top-4 left-1/2 z-30 px-6 py-2 rounded border pointer-events-none"
                 style={{
-                  background: 'rgba(100, 50, 200, 0.4)',
-                  borderColor: '#8844cc',
-                  color: '#ddbbff',
+                  background: 'rgba(100, 50, 200, 0.35)',
+                  borderColor: '#7744aa',
+                  color: '#ccaaee',
                   fontFamily: 'monospace',
                   fontSize: '13px',
-                  textShadow: '0 0 10px rgba(150, 80, 255, 0.5)',
+                  letterSpacing: '0.05em',
                   animation: 'fadeIn 0.3s ease-out',
                   transform: 'translateX(-50%)',
                 }}
@@ -164,12 +164,12 @@ const Index = () => {
               <div
                 className="absolute top-16 left-1/2 z-30 px-8 py-3 rounded border pointer-events-none"
                 style={{
-                  background: 'rgba(200, 150, 50, 0.3)',
-                  borderColor: '#aa8833',
-                  color: '#ffddaa',
+                  background: 'rgba(180, 130, 50, 0.25)',
+                  borderColor: '#997733',
+                  color: '#ddc088',
                   fontFamily: "'Cinzel', serif",
                   fontSize: '18px',
-                  textShadow: '0 0 15px rgba(255, 200, 100, 0.5)',
+                  letterSpacing: '0.1em',
                   animation: 'fadeIn 0.3s ease-out',
                   transform: 'translateX(-50%)',
                 }}

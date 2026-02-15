@@ -81,21 +81,23 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
           {/* Title */}
           <div className="text-center mb-4 md:mb-6 flex-shrink-0">
             <h1
-              className="text-4xl md:text-6xl font-bold tracking-wider leading-none"
+              className="text-4xl md:text-6xl font-medium tracking-wider leading-none"
               style={{
                 fontFamily: "'Cinzel', serif",
-                color: '#cc4444',
-                textShadow: '0 0 20px rgba(200, 50, 50, 0.4), 0 0 40px rgba(150, 20, 20, 0.2), 2px 2px 0 #1a0a0a',
+                color: '#c45555',
+                letterSpacing: '0.12em',
+                WebkitTextStroke: '1px rgba(0,0,0,0.4)',
               }}
             >
               DUNGEON
             </h1>
             <h2
-              className="text-lg md:text-2xl tracking-[0.3em] mt-1"
+              className="text-lg md:text-2xl mt-1"
               style={{
                 fontFamily: "'Cinzel', serif",
-                color: '#8866aa',
-                textShadow: '0 0 12px rgba(120, 80, 160, 0.3)',
+                color: '#8870a8',
+                letterSpacing: '0.3em',
+                WebkitTextStroke: '0.5px rgba(0,0,0,0.3)',
               }}
             >
               OF SHADOWS
@@ -108,7 +110,6 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
             style={{
               background: 'rgba(10, 10, 20, 0.6)',
               borderColor: `${rank.color}44`,
-              boxShadow: `0 0 15px ${rank.glowColor}`,
             }}
           >
             <div className="flex items-center gap-3">
@@ -116,12 +117,12 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
                   <span
-                    className="text-xs font-bold tracking-widest truncate"
-                    style={{ fontFamily: "'Cinzel', serif", color: rank.color, textShadow: `0 0 8px ${rank.glowColor}` }}
+                    className="text-xs font-medium truncate"
+                    style={{ fontFamily: "'Cinzel', serif", color: rank.color, letterSpacing: '0.15em' }}
                   >
                     {rank.name.toUpperCase()}
                   </span>
-                  <span className="text-xs ml-2 flex-shrink-0" style={{ color: '#555566', fontFamily: 'monospace' }}>
+                  <span className="text-xs ml-2 flex-shrink-0" style={{ color: '#555566', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
                     {stats.totalSouls} almas
                   </span>
                 </div>
@@ -136,7 +137,6 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
                         style={{
                           width: `${progress * 100}%`,
                           background: `linear-gradient(90deg, ${rank.color}, ${next.color})`,
-                          boxShadow: `0 0 4px ${rank.glowColor}`,
                         }}
                       />
                     </div>
@@ -158,14 +158,13 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
           <div className="w-full flex flex-col gap-2 mb-4 flex-shrink-0">
             <button
               onClick={() => onStart(false)}
-              className="w-full py-3 text-base font-bold tracking-widest border rounded transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full py-3 text-base font-medium border rounded transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
               style={{
                 fontFamily: "'Cinzel', serif",
-                color: '#ddcccc',
+                color: '#d4b0b0',
+                letterSpacing: '0.15em',
                 background: 'linear-gradient(180deg, rgba(160, 35, 35, 0.35), rgba(120, 20, 20, 0.25))',
-                borderColor: '#773333',
-                textShadow: '0 0 10px rgba(200, 50, 50, 0.4)',
-                boxShadow: '0 4px 20px rgba(150, 30, 30, 0.15)',
+                borderColor: '#663333',
               }}
             >
               NOVA RUN
@@ -174,14 +173,13 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
             {hasSave && (
               <button
                 onClick={() => onStart(true)}
-                className="w-full py-3 text-base font-bold tracking-widest border rounded transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full py-3 text-base font-medium border rounded transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                 style={{
                   fontFamily: "'Cinzel', serif",
-                  color: '#aaddaa',
+                  color: '#a0cca0',
+                  letterSpacing: '0.15em',
                   background: 'linear-gradient(180deg, rgba(30, 110, 30, 0.3), rgba(20, 80, 20, 0.2))',
-                  borderColor: '#336633',
-                  textShadow: '0 0 10px rgba(50, 200, 50, 0.4)',
-                  boxShadow: '0 4px 20px rgba(30, 100, 30, 0.1)',
+                  borderColor: '#2d5a2d',
                 }}
               >
                 CONTINUAR
@@ -292,13 +290,14 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
             </div>
           </div>
 
-          {/* Dev Mode (small toggle at bottom) */}
+          {/* Dev Mode */}
           <button
             onClick={() => setShowDevMenu(true)}
-            className="mt-4 px-3 py-1 text-xs tracking-widest border rounded transition-all duration-300 hover:opacity-80 flex-shrink-0"
+            className="mt-4 px-3 py-1 text-xs border rounded transition-all duration-300 hover:opacity-80 flex-shrink-0"
             style={{
               fontFamily: 'monospace',
               color: '#444455',
+              letterSpacing: '0.15em',
               background: 'rgba(30, 30, 50, 0.2)',
               borderColor: '#222233',
               fontSize: '10px',
@@ -307,7 +306,6 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
             🛠️ DEV
           </button>
 
-          {/* Spacer */}
           <div className="flex-1 min-h-4" />
         </div>
       </div>
@@ -319,7 +317,6 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
           style={{
             background: 'rgba(10, 8, 20, 0.98)',
             borderColor: '#333355',
-            boxShadow: '0 0 40px rgba(100, 60, 160, 0.2), 0 0 80px rgba(0,0,0,0.6)',
             maxWidth: '380px',
           }}
         >
@@ -328,8 +325,8 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
             <div className="flex items-center gap-2 mb-4">
               <span className="text-lg">🛠️</span>
               <h3
-                className="text-sm font-bold tracking-[0.2em] uppercase"
-                style={{ fontFamily: 'monospace', color: '#8877aa' }}
+                className="text-sm font-medium uppercase"
+                style={{ fontFamily: 'monospace', color: '#8877aa', letterSpacing: '0.2em' }}
               >
                 Dev Mode
               </h3>
@@ -347,13 +344,13 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
                   <button
                     key={floor}
                     onClick={() => { setShowDevMenu(false); onStartFloor?.(floor); }}
-                    className="py-2.5 text-sm font-bold border rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+                    className="py-2.5 text-sm font-medium border rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
                     style={{
                       fontFamily: 'monospace',
-                      color: '#ddaa44',
+                      color: '#ccaa55',
+                      letterSpacing: '0.1em',
                       background: 'linear-gradient(180deg, rgba(80, 60, 15, 0.4), rgba(60, 45, 10, 0.2))',
                       borderColor: '#554422',
-                      textShadow: '0 0 8px rgba(200, 150, 50, 0.3)',
                     }}
                   >
                     F{floor}

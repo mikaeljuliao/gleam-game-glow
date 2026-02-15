@@ -6,11 +6,11 @@ interface Props {
   onSelect: (upgrade: Upgrade) => void;
 }
 
-const rarityColors: Record<string, { border: string; bg: string; glow: string }> = {
-  common: { border: '#888888', bg: 'rgba(100,100,100,0.15)', glow: 'rgba(150,150,150,0.2)' },
-  rare: { border: '#4488ff', bg: 'rgba(68,136,255,0.12)', glow: 'rgba(68,136,255,0.3)' },
-  epic: { border: '#bb44ff', bg: 'rgba(187,68,255,0.12)', glow: 'rgba(187,68,255,0.3)' },
-  legendary: { border: '#ffaa00', bg: 'rgba(255,170,0,0.15)', glow: 'rgba(255,170,0,0.5)' },
+const rarityColors: Record<string, { border: string; bg: string }> = {
+  common: { border: '#888888', bg: 'rgba(100,100,100,0.1)' },
+  rare: { border: '#6699dd', bg: 'rgba(68,136,255,0.08)' },
+  epic: { border: '#aa66dd', bg: 'rgba(187,68,255,0.08)' },
+  legendary: { border: '#ddaa55', bg: 'rgba(255,170,0,0.1)' },
 };
 
 const UpgradeSelection = ({ choices, onSelect }: Props) => {
@@ -35,11 +35,12 @@ const UpgradeSelection = ({ choices, onSelect }: Props) => {
       style={{ background: 'rgba(5, 5, 10, 0.85)', padding: isSmall ? '8px' : '16px' }}
     >
       <h2
-        className="font-bold tracking-wider"
+        className="font-medium"
         style={{
           fontFamily: "'Cinzel', serif",
-          color: '#ffcc00',
-          textShadow: '0 0 20px rgba(255, 200, 0, 0.4), 0 0 40px rgba(255, 150, 0, 0.2)',
+          color: '#d4b44a',
+          letterSpacing: '0.12em',
+          WebkitTextStroke: '0.5px rgba(0,0,0,0.3)',
           fontSize: isSmall ? '18px' : isLandscape && isMobile ? '22px' : '32px',
           marginBottom: isSmall ? '4px' : '8px',
         }}
@@ -48,9 +49,10 @@ const UpgradeSelection = ({ choices, onSelect }: Props) => {
       </h2>
       <p
         style={{
-          color: '#aaaabb',
+          color: '#8888aa',
           fontFamily: 'monospace',
           fontSize: isSmall ? '10px' : '14px',
+          letterSpacing: '0.08em',
           marginBottom: isSmall ? '8px' : isLandscape ? '12px' : '24px',
         }}
       >
@@ -83,10 +85,9 @@ const UpgradeSelection = ({ choices, onSelect }: Props) => {
                 padding: isSmall ? '10px 14px' : '14px',
                 width: isSmall && !isLandscape ? '100%' : isLandscape && isMobile ? '140px' : '150px',
                 minHeight: isMobile ? '48px' : undefined,
-                border: `2px solid ${rc.border}`,
+                border: `1.5px solid ${rc.border}`,
                 borderRadius: '8px',
                 background: rc.bg,
-                boxShadow: `0 0 15px ${rc.glow}`,
                 transition: 'all 0.2s',
                 gap: isSmall && !isLandscape ? '10px' : '4px',
                 cursor: 'pointer',
@@ -100,8 +101,9 @@ const UpgradeSelection = ({ choices, onSelect }: Props) => {
                   style={{
                     color: rc.border,
                     fontFamily: "'Cinzel', serif",
-                    fontWeight: 'bold',
+                    fontWeight: 500,
                     fontSize: isSmall ? '12px' : '13px',
+                    letterSpacing: '0.06em',
                     display: 'block',
                   }}
                 >
@@ -109,10 +111,11 @@ const UpgradeSelection = ({ choices, onSelect }: Props) => {
                 </span>
                 <span
                   style={{
-                    color: '#aaaabb',
+                    color: '#8888aa',
                     fontFamily: 'monospace',
                     fontSize: isSmall ? '10px' : '11px',
                     lineHeight: '1.3',
+                    letterSpacing: '0.02em',
                     display: 'block',
                     marginTop: '2px',
                   }}
