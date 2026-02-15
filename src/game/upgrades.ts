@@ -72,7 +72,7 @@ function getApplyFunction(id: string): (p: PlayerState) => void {
   return fns[id] || (() => {});
 }
 
-export function getRandomUpgrades(count: number, ownedIds: string[]): Upgrade[] {
+export function getRandomUpgrades(count: number, ownedIds: string[], guaranteeLegendary = false): Upgrade[] {
   const available = UPGRADE_POOL.filter(u => !ownedIds.includes(u.id));
   if (available.length === 0) return [];
 
@@ -85,6 +85,16 @@ export function getRandomUpgrades(count: number, ownedIds: string[]): Upgrade[] 
 
   const selected: Upgrade[] = [];
   const usedIds = new Set<string>();
+
+  // If guaranteeLegendary, pick one legendary first
+  if (guaranteeLegendary) {
+    const legendaries = available.filter(u => u.rarity === 'legendary');
+    if (legendaries.length > 0) {
+      const leg = legendaries[Math.floor(Math.random() * legendaries.length)];
+      usedIds.add(leg.id);
+      selected.push({ ...leg, apply: getApplyFunction(leg.id) });
+    }
+  }
 
   while (selected.length < count && weighted.length > 0) {
     const idx = Math.floor(Math.random() * weighted.length);

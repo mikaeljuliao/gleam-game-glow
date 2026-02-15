@@ -340,6 +340,34 @@ export const SFX = {
     }, 300);
   },
 
+  mapOpen() {
+    // Soft parchment unfold sound
+    playNoise(0.15, 0.04, 2000);
+    playTone(400, 0.12, 'sine', 0.04);
+    setTimeout(() => playTone(600, 0.08, 'sine', 0.03), 80);
+  },
+
+  mapClose() {
+    // Soft fold-back sound
+    playTone(500, 0.08, 'sine', 0.03);
+    setTimeout(() => playTone(300, 0.1, 'sine', 0.03), 60);
+    playNoise(0.08, 0.03, 1500);
+  },
+
+  amuletEquip() {
+    // Magical chime — ascending
+    playTone(500, 0.15, 'sine', 0.06);
+    setTimeout(() => playTone(700, 0.12, 'sine', 0.05), 70);
+    setTimeout(() => playTone(900, 0.1, 'sine', 0.04), 140);
+  },
+
+  amuletUnequip() {
+    // Descending de-power
+    playTone(700, 0.1, 'sine', 0.05);
+    setTimeout(() => playTone(500, 0.1, 'sine', 0.04), 60);
+    setTimeout(() => playTone(350, 0.12, 'sine', 0.03), 120);
+  },
+
   // ambientDrone removed — replaced by psychological horror system in horror.ts
 };
 

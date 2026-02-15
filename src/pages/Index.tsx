@@ -7,7 +7,7 @@ import ShopOverlay from '@/components/ShopOverlay';
 import AmuletInventoryOverlay from '@/components/AmuletInventory';
 import CartographerMap from '@/components/CartographerMap';
 import { GameEngine } from '@/game/engine';
-import { initAudio } from '@/game/audio';
+import { initAudio, SFX } from '@/game/audio';
 import { Upgrade, Synergy, GameStats, ShopItem, DungeonMap } from '@/game/types';
 import { hasSave, clearSave } from '@/game/save';
 import { AmuletInventory, createAmuletInventory, addAmulet, toggleEquip, getAmuletDef, isAmuletEquipped } from '@/game/amulets';
@@ -130,7 +130,13 @@ const Index = () => {
   const handleToggleEquip = useCallback((defId: string) => {
     const engine = engineRef.current;
     if (!engine) return;
+    const wasEquipped = engine.amuletInventory.owned.find(a => a.defId === defId)?.equipped;
     toggleEquip(engine.amuletInventory, defId, engine.player);
+    if (wasEquipped) {
+      SFX.amuletUnequip();
+    } else {
+      SFX.amuletEquip();
+    }
     setAmuletInv({ ...engine.amuletInventory, owned: engine.amuletInventory.owned.map(a => ({ ...a })) });
   }, []);
 
@@ -164,11 +170,13 @@ const Index = () => {
       }
       if (key === 'm') {
         if (gameState === 'cartographer') {
+          SFX.mapClose();
           setGameState('playing');
           engineRef.current?.resume();
         } else if (gameState === 'playing') {
           const engine = engineRef.current;
           if (engine && isAmuletEquipped(engine.amuletInventory, 'cartographer')) {
+            SFX.mapOpen();
             engine.pause();
             setCartoDungeon(engine.dungeon);
             setGameState('cartographer');

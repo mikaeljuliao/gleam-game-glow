@@ -126,7 +126,7 @@ export interface WarRhythmState {
 }
 
 export function createWarRhythmState(): WarRhythmState {
-  return { stacks: 0, maxStacks: 10, decayTimer: 0, decayDelay: 3, bonusPerStack: 0.08 };
+  return { stacks: 0, maxStacks: 10, decayTimer: 0, decayDelay: 5, bonusPerStack: 0.08 };
 }
 
 // Soul Collector: damage bonus based on souls carried
