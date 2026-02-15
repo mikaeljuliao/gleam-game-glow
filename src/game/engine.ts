@@ -1394,7 +1394,7 @@ export class GameEngine {
     ctx.strokeRect(C.dims.gw / 2 - 160, C.dims.gh / 2 - 35, 320, 70);
     
     ctx.fillStyle = '#ffcc44';
-    ctx.font = `bold 16px ${C.HUD_FONT}`;
+    ctx.font = `500 16px ${C.HUD_FONT}`;
     ctx.fillText('Parabéns, você derrotou o boss!', C.dims.gw / 2, C.dims.gh / 2 - 10);
     
     // Countdown
@@ -1461,7 +1461,7 @@ export class GameEngine {
 
     // Speaker name
     ctx.fillStyle = '#e8d5a0';
-    ctx.font = `bold 10px ${C.HUD_FONT}`;
+    ctx.font = `500 10px ${C.HUD_FONT}`;
     ctx.textAlign = 'left';
     ctx.fillText('🧙 O Mercador', boxX + padding, boxY + 14);
 

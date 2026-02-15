@@ -180,7 +180,7 @@ export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, ti
         ctx.fill();
         // Label
         ctx.fillStyle = `rgba(50, 255, 100, ${0.7 * pulse})`;
-        ctx.font = `bold 7px ${C.HUD_FONT}`;
+        ctx.font = `500 7px ${C.HUD_FONT}`;
         ctx.textAlign = 'center';
         if (dir === 'north') ctx.fillText('VISITADA', cx, y + C.TILE_SIZE + 14);
         else if (dir === 'south') ctx.fillText('VISITADA', cx, y - 6);
@@ -210,7 +210,7 @@ export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, ti
         ctx.fill();
         // Label
         ctx.fillStyle = `rgba(255, 180, 30, ${0.85 * pulse})`;
-        ctx.font = `bold 8px ${C.HUD_FONT}`;
+        ctx.font = `500 8px ${C.HUD_FONT}`;
         ctx.textAlign = 'center';
         if (dir === 'north') ctx.fillText('? EXPLORAR ?', cx, y + C.TILE_SIZE + 16);
         else if (dir === 'south') ctx.fillText('? EXPLORAR ?', cx, y - 8);
@@ -1225,10 +1225,10 @@ export function renderParticles(ctx: CanvasRenderingContext2D, particles: Partic
     const alpha = Math.max(0, p.life / p.maxLife);
     if (p.type === 'text' && p.text) {
       ctx.globalAlpha = alpha;
-      ctx.font = `bold ${p.size}px ${C.HUD_FONT}`;
+      ctx.font = `500 ${p.size}px ${C.HUD_FONT}`;
       // Black outline for contrast
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.lineWidth = 1.5;
       ctx.lineJoin = 'round';
       ctx.strokeText(p.text, Math.floor(p.x), Math.floor(p.y));
       ctx.fillStyle = p.color;
@@ -1311,9 +1311,9 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   ctx.lineWidth = 1;
   ctx.strokeRect(hpX + 2, hpY + 2, hpW, hpH);
   ctx.fillStyle = C.COLORS.white;
-  ctx.font = `bold ${Math.round(10 * ms)}px ${C.HUD_FONT}`;
-  ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-  ctx.lineWidth = 2.5;
+  ctx.font = `500 ${Math.round(11 * ms)}px ${C.HUD_FONT}`;
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+  ctx.lineWidth = 1.5;
   ctx.lineJoin = 'round';
   ctx.strokeText(`${player.hp}/${player.maxHp}`, hpX + 5, hpY + 2 + Math.round(hpH * 0.75));
   ctx.fillText(`${player.hp}/${player.maxHp}`, hpX + 5, hpY + 2 + Math.round(hpH * 0.75));
@@ -1328,7 +1328,7 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   ctx.fillStyle = C.COLORS.xpFill;
   ctx.fillRect(hpX + 2, xpY + 2, hpW * (player.xp / player.xpToNext), xpH);
   ctx.fillStyle = '#88ffaa';
-  ctx.font = `${Math.round(7 * ms)}px ${C.HUD_FONT}`;
+  ctx.font = `500 ${Math.round(8 * ms)}px ${C.HUD_FONT}`;
   ctx.fillText('XP', hpX + 3, xpY + 2 + Math.round(xpH * 0.8));
 
   // --- Level Badge ---
@@ -1341,7 +1341,7 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   ctx.lineWidth = 1;
   ctx.strokeRect(lvlX, hpY, lvlW, lvlH);
   ctx.fillStyle = '#aaccff';
-  ctx.font = `bold ${Math.round(10 * ms)}px ${C.HUD_FONT}`;
+  ctx.font = `500 ${Math.round(11 * ms)}px ${C.HUD_FONT}`;
   ctx.fillText(`Nv.${player.level}`, lvlX + 4, hpY + Math.round(lvlH * 0.7));
 
   // --- Floor indicator (top-right) ---
@@ -1352,9 +1352,9 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   ctx.strokeStyle = '#aa8833';
   ctx.lineWidth = 1;
   ctx.strokeRect(visRight - floorW - 6, hpY, floorW, floorH);
-  ctx.font = `bold ${Math.round(11 * ms)}px ${C.HUD_FONT}`;
-  ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-  ctx.lineWidth = 2.5;
+  ctx.font = `500 ${Math.round(12 * ms)}px ${C.HUD_FONT}`;
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+  ctx.lineWidth = 1.5;
   ctx.lineJoin = 'round';
   ctx.strokeText(`Andar ${dungeon.floor}`, visRight - floorW - 2, hpY + Math.round(floorH * 0.72));
   ctx.fillStyle = '#ffddaa';
@@ -1366,17 +1366,17 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
   ctx.fillRect(visRight - floorW - 6, ecY, floorW, ecH);
   if (enemyCount > 0) {
-    ctx.font = `bold ${Math.round(10 * ms)}px ${C.HUD_FONT}`;
-    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-    ctx.lineWidth = 2.5;
+    ctx.font = `500 ${Math.round(11 * ms)}px ${C.HUD_FONT}`;
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 1.5;
     ctx.lineJoin = 'round';
     ctx.strokeText(`${enemyCount} inimigos`, visRight - floorW - 2, ecY + Math.round(ecH * 0.75));
     ctx.fillStyle = '#ff6644';
     ctx.fillText(`${enemyCount} inimigos`, visRight - floorW - 2, ecY + Math.round(ecH * 0.75));
   } else {
-    ctx.font = `bold ${Math.round(10 * ms)}px ${C.HUD_FONT}`;
-    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-    ctx.lineWidth = 2.5;
+    ctx.font = `500 ${Math.round(11 * ms)}px ${C.HUD_FONT}`;
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 1.5;
     ctx.lineJoin = 'round';
     ctx.strokeText(`Sala limpa!`, visRight - floorW - 2, ecY + Math.round(ecH * 0.75));
     ctx.fillStyle = '#44ff66';
@@ -1396,9 +1396,9 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
     const objW = Math.round(240 * ms);
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(C.dims.gw / 2 - objW / 2, 4, objW, objBarH);
-    ctx.font = `bold ${objFontSize}px ${C.HUD_FONT}`;
-    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-    ctx.lineWidth = 3;
+    ctx.font = `500 ${objFontSize}px ${C.HUD_FONT}`;
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 1.5;
     ctx.lineJoin = 'round';
     ctx.strokeText(objText, C.dims.gw / 2, 4 + Math.round(objBarH * 0.75));
     ctx.fillStyle = objColor;
@@ -1410,14 +1410,14 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
       ctx.fillStyle = `rgba(40, 20, 60, ${0.8 * pulse})`;
       ctx.fillRect(C.dims.gw / 2 - boxW / 2, 2, boxW, objBarH + 4);
       ctx.fillStyle = `rgba(180, 130, 255, ${pulse})`;
-      ctx.font = `bold ${objFontSize}px ${C.HUD_FONT}`;
+      ctx.font = `500 ${objFontSize}px ${C.HUD_FONT}`;
       ctx.fillText(isMobile ? 'ANDE ATÉ O SANTUÁRIO' : 'ANDE ATÉ O SANTUÁRIO (risco/recompensa)', C.dims.gw / 2, 2 + Math.round((objBarH + 4) * 0.72));
     } else if (room.type === 'treasure' && !room.treasureCollected) {
       const boxW = Math.round(240 * ms);
       ctx.fillStyle = `rgba(60, 40, 0, ${0.8 * pulse})`;
       ctx.fillRect(C.dims.gw / 2 - boxW / 2, 2, boxW, objBarH + 4);
       ctx.fillStyle = `rgba(255, 200, 50, ${pulse})`;
-      ctx.font = `bold ${objFontSize}px ${C.HUD_FONT}`;
+      ctx.font = `500 ${objFontSize}px ${C.HUD_FONT}`;
       ctx.fillText('ANDE ATÉ O BAÚ PARA COLETAR', C.dims.gw / 2, 2 + Math.round((objBarH + 4) * 0.72));
     } else {
       const boxW = Math.round(320 * ms);
@@ -1427,7 +1427,7 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
       ctx.lineWidth = 1;
       ctx.strokeRect(C.dims.gw / 2 - boxW / 2, 2, boxW, objBarH + 4);
       ctx.fillStyle = `rgba(100, 255, 100, ${pulse})`;
-      ctx.font = `bold ${Math.round(objFontSize * 1.05)}px ${C.HUD_FONT}`;
+      ctx.font = `500 ${Math.round(objFontSize * 1.05)}px ${C.HUD_FONT}`;
       ctx.fillText(isMobile ? '⬆ PORTA VERDE PARA AVANÇAR ⬆' : '⬆ ANDE ATÉ A PORTA VERDE PARA AVANÇAR ⬆', C.dims.gw / 2, 2 + Math.round((objBarH + 4) * 0.72));
     }
   }
@@ -1439,7 +1439,7 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(6, 30, 50, 14);
     ctx.fillStyle = dashReady ? '#44aaff' : '#333355';
-    ctx.font = `bold 9px ${C.HUD_FONT}`;
+    ctx.font = `500 9px ${C.HUD_FONT}`;
     ctx.fillText(dashReady ? '[F] Dash' : '[F] ...', 10, 40);
     if (!dashReady) {
       const pct = 1 - (player.dashCooldown / C.PLAYER_DASH_COOLDOWN);
@@ -1539,7 +1539,7 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
 
   // Title
   ctx.fillStyle = 'rgba(160, 160, 200, 0.7)';
-  ctx.font = `bold 7px ${C.HUD_FONT}`;
+  ctx.font = `500 7px ${C.HUD_FONT}`;
   ctx.textAlign = 'center';
   ctx.fillText(`ANDAR ${dungeon.floor}`, panelX + panelW / 2, panelY + 9);
   ctx.textAlign = 'left';
@@ -1601,7 +1601,7 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
         ctx.setLineDash([]);
         // Question mark
         ctx.fillStyle = 'rgba(120, 120, 160, 0.4)';
-        ctx.font = `bold 8px ${C.HUD_FONT}`;
+        ctx.font = `500 8px ${C.HUD_FONT}`;
         ctx.textAlign = 'center';
         ctx.fillText('?', cx, cy + 3);
         ctx.textAlign = 'left';
