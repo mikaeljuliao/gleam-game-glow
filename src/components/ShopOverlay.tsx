@@ -13,17 +13,17 @@ const VENDOR_DIALOGUES = [
 ];
 
 const RARITY_COLORS: Record<string, string> = {
-  common: '#aaaaaa',
-  rare: '#4488ff',
-  epic: '#bb44ff',
-  legendary: '#ffaa00',
+  common: '#999999',
+  rare: '#6699dd',
+  epic: '#aa66dd',
+  legendary: '#ddaa55',
 };
 
 const RARITY_BG: Record<string, string> = {
-  common: 'rgba(120, 120, 120, 0.15)',
-  rare: 'rgba(68, 136, 255, 0.15)',
-  epic: 'rgba(187, 68, 255, 0.15)',
-  legendary: 'rgba(255, 170, 0, 0.15)',
+  common: 'rgba(120, 120, 120, 0.1)',
+  rare: 'rgba(68, 136, 255, 0.1)',
+  epic: 'rgba(187, 68, 255, 0.1)',
+  legendary: 'rgba(255, 170, 0, 0.1)',
 };
 
 const RARITY_LABELS: Record<string, string> = {
@@ -64,7 +64,6 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
     onBuy(index);
     setBuyFlash(index);
     setTimeout(() => setBuyFlash(null), 300);
-    // New dialogue after purchase
     const newDialogue = [
       "Boa escolha.",
       "Use com sabedoria.",
@@ -90,19 +89,18 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
         className="relative flex flex-col items-center p-6 rounded-lg border max-w-md w-full mx-4"
         style={{
           background: 'linear-gradient(180deg, rgba(30, 25, 20, 0.97) 0%, rgba(20, 18, 15, 0.98) 100%)',
-          borderColor: 'rgba(180, 150, 80, 0.4)',
-          boxShadow: '0 0 40px rgba(180, 150, 50, 0.15), inset 0 0 20px rgba(0, 0, 0, 0.5)',
+          borderColor: 'rgba(160, 130, 70, 0.3)',
         }}
       >
         {/* Vendor title */}
         <div className="flex items-center gap-3 mb-3">
           <span style={{ fontSize: '28px' }}>🧙</span>
           <h2
-            className="text-lg font-bold"
+            className="text-lg font-medium"
             style={{
-              color: '#e8d5a0',
+              color: '#d4c090',
               fontFamily: "'Cinzel', serif",
-              textShadow: '0 0 10px rgba(200, 170, 80, 0.3)',
+              letterSpacing: '0.1em',
             }}
           >
             Mercador das Sombras
@@ -114,12 +112,13 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
           className="w-full px-4 py-2 mb-4 rounded text-center italic"
           style={{
             background: 'rgba(0, 0, 0, 0.3)',
-            color: '#c8b888',
+            color: '#b8a878',
             fontFamily: "'Cinzel', serif",
             fontSize: '13px',
+            letterSpacing: '0.04em',
             minHeight: '36px',
-            borderLeft: '2px solid rgba(180, 150, 80, 0.3)',
-            borderRight: '2px solid rgba(180, 150, 80, 0.3)',
+            borderLeft: '2px solid rgba(160, 130, 70, 0.25)',
+            borderRight: '2px solid rgba(160, 130, 70, 0.25)',
           }}
         >
           "{displayedText}"
@@ -130,18 +129,18 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
         <div
           className="flex items-center gap-2 mb-4 px-4 py-1 rounded"
           style={{
-            background: 'rgba(200, 170, 50, 0.15)',
-            border: '1px solid rgba(200, 170, 50, 0.3)',
+            background: 'rgba(180, 150, 50, 0.1)',
+            border: '1px solid rgba(180, 150, 50, 0.25)',
           }}
         >
           <span style={{ fontSize: '18px' }}>🪙</span>
           <span
             style={{
-              color: '#ffd700',
+              color: '#d4b44a',
               fontFamily: 'monospace',
               fontSize: '16px',
-              fontWeight: 'bold',
-              textShadow: '0 0 8px rgba(255, 215, 0, 0.4)',
+              fontWeight: 500,
+              letterSpacing: '0.08em',
             }}
           >
             {coins}
@@ -163,7 +162,7 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
                   background: isSold
                     ? 'rgba(30, 30, 30, 0.5)'
                     : buyFlash === idx
-                    ? 'rgba(255, 215, 0, 0.2)'
+                    ? 'rgba(220, 190, 80, 0.15)'
                     : RARITY_BG[item.upgrade.rarity],
                   border: `1px solid ${isSold ? 'rgba(60, 60, 60, 0.3)' : RARITY_COLORS[item.upgrade.rarity]}40`,
                   opacity: isSold ? 0.4 : canAfford ? 1 : 0.6,
@@ -179,7 +178,8 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
                       style={{
                         color: isSold ? '#666' : RARITY_COLORS[item.upgrade.rarity],
                         fontSize: '13px',
-                        fontWeight: 'bold',
+                        fontWeight: 500,
+                        letterSpacing: '0.06em',
                         textDecoration: isSold ? 'line-through' : 'none',
                       }}
                     >
@@ -191,12 +191,13 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
                         fontSize: '9px',
                         opacity: 0.7,
                         textTransform: 'uppercase',
+                        letterSpacing: '0.1em',
                       }}
                     >
                       {RARITY_LABELS[item.upgrade.rarity]}
                     </span>
                   </div>
-                  <span style={{ color: isSold ? '#555' : '#a0a0a0', fontSize: '11px' }}>
+                  <span style={{ color: isSold ? '#555' : '#909090', fontSize: '11px', letterSpacing: '0.02em' }}>
                     {isSold ? 'VENDIDO' : item.upgrade.description}
                   </span>
                 </div>
@@ -204,10 +205,10 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
                   className="flex items-center gap-1 px-2 py-1 rounded"
                   style={{
                     background: 'rgba(0, 0, 0, 0.3)',
-                    color: isSold ? '#555' : canAfford ? '#ffd700' : '#ff4444',
+                    color: isSold ? '#555' : canAfford ? '#d4b44a' : '#cc5555',
                     fontFamily: 'monospace',
                     fontSize: '13px',
-                    fontWeight: 'bold',
+                    fontWeight: 500,
                   }}
                 >
                   🪙 {item.cost}
@@ -220,12 +221,13 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
         {/* Close button */}
         <button
           onClick={onClose}
-          className="px-6 py-2 rounded font-bold transition-all hover:brightness-110"
+          className="px-6 py-2 rounded font-medium transition-all hover:brightness-110"
           style={{
-            background: 'rgba(80, 60, 30, 0.6)',
-            color: '#e8d5a0',
-            border: '1px solid rgba(180, 150, 80, 0.4)',
+            background: 'rgba(80, 60, 30, 0.5)',
+            color: '#d4c090',
+            border: '1px solid rgba(160, 130, 70, 0.3)',
             fontSize: '13px',
+            letterSpacing: '0.1em',
           }}
         >
           Sair da Loja

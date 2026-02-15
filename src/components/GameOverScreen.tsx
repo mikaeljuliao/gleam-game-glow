@@ -72,11 +72,12 @@ const GameOverScreen = ({ stats, onRestart }: Props) => {
         {/* Left/Top column */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: compact ? '6px' : '12px' }}>
           <h2
-            className="font-bold tracking-wider"
+            className="font-medium"
             style={{
               fontFamily: "'Cinzel', serif",
-              color: '#cc2222',
-              textShadow: '0 0 30px rgba(200, 30, 30, 0.5), 0 0 60px rgba(150, 10, 10, 0.3)',
+              color: '#bb3333',
+              letterSpacing: '0.12em',
+              WebkitTextStroke: '1px rgba(0,0,0,0.4)',
               fontSize: compact ? '24px' : '40px',
             }}
           >
@@ -90,16 +91,15 @@ const GameOverScreen = ({ stats, onRestart }: Props) => {
               style={{
                 background: 'rgba(10, 5, 20, 0.8)',
                 borderColor: rank.color,
-                boxShadow: `0 0 30px ${rank.glowColor}, 0 0 60px ${rank.glowColor}`,
                 animation: 'pulse 1.5s ease-in-out infinite',
                 padding: compact ? '6px 12px' : '12px 24px',
               }}
             >
-              <p style={{ color: '#888899', fontFamily: 'monospace', fontSize: compact ? '9px' : '11px', marginBottom: '4px' }}>
+              <p style={{ color: '#888899', fontFamily: 'monospace', fontSize: compact ? '9px' : '11px', marginBottom: '4px', letterSpacing: '0.1em' }}>
                 RANK UP!
               </p>
               <div className="flex items-center justify-center gap-3">
-                <span style={{ color: prevRank.color, fontFamily: "'Cinzel', serif", fontSize: compact ? '11px' : '13px' }}>
+                <span style={{ color: prevRank.color, fontFamily: "'Cinzel', serif", fontSize: compact ? '11px' : '13px', letterSpacing: '0.08em' }}>
                   {prevRank.icon} {prevRank.name}
                 </span>
                 <span style={{ color: '#666677' }}>→</span>
@@ -108,14 +108,14 @@ const GameOverScreen = ({ stats, onRestart }: Props) => {
                     color: rank.color,
                     fontFamily: "'Cinzel', serif",
                     fontSize: compact ? '12px' : '15px',
-                    fontWeight: 'bold',
-                    textShadow: `0 0 12px ${rank.glowColor}`,
+                    fontWeight: 500,
+                    letterSpacing: '0.08em',
                   }}
                 >
                   {rank.icon} {rank.name}
                 </span>
               </div>
-              <p className="italic" style={{ color: rank.color, opacity: 0.7, fontFamily: 'monospace', fontSize: '10px', marginTop: '2px' }}>
+              <p className="italic" style={{ color: rank.color, opacity: 0.6, fontFamily: 'monospace', fontSize: '10px', marginTop: '2px' }}>
                 "{rank.title}"
               </p>
             </div>
@@ -123,7 +123,7 @@ const GameOverScreen = ({ stats, onRestart }: Props) => {
 
           {/* Souls gained */}
           <div className="text-center">
-            <span style={{ color: '#aa8888', fontFamily: 'monospace', fontSize: compact ? '11px' : '13px' }}>
+            <span style={{ color: '#aa8888', fontFamily: 'monospace', fontSize: compact ? '11px' : '13px', letterSpacing: '0.05em' }}>
               +{soulsGained} almas coletadas
             </span>
           </div>
@@ -133,8 +133,8 @@ const GameOverScreen = ({ stats, onRestart }: Props) => {
             <div className="flex items-center gap-2">
               <span style={{ fontSize: compact ? '12px' : '14px' }}>{rank.icon}</span>
               <span
-                className="font-bold tracking-widest"
-                style={{ color: rank.color, fontFamily: "'Cinzel', serif", textShadow: `0 0 8px ${rank.glowColor}`, fontSize: compact ? '10px' : '12px' }}
+                className="font-medium"
+                style={{ color: rank.color, fontFamily: "'Cinzel', serif", fontSize: compact ? '10px' : '12px', letterSpacing: '0.15em' }}
               >
                 {rank.name.toUpperCase()}
               </span>
@@ -153,7 +153,6 @@ const GameOverScreen = ({ stats, onRestart }: Props) => {
                   style={{
                     width: `${rankData.progress * 100}%`,
                     background: `linear-gradient(90deg, ${rank.color}, ${rankData.next.color})`,
-                    boxShadow: `0 0 4px ${rank.glowColor}`,
                   }}
                 />
               </div>
@@ -172,6 +171,7 @@ const GameOverScreen = ({ stats, onRestart }: Props) => {
               fontSize: compact ? '11px' : '13px',
               padding: compact ? '10px' : '16px',
               width: compact ? '220px' : '280px',
+              letterSpacing: '0.03em',
             }}
           >
             {[
@@ -194,13 +194,13 @@ const GameOverScreen = ({ stats, onRestart }: Props) => {
 
           <button
             onClick={onRestart}
-            className="font-bold tracking-widest border-2 transition-all duration-300"
+            className="font-medium border-2 transition-all duration-300"
             style={{
               fontFamily: "'Cinzel', serif",
-              color: '#ddcccc',
+              color: '#d4b0b0',
+              letterSpacing: '0.15em',
               background: 'rgba(150, 30, 30, 0.3)',
-              borderColor: '#883333',
-              textShadow: '0 0 10px rgba(200, 50, 50, 0.5)',
+              borderColor: '#773333',
               padding: compact ? '10px 24px' : '12px 32px',
               fontSize: compact ? '14px' : '16px',
               minHeight: '48px',
