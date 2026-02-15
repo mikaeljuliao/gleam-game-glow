@@ -1339,8 +1339,16 @@ export class GameEngine {
     // Copy to display - scaled to fit with offset
     const scaledW = Math.round(rw * this.scale);
     const scaledH = Math.round(rh * this.scale);
+    const dcw = this.displayCanvas.width;
+    const dch = this.displayCanvas.height;
     dCtx.fillStyle = '#000';
-    dCtx.fillRect(0, 0, this.displayCanvas.width, this.displayCanvas.height);
+    dCtx.fillRect(0, 0, dcw, dch);
+
+    // On desktop, render stone frame in the side margins
+    if (!this.input.isMobile && this.offsetX > 0) {
+      this.renderStoneFrame(dCtx, dcw, dch, scaledW, scaledH);
+    }
+
     dCtx.drawImage(this.gameCanvas, 0, 0, rw, rh, this.offsetX, this.offsetY, scaledW, scaledH);
   }
 
@@ -1366,10 +1374,92 @@ export class GameEngine {
       this.gameCtx.imageSmoothingEnabled = false;
     }
     
-    // Scale to fit display (contain-fit, perfect on initial aspect)
-    this.scale = Math.min(dw / this.renderWidth, dh / this.renderHeight);
+    // Scale to fit display
+    if (this.input.isMobile) {
+      // Mobile: fill entire screen (no margins)
+      this.scale = Math.min(dw / this.renderWidth, dh / this.renderHeight);
+    } else {
+      // Desktop: cap to 80% width, keep aspect ratio
+      const maxW = dw * 0.8;
+      this.scale = Math.min(maxW / this.renderWidth, dh / this.renderHeight);
+    }
     this.offsetX = Math.floor((dw - this.renderWidth * this.scale) / 2);
     this.offsetY = Math.floor((dh - this.renderHeight * this.scale) / 2);
     this.input.setTransform(this.scale, this.offsetX, this.offsetY);
+  }
+
+  private renderStoneFrame(dCtx: CanvasRenderingContext2D, dcw: number, dch: number, _scaledW: number, _scaledH: number) {
+    const ts = 20; // tile size for frame stones
+    const leftW = this.offsetX;
+    const rightX = dcw - this.offsetX;
+    const topY = this.offsetY;
+    const bottomY = dch - this.offsetY;
+
+    // Draw stone tiles in left and right margins
+    const drawStoneArea = (startX: number, endX: number, startY: number, endY: number) => {
+      const sc = Math.floor(startX / ts);
+      const ec = Math.ceil(endX / ts);
+      const sr = Math.floor(startY / ts);
+      const er = Math.ceil(endY / ts);
+      for (let row = sr; row < er; row++) {
+        for (let col = sc; col < ec; col++) {
+          const x = col * ts;
+          const y = row * ts;
+          const hash = ((row * 7 + col * 13) & 0xFF);
+          const darkness = 0.5 + (hash % 10) * 0.025;
+          const r = Math.floor(16 * darkness);
+          const g = Math.floor(16 * darkness);
+          const b = Math.floor(26 * darkness);
+          dCtx.fillStyle = `rgb(${r},${g},${b})`;
+          dCtx.fillRect(x, y, ts, ts);
+          // Brick lines
+          if ((row + col) % 2 === 0) {
+            dCtx.fillStyle = 'rgba(30, 30, 48, 0.5)';
+            dCtx.fillRect(x, y, ts, 1);
+            dCtx.fillRect(x, y, 1, ts);
+          }
+          // Cracks
+          if (hash % 11 === 0) {
+            dCtx.fillStyle = 'rgba(8, 8, 15, 0.6)';
+            dCtx.fillRect(x + 3, y + 5, 4, 1);
+          }
+          if (hash % 13 === 0) {
+            dCtx.fillStyle = 'rgba(8, 8, 15, 0.5)';
+            dCtx.fillRect(x + 8, y + 3, 1, 5);
+          }
+          // Moss
+          if (hash % 23 === 0) {
+            dCtx.fillStyle = 'rgba(20, 45, 20, 0.2)';
+            dCtx.fillRect(x + 2, y + ts - 4, 6, 3);
+          }
+        }
+      }
+    };
+
+    // Left margin
+    if (leftW > 0) drawStoneArea(0, leftW, 0, dch);
+    // Right margin
+    if (rightX < dcw) drawStoneArea(rightX, dcw, 0, dch);
+    // Top margin (between left and right)
+    if (topY > 0) drawStoneArea(leftW, rightX, 0, topY);
+    // Bottom margin (between left and right)
+    if (bottomY < dch) drawStoneArea(leftW, rightX, bottomY, dch);
+
+    // Dark gradient edge (vignette into game area)
+    if (leftW > 2) {
+      const edgeW = Math.min(30, leftW);
+      // Left edge
+      const gl = dCtx.createLinearGradient(leftW - edgeW, 0, leftW, 0);
+      gl.addColorStop(0, 'rgba(0,0,0,0)');
+      gl.addColorStop(1, 'rgba(0,0,0,0.4)');
+      dCtx.fillStyle = gl;
+      dCtx.fillRect(leftW - edgeW, topY, edgeW, bottomY - topY);
+      // Right edge
+      const gr = dCtx.createLinearGradient(rightX, 0, rightX + edgeW, 0);
+      gr.addColorStop(0, 'rgba(0,0,0,0.4)');
+      gr.addColorStop(1, 'rgba(0,0,0,0)');
+      dCtx.fillStyle = gr;
+      dCtx.fillRect(rightX, topY, edgeW, bottomY - topY);
+    }
   }
 }
