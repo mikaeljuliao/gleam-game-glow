@@ -1,5 +1,5 @@
 export const GAME_WIDTH = 640;
-export const HUD_FONT = 'Arial, Helvetica, sans-serif';
+export const HUD_FONT = "'VT323', monospace";
 export const GAME_HEIGHT = 400;
 export const TILE_SIZE = 20;
 export const ROOM_COLS = 32;
