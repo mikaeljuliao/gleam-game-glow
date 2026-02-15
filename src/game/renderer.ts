@@ -1275,6 +1275,23 @@ export function renderParticles(ctx: CanvasRenderingContext2D, particles: Partic
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
+    } else if (p.type === 'soul') {
+      // Soul collection: glowing blue energy orb
+      ctx.globalAlpha = alpha * 0.85;
+      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 2);
+      glow.addColorStop(0, p.color);
+      glow.addColorStop(0.5, p.color.replace(')', ', 0.4)').replace('hsl', 'hsla'));
+      glow.addColorStop(1, 'rgba(60, 120, 220, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      // Core
+      ctx.fillStyle = '#aaddff';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
     } else if (p.type === 'fog') {
       ctx.globalAlpha = alpha * 0.3;
       ctx.fillStyle = p.color;
@@ -1353,18 +1370,53 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   ctx.font = `500 ${Math.round(8 * ms)}px ${C.HUD_FONT}`;
   ctx.fillText('XP', hpX + 3, xpY + 2 + Math.round(xpH * 0.8));
 
-  // --- Level Badge ---
+  // --- Soul Counter (next to level) ---
   const lvlX = hpW + 14;
+  const soulW = Math.round(70 * ms);
+  const soulH = Math.round(20 * ms);
+  ctx.fillStyle = 'rgba(10, 15, 35, 0.85)';
+  ctx.fillRect(lvlX, hpY, soulW, soulH);
+  ctx.strokeStyle = 'rgba(80, 140, 220, 0.7)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(lvlX, hpY, soulW, soulH);
+  // Soul crystal icon — draw a small diamond shape
+  const scx = lvlX + 10;
+  const scy = hpY + soulH / 2;
+  const scSize = Math.round(4 * ms);
+  ctx.fillStyle = '#5599dd';
+  ctx.beginPath();
+  ctx.moveTo(scx, scy - scSize);
+  ctx.lineTo(scx + scSize * 0.7, scy);
+  ctx.lineTo(scx, scy + scSize);
+  ctx.lineTo(scx - scSize * 0.7, scy);
+  ctx.closePath();
+  ctx.fill();
+  // Inner bright core
+  ctx.fillStyle = '#88ccff';
+  ctx.beginPath();
+  ctx.moveTo(scx, scy - scSize * 0.5);
+  ctx.lineTo(scx + scSize * 0.35, scy);
+  ctx.lineTo(scx, scy + scSize * 0.5);
+  ctx.lineTo(scx - scSize * 0.35, scy);
+  ctx.closePath();
+  ctx.fill();
+  // Soul count
+  ctx.font = `600 ${Math.round(10 * ms)}px ${C.HUD_FONT}`;
+  ctx.textAlign = 'left';
+  drawHudText(ctx, `${player.souls}`, scx + scSize + 4, hpY + Math.round(soulH * 0.7), '#88ccff');
+
+  // --- Level Badge ---
+  const lvlBadgeX = lvlX + soulW + 4;
   const lvlW = Math.round(44 * ms);
   const lvlH = Math.round(20 * ms);
   ctx.fillStyle = 'rgba(20, 20, 60, 0.85)';
-  ctx.fillRect(lvlX, hpY, lvlW, lvlH);
+  ctx.fillRect(lvlBadgeX, hpY, lvlW, lvlH);
   ctx.strokeStyle = '#5599ff';
   ctx.lineWidth = 1;
-  ctx.strokeRect(lvlX, hpY, lvlW, lvlH);
+  ctx.strokeRect(lvlBadgeX, hpY, lvlW, lvlH);
   ctx.font = `500 ${Math.round(11 * ms)}px ${C.HUD_FONT}`;
   ctx.textAlign = 'left';
-  drawHudText(ctx, `Nv.${player.level}`, lvlX + 4, hpY + Math.round(lvlH * 0.7), '#aaccff');
+  drawHudText(ctx, `Nv.${player.level}`, lvlBadgeX + 4, hpY + Math.round(lvlH * 0.7), '#aaccff');
 
   // --- Floor indicator (top-right) ---
   const floorW = Math.round(84 * ms);

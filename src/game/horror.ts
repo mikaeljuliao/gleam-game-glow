@@ -869,6 +869,71 @@ export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: strin
     ctx.textAlign = 'center';
     ctx.fillText('MERCADOR', cx, cy + 30);
     ctx.textAlign = 'left';
+
+    // === SANCTUARY (left side of vendor room) ===
+    const shrineX = Math.floor(C.dims.gw * 0.18);
+    const shrineY = Math.floor(C.dims.gh * 0.5);
+    const sFloat = Math.sin(time * 2) * 1;
+    
+    // Shrine glow
+    const shrineGlow = ctx.createRadialGradient(shrineX, shrineY, 0, shrineX, shrineY, 35);
+    shrineGlow.addColorStop(0, `rgba(60, 130, 255, ${0.15 * pulse})`);
+    shrineGlow.addColorStop(0.5, `rgba(40, 100, 220, ${0.07 * pulse})`);
+    shrineGlow.addColorStop(1, 'rgba(40, 100, 220, 0)');
+    ctx.fillStyle = shrineGlow;
+    ctx.beginPath();
+    ctx.arc(shrineX, shrineY, 35, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Shrine pillar
+    ctx.fillStyle = '#1a2040';
+    ctx.fillRect(shrineX - 5, shrineY - 8 + sFloat, 10, 18);
+    ctx.fillStyle = '#222850';
+    ctx.fillRect(shrineX - 7, shrineY - 10 + sFloat, 14, 4);
+    ctx.fillRect(shrineX - 6, shrineY + 8 + sFloat, 12, 3);
+    
+    // Crystal on top
+    const cPulse = Math.sin(time * 3.5) * 0.3 + 0.7;
+    ctx.fillStyle = `rgba(80, 160, 255, ${0.9 * cPulse})`;
+    ctx.beginPath();
+    ctx.moveTo(shrineX, shrineY - 16 + sFloat);
+    ctx.lineTo(shrineX + 4, shrineY - 10 + sFloat);
+    ctx.lineTo(shrineX, shrineY - 7 + sFloat);
+    ctx.lineTo(shrineX - 4, shrineY - 10 + sFloat);
+    ctx.closePath();
+    ctx.fill();
+    // Inner glow
+    ctx.fillStyle = `rgba(160, 210, 255, ${cPulse})`;
+    ctx.beginPath();
+    ctx.moveTo(shrineX, shrineY - 14 + sFloat);
+    ctx.lineTo(shrineX + 2, shrineY - 10 + sFloat);
+    ctx.lineTo(shrineX, shrineY - 8 + sFloat);
+    ctx.lineTo(shrineX - 2, shrineY - 10 + sFloat);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Floating particles
+    for (let i = 0; i < 4; i++) {
+      const a = time * 1.2 + (i / 4) * Math.PI * 2;
+      const d = 10 + Math.sin(time * 2 + i) * 4;
+      const fpx = shrineX + Math.cos(a) * d;
+      const fpy = shrineY - 10 + Math.sin(a) * d * 0.5 + sFloat;
+      ctx.fillStyle = `rgba(100, 180, 255, ${0.4 * cPulse})`;
+      ctx.beginPath();
+      ctx.arc(fpx, fpy, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Label
+    ctx.fillStyle = `rgba(100, 170, 255, ${pulse * 0.8})`;
+    ctx.font = `bold 8px ${C.HUD_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('SANTUÁRIO', shrineX, shrineY + 22);
+    ctx.fillStyle = `rgba(100, 170, 255, ${pulse * 0.5})`;
+    ctx.font = `7px ${C.HUD_FONT}`;
+    ctx.fillText('Cura por Almas', shrineX, shrineY + 30);
+    ctx.textAlign = 'left';
+
     return;
   }
 

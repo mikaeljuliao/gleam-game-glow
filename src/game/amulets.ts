@@ -63,7 +63,7 @@ export const AMULET_DEFS: AmuletDef[] = [
     id: 'soul_collector',
     name: 'Coletor de Almas',
     icon: '🩸',
-    description: 'Quanto mais almas carrega, mais dano causa. Gastar almas reduz o bônus.',
+    description: 'Quanto mais almas carrega, mais dano e velocidade. Gastar almas reduz os bônus.',
   },
 ];
 
@@ -133,4 +133,10 @@ export function createWarRhythmState(): WarRhythmState {
 export function getSoulCollectorBonus(souls: number): number {
   // +1% damage per 10 souls, up to +100%
   return Math.min(1, souls / 1000);
+}
+
+// Soul Collector: speed bonus based on souls carried
+export function getSoulCollectorSpeedBonus(souls: number): number {
+  // +0.5% speed per 10 souls, up to +50%
+  return Math.min(0.5, souls / 2000) ;
 }

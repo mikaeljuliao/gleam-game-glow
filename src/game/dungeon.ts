@@ -150,11 +150,10 @@ export function generateDungeon(floor: number): DungeonMap {
     }
   }
 
-  // Assign special room types to some rooms
-  const specialTypes: Array<'treasure' | 'trap' | 'shrine' | 'vendor'> = [];
+  // Assign special room types to some rooms (shrine removed — now inside vendor room)
+  const specialTypes: Array<'treasure' | 'trap' | 'vendor'> = [];
   if (path.length > 4) specialTypes.push('treasure');
   if (path.length > 5) specialTypes.push('trap');
-  if (path.length > 6) specialTypes.push('shrine');
   // Always add a vendor room
   specialTypes.push('vendor');
   if (path.length > 8) specialTypes.push('trap');
@@ -165,7 +164,7 @@ export function generateDungeon(floor: number): DungeonMap {
     .filter(({ pos }) => !(pos.x === center && pos.y === center) && !(pos.x === bossPos.x && pos.y === bossPos.y));
   
   const shuffled = normalIndices.sort(() => Math.random() - 0.5);
-  const specialAssign = new Map<number, 'treasure' | 'trap' | 'shrine' | 'vendor'>();
+  const specialAssign = new Map<number, 'treasure' | 'trap' | 'vendor'>();
   for (let i = 0; i < Math.min(specialTypes.length, shuffled.length); i++) {
     specialAssign.set(shuffled[i].i, specialTypes[i]);
   }
@@ -207,9 +206,6 @@ export function generateDungeon(floor: number): DungeonMap {
       room.cleared = true;
     } else if (roomType === 'treasure') {
       room.enemies = generateEnemySpawns({ ...room, type: 'normal' } as DungeonRoom, floor).slice(0, 3);
-    } else if (roomType === 'shrine') {
-      room.enemies = []; // Shrine is peaceful... until used
-      room.cleared = true;
     } else if (roomType === 'trap') {
       room.enemies = generateEnemySpawns(room, floor);
       // Add extra enemies for traps
