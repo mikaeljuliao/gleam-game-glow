@@ -286,49 +286,98 @@ export function getCombatIntensity(): number {
   return combatIntensity;
 }
 
-// ── Vendor room ambient (calm, safe) ─────────────────────
+// ── Vendor room ambient (calm, melodic music) ───────────
 let vendorAmbienceActive = false;
-let vendorOsc: OscillatorNode | null = null;
-let vendorGain: GainNode | null = null;
-let vendorOsc2: OscillatorNode | null = null;
-let vendorGain2: GainNode | null = null;
+let vendorNodes: (OscillatorNode | GainNode | AudioBufferSourceNode)[] = [];
+let vendorMelodyTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function startVendorAmbience() {
   if (vendorAmbienceActive) return;
   vendorAmbienceActive = true;
   const ctx = getBgCtx();
-  // Soft pad chord — C major with gentle filter
-  vendorOsc = ctx.createOscillator();
-  vendorGain = ctx.createGain();
-  vendorOsc.type = 'sine';
-  vendorOsc.frequency.setValueAtTime(261.6, ctx.currentTime); // C4
-  vendorGain.gain.setValueAtTime(0, ctx.currentTime);
-  vendorGain.gain.linearRampToValueAtTime(0.04, ctx.currentTime + 1);
-  vendorOsc.connect(vendorGain);
-  vendorGain.connect(ctx.destination);
-  vendorOsc.start();
-  // Second voice — E4
-  vendorOsc2 = ctx.createOscillator();
-  vendorGain2 = ctx.createGain();
-  vendorOsc2.type = 'sine';
-  vendorOsc2.frequency.setValueAtTime(329.6, ctx.currentTime);
-  vendorGain2.gain.setValueAtTime(0, ctx.currentTime);
-  vendorGain2.gain.linearRampToValueAtTime(0.025, ctx.currentTime + 1.5);
-  vendorOsc2.connect(vendorGain2);
-  vendorGain2.connect(ctx.destination);
-  vendorOsc2.start();
+
+  // --- Warm pad layer (sustained chord) ---
+  const padNotes = [261.6, 329.6, 392.0, 523.3]; // C4, E4, G4, C5
+  for (const freq of padNotes) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, ctx.currentTime);
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.025, ctx.currentTime + 2);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    vendorNodes.push(osc, gain);
+  }
+
+  // --- Gentle melody arpeggio (repeating pattern) ---
+  const melodyNotes = [523.3, 659.3, 784.0, 659.3, 587.3, 523.3, 392.0, 440.0];
+  let noteIndex = 0;
+  function playMelodyNote() {
+    if (!vendorAmbienceActive) return;
+    const ctx2 = getBgCtx();
+    const freq = melodyNotes[noteIndex % melodyNotes.length];
+    noteIndex++;
+    const osc = ctx2.createOscillator();
+    const gain = ctx2.createGain();
+    const filter = ctx2.createBiquadFilter();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, ctx2.currentTime);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1200, ctx2.currentTime);
+    const vol = 0.04 + Math.random() * 0.015;
+    gain.gain.setValueAtTime(vol, ctx2.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 1.2);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx2.destination);
+    osc.start();
+    osc.stop(ctx2.currentTime + 1.3);
+    vendorMelodyTimer = setTimeout(playMelodyNote, 600 + Math.random() * 200);
+  }
+  vendorMelodyTimer = setTimeout(playMelodyNote, 800);
+
+  // --- Soft shimmer/chime layer ---
+  function playShimmer() {
+    if (!vendorAmbienceActive) return;
+    const ctx2 = getBgCtx();
+    const shimmerFreqs = [1046.5, 1318.5, 1568.0]; // C6, E6, G6
+    const f = shimmerFreqs[Math.floor(Math.random() * shimmerFreqs.length)];
+    const osc = ctx2.createOscillator();
+    const gain = ctx2.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(f, ctx2.currentTime);
+    gain.gain.setValueAtTime(0.015, ctx2.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 2);
+    osc.connect(gain);
+    gain.connect(ctx2.destination);
+    osc.start();
+    osc.stop(ctx2.currentTime + 2.1);
+    setTimeout(playShimmer, 2000 + Math.random() * 3000);
+  }
+  setTimeout(playShimmer, 1500);
 }
 
 export function stopVendorAmbience() {
   vendorAmbienceActive = false;
   const ctx = getBgCtx();
-  if (vendorGain) vendorGain.gain.setTargetAtTime(0, ctx.currentTime, 0.5);
-  if (vendorGain2) vendorGain2.gain.setTargetAtTime(0, ctx.currentTime, 0.5);
+  for (const node of vendorNodes) {
+    if (node instanceof GainNode) {
+      node.gain.setTargetAtTime(0, ctx.currentTime, 0.5);
+    }
+  }
+  if (vendorMelodyTimer) clearTimeout(vendorMelodyTimer);
+  vendorMelodyTimer = null;
   setTimeout(() => {
-    try { vendorOsc?.stop(); } catch {}
-    try { vendorOsc2?.stop(); } catch {}
-    vendorOsc = null; vendorGain = null;
-    vendorOsc2 = null; vendorGain2 = null;
+    for (const node of vendorNodes) {
+      try { if ('stop' in node && typeof (node as any).stop === 'function') (node as OscillatorNode).stop(); } catch {}
+    }
+    vendorNodes = [];
   }, 2000);
 }
 
@@ -675,56 +724,109 @@ export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: strin
   const pulse = Math.sin(time * 3) * 0.3 + 0.7;
 
   if (roomType === 'vendor') {
-    // Warm ambient glow for vendor room
-    const warmGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 120);
-    warmGlow.addColorStop(0, `rgba(255, 220, 150, ${0.08 * pulse})`);
-    warmGlow.addColorStop(0.5, `rgba(200, 170, 80, ${0.04 * pulse})`);
+    // Large warm ambient glow
+    const warmGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 160);
+    warmGlow.addColorStop(0, `rgba(255, 230, 170, ${0.12 * pulse})`);
+    warmGlow.addColorStop(0.3, `rgba(255, 210, 120, ${0.07 * pulse})`);
+    warmGlow.addColorStop(0.6, `rgba(200, 170, 80, ${0.03 * pulse})`);
     warmGlow.addColorStop(1, 'rgba(200, 170, 80, 0)');
     ctx.fillStyle = warmGlow;
-    ctx.fillRect(cx - 120, cy - 120, 240, 240);
+    ctx.fillRect(cx - 160, cy - 160, 320, 320);
 
-    // NPC body — hooded merchant figure
-    const nFloat = Math.sin(time * 2) * 1;
-    // Shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    // Floating particles around vendor
+    for (let i = 0; i < 6; i++) {
+      const angle = time * 0.5 + (i / 6) * Math.PI * 2;
+      const dist = 25 + Math.sin(time * 1.5 + i) * 8;
+      const px = cx + Math.cos(angle) * dist;
+      const py = cy + Math.sin(angle) * dist - 10;
+      const particleAlpha = 0.3 + Math.sin(time * 3 + i * 2) * 0.2;
+      ctx.fillStyle = `rgba(255, 220, 100, ${particleAlpha})`;
+      ctx.beginPath();
+      ctx.arc(px, py, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const nFloat = Math.sin(time * 1.5) * 1.5;
+    // Shadow on ground
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.beginPath();
-    ctx.ellipse(cx, cy + 12, 8, 3, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + 14, 10, 4, 0, 0, Math.PI * 2);
     ctx.fill();
-    // Robe
-    ctx.fillStyle = '#3a3020';
-    ctx.fillRect(cx - 7, cy - 4 + nFloat, 14, 16);
-    // Hood
-    ctx.fillStyle = '#4a3828';
+
+    // Robe body — layered dark robes with gold trim
+    ctx.fillStyle = '#2a1e14';
+    ctx.fillRect(cx - 8, cy - 2 + nFloat, 16, 18);
+    // Robe detail — bottom tattered edges
+    ctx.fillStyle = '#221810';
+    for (let i = -8; i < 8; i += 3) {
+      const yOff = Math.sin(i * 0.7 + time * 2) * 1.5;
+      ctx.fillRect(cx + i, cy + 14 + nFloat + yOff, 3, 3);
+    }
+    // Gold trim lines
+    ctx.fillStyle = 'rgba(200, 170, 60, 0.5)';
+    ctx.fillRect(cx - 8, cy - 2 + nFloat, 1, 18);
+    ctx.fillRect(cx + 7, cy - 2 + nFloat, 1, 18);
+    ctx.fillRect(cx - 5, cy + 6 + nFloat, 10, 1);
+
+    // Shoulders
+    ctx.fillStyle = '#352818';
+    ctx.fillRect(cx - 10, cy - 3 + nFloat, 4, 6);
+    ctx.fillRect(cx + 6, cy - 3 + nFloat, 4, 6);
+
+    // Hood — larger, more dramatic
+    ctx.fillStyle = '#3d2c1a';
     ctx.beginPath();
-    ctx.arc(cx, cy - 6 + nFloat, 8, Math.PI, Math.PI * 2);
+    ctx.arc(cx, cy - 6 + nFloat, 10, Math.PI, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#2a1e14';
     ctx.beginPath();
-    ctx.arc(cx, cy - 6 + nFloat, 6, Math.PI, Math.PI * 2);
+    ctx.arc(cx, cy - 5 + nFloat, 7, Math.PI, Math.PI * 2);
     ctx.fill();
-    // Eyes — warm gold
-    const eyePulse = Math.sin(time * 4) * 0.2 + 0.8;
-    ctx.fillStyle = `rgba(255, 200, 80, ${eyePulse})`;
+    // Deep shadow inside hood
+    ctx.fillStyle = '#0d0906';
+    ctx.beginPath();
+    ctx.arc(cx, cy - 6 + nFloat, 5, Math.PI * 0.8, Math.PI * 2.2);
+    ctx.fill();
+
+    // Eyes — eerie glowing cyan-gold, pulsing
+    const eyePulse = Math.sin(time * 3) * 0.3 + 0.7;
+    const eyeColor = `rgba(180, 255, 200, ${eyePulse})`;
+    ctx.fillStyle = eyeColor;
     ctx.fillRect(cx - 3, cy - 8 + nFloat, 2, 2);
     ctx.fillRect(cx + 2, cy - 8 + nFloat, 2, 2);
-    // Lantern
-    ctx.fillStyle = '#553311';
-    ctx.fillRect(cx + 9, cy - 10 + nFloat, 2, 12);
-    const lanternGlow = Math.sin(time * 5) * 0.15 + 0.85;
-    ctx.fillStyle = `rgba(255, 200, 80, ${0.8 * lanternGlow})`;
-    ctx.fillRect(cx + 8, cy - 12 + nFloat, 4, 4);
-    // Lantern light
-    const lg = ctx.createRadialGradient(cx + 10, cy - 10 + nFloat, 0, cx + 10, cy - 10 + nFloat, 20);
-    lg.addColorStop(0, `rgba(255, 200, 80, ${0.2 * lanternGlow})`);
-    lg.addColorStop(1, 'rgba(255, 200, 80, 0)');
-    ctx.fillStyle = lg;
-    ctx.fillRect(cx - 10, cy - 30 + nFloat, 40, 40);
+    // Eye glow
+    const eg = ctx.createRadialGradient(cx, cy - 7 + nFloat, 0, cx, cy - 7 + nFloat, 8);
+    eg.addColorStop(0, `rgba(180, 255, 200, ${0.12 * eyePulse})`);
+    eg.addColorStop(1, 'rgba(180, 255, 200, 0)');
+    ctx.fillStyle = eg;
+    ctx.fillRect(cx - 8, cy - 15 + nFloat, 16, 16);
 
-    // "Approach" text
-    ctx.fillStyle = `rgba(230, 200, 130, ${pulse})`;
+    // Staff with orb instead of lantern
+    ctx.fillStyle = '#442211';
+    ctx.fillRect(cx + 11, cy - 16 + nFloat, 2, 22);
+    // Staff top ornament
+    ctx.fillStyle = '#553311';
+    ctx.fillRect(cx + 10, cy - 18 + nFloat, 4, 3);
+    // Glowing orb
+    const orbPulse = Math.sin(time * 4) * 0.2 + 0.8;
+    const orbGlow = ctx.createRadialGradient(cx + 12, cy - 20 + nFloat, 0, cx + 12, cy - 20 + nFloat, 10);
+    orbGlow.addColorStop(0, `rgba(100, 255, 180, ${0.6 * orbPulse})`);
+    orbGlow.addColorStop(0.4, `rgba(80, 200, 150, ${0.3 * orbPulse})`);
+    orbGlow.addColorStop(1, 'rgba(80, 200, 150, 0)');
+    ctx.fillStyle = orbGlow;
+    ctx.beginPath();
+    ctx.arc(cx + 12, cy - 20 + nFloat, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(150, 255, 200, ${0.9 * orbPulse})`;
+    ctx.beginPath();
+    ctx.arc(cx + 12, cy - 20 + nFloat, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Label
+    ctx.fillStyle = `rgba(230, 210, 150, ${pulse})`;
     ctx.font = `bold 9px ${C.HUD_FONT}`;
     ctx.textAlign = 'center';
-    ctx.fillText('MERCADOR', cx, cy + 28);
+    ctx.fillText('MERCADOR', cx, cy + 30);
     ctx.textAlign = 'left';
     return;
   }
