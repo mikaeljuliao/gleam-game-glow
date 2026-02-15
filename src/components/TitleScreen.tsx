@@ -83,7 +83,7 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
             <h1
               className="text-4xl md:text-6xl font-bold tracking-wider leading-none"
               style={{
-                fontFamily: "'Georgia', serif",
+                fontFamily: "'Cinzel', serif",
                 color: '#cc4444',
                 textShadow: '0 0 20px rgba(200, 50, 50, 0.4), 0 0 40px rgba(150, 20, 20, 0.2), 2px 2px 0 #1a0a0a',
               }}
@@ -93,7 +93,7 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
             <h2
               className="text-lg md:text-2xl tracking-[0.3em] mt-1"
               style={{
-                fontFamily: "'Georgia', serif",
+                fontFamily: "'Cinzel', serif",
                 color: '#8866aa',
                 textShadow: '0 0 12px rgba(120, 80, 160, 0.3)',
               }}
@@ -117,7 +117,7 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
                 <div className="flex items-center justify-between">
                   <span
                     className="text-xs font-bold tracking-widest truncate"
-                    style={{ fontFamily: "'Georgia', serif", color: rank.color, textShadow: `0 0 8px ${rank.glowColor}` }}
+                    style={{ fontFamily: "'Cinzel', serif", color: rank.color, textShadow: `0 0 8px ${rank.glowColor}` }}
                   >
                     {rank.name.toUpperCase()}
                   </span>
@@ -160,7 +160,7 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
               onClick={() => onStart(false)}
               className="w-full py-3 text-base font-bold tracking-widest border rounded transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
               style={{
-                fontFamily: "'Georgia', serif",
+                fontFamily: "'Cinzel', serif",
                 color: '#ddcccc',
                 background: 'linear-gradient(180deg, rgba(160, 35, 35, 0.35), rgba(120, 20, 20, 0.25))',
                 borderColor: '#773333',
@@ -176,7 +176,7 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
                 onClick={() => onStart(true)}
                 className="w-full py-3 text-base font-bold tracking-widest border rounded transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                 style={{
-                  fontFamily: "'Georgia', serif",
+                  fontFamily: "'Cinzel', serif",
                   color: '#aaddaa',
                   background: 'linear-gradient(180deg, rgba(30, 110, 30, 0.3), rgba(20, 80, 20, 0.2))',
                   borderColor: '#336633',
