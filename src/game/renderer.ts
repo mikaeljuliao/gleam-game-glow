@@ -1624,6 +1624,9 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
     } else if (room.type === 'shrine') {
       fillColor = room.shrineUsed ? 'rgba(50, 30, 70, 0.4)' : 'rgba(130, 60, 200, 0.45)';
       borderColor = 'rgba(170, 100, 255, 0.7)';
+    } else if (room.type === 'vendor') {
+      fillColor = 'rgba(60, 120, 80, 0.45)';
+      borderColor = 'rgba(100, 220, 140, 0.7)';
     } else if (room.type === 'trap') {
       fillColor = room.trapTriggered ? 'rgba(80, 30, 30, 0.4)' : 'rgba(200, 60, 50, 0.4)';
       borderColor = 'rgba(255, 100, 80, 0.6)';
@@ -1671,6 +1674,9 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
     } else if (room.type === 'shrine') {
       ctx.fillStyle = 'rgba(180, 120, 255, 0.9)';
       ctx.fillText(room.shrineUsed ? '·' : '✦', cx, cy + 3);
+    } else if (room.type === 'vendor') {
+      ctx.fillStyle = 'rgba(100, 255, 180, 0.9)';
+      ctx.fillText('$', cx, cy + 3);
     } else if (room.type === 'trap') {
       ctx.fillStyle = 'rgba(255, 100, 70, 0.9)';
       ctx.fillText(room.trapTriggered ? '·' : '⚠', cx, cy + 3);
@@ -1690,6 +1696,7 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
     { color: 'rgba(70, 140, 80, 0.8)', label: 'LIMPA' },
     { color: 'rgba(255, 80, 80, 0.8)', label: 'BOSS' },
     { color: 'rgba(255, 210, 60, 0.8)', label: 'TESOURO' },
+    { color: 'rgba(100, 220, 140, 0.8)', label: 'LOJA' },
   ];
   let lx = panelX;
   for (const l of legends) {

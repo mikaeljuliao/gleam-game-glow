@@ -58,6 +58,12 @@ export class GameEngine {
   shopOpen = false;
   shopItems: ShopItem[] = [];
   vendorInteractCooldown = 0;
+  vendorFirstMeet = true;
+  vendorDialogueActive = false;
+  vendorDialogueLines: string[] = [];
+  vendorDialogueIndex = 0;
+  vendorDialogueCharIndex = 0;
+  vendorDialogueTimer = 0;
 
   constructor(displayCanvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     this.displayCanvas = displayCanvas;
@@ -173,13 +179,20 @@ export class GameEngine {
     if (this.shopOpen) return;
     this.shopOpen = true;
     this.pause();
-    // Generate shop items from existing upgrade pool
-    const items = getRandomUpgrades(4, this.player.upgrades);
-    this.shopItems = items.map(u => ({
-      upgrade: u,
-      cost: C.SHOP_PRICES[u.rarity] || 30,
-      sold: false,
-    }));
+    // Use persisted shop items from room, or generate if first visit
+    const room = getCurrentRoom(this.dungeon);
+    if (room.shopItems && room.shopItems.length > 0) {
+      this.shopItems = room.shopItems;
+    } else {
+      const items = getRandomUpgrades(4, this.player.upgrades);
+      this.shopItems = items.map(u => ({
+        upgrade: u,
+        cost: C.SHOP_PRICES[u.rarity] || 30,
+        sold: false,
+      }));
+      // Persist to room
+      room.shopItems = this.shopItems;
+    }
     this.callbacks.onShopOpen(this.shopItems, this.player.coins);
   }
 
@@ -187,6 +200,66 @@ export class GameEngine {
     this.shopOpen = false;
     this.vendorInteractCooldown = 1.5;
     this.resume();
+  }
+
+  // Vendor dialogue system
+  private startVendorDialogue() {
+    this.vendorDialogueActive = true;
+    this.vendorDialogueIndex = 0;
+    this.vendorDialogueCharIndex = 0;
+    this.vendorDialogueTimer = 0;
+    this.pause();
+
+    if (this.vendorFirstMeet) {
+      this.vendorFirstMeet = false;
+      this.vendorDialogueLines = [
+        'Ah… um sobrevivente.',
+        'Poucos chegam até mim.',
+        'Eu negocio poder.',
+        'Mas nada aqui é de graça.',
+      ];
+    } else {
+      const shortLines = [
+        ['Voltou vivo.', 'Precisa de mais força?'],
+        ['Tenho algo útil…', '…por um preço.'],
+        ['Você sobreviveu… impressionante.', 'Vamos negociar.'],
+        ['As sombras estão ficando mais famintas.', 'Melhor se preparar.'],
+      ];
+      this.vendorDialogueLines = shortLines[Math.floor(Math.random() * shortLines.length)];
+    }
+  }
+
+  private updateVendorDialogue(dt: number) {
+    if (!this.vendorDialogueActive) return;
+    this.vendorDialogueTimer += dt;
+
+    const line = this.vendorDialogueLines[this.vendorDialogueIndex];
+    if (this.vendorDialogueCharIndex < line.length) {
+      // Type out characters
+      if (this.vendorDialogueTimer >= 0.03) {
+        this.vendorDialogueTimer = 0;
+        this.vendorDialogueCharIndex++;
+      }
+    }
+  }
+
+  advanceVendorDialogue() {
+    if (!this.vendorDialogueActive) return;
+    const line = this.vendorDialogueLines[this.vendorDialogueIndex];
+    if (this.vendorDialogueCharIndex < line.length) {
+      // Skip to end of current line
+      this.vendorDialogueCharIndex = line.length;
+      return;
+    }
+    this.vendorDialogueIndex++;
+    this.vendorDialogueCharIndex = 0;
+    this.vendorDialogueTimer = 0;
+    if (this.vendorDialogueIndex >= this.vendorDialogueLines.length) {
+      // Dialogue done → open shop
+      this.vendorDialogueActive = false;
+      this.resume();
+      this.openShop();
+    }
   }
 
   buyShopItem(index: number): boolean {
@@ -222,7 +295,7 @@ export class GameEngine {
     const dt = Math.min((now - this.lastTime) / 1000, 0.05);
     this.lastTime = now;
 
-    if (!this.paused) {
+    if (!this.paused || this.vendorDialogueActive) {
       // Apply slow-mo
       let effectiveDt = dt;
       if (this.slowMoTimer > 0) {
@@ -233,7 +306,15 @@ export class GameEngine {
           this.slowMoFactor = 1;
         }
       }
-      this.update(effectiveDt);
+      if (this.vendorDialogueActive) {
+        this.updateVendorDialogue(dt);
+        // Click/key to advance dialogue
+        if (this.input.isMouseJustPressed(0) || this.input.isMouseJustPressed(2) || this.input.wantsDash()) {
+          this.advanceVendorDialogue();
+        }
+      } else {
+        this.update(effectiveDt);
+      }
     }
     this.render();
     this.input.clearFrame();
@@ -1259,12 +1340,12 @@ export class GameEngine {
       room.trapTriggered = true;
     }
 
-    // Vendor room interaction
-    if (room.type === 'vendor' && !this.shopOpen) {
+    // Vendor room interaction — dialogue first, then shop
+    if (room.type === 'vendor' && !this.shopOpen && !this.vendorDialogueActive) {
       if (this.vendorInteractCooldown > 0) {
         this.vendorInteractCooldown -= 0.016;
       } else if (dist < 30) {
-        this.openShop();
+        this.startVendorDialogue();
       }
     }
   }
@@ -1318,6 +1399,58 @@ export class GameEngine {
     ctx.font = `12px ${C.HUD_FONT}`;
     ctx.fillText(`Indo para o próximo andar em ${secs}...`, C.dims.gw / 2, C.dims.gh / 2 + 15);
     
+    ctx.textAlign = 'left';
+  }
+
+  private renderVendorDialogue(ctx: CanvasRenderingContext2D) {
+    const cx = C.dims.gw / 2;
+    const cy = C.dims.gh / 2;
+
+    // Dark overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, C.dims.gw, C.dims.gh);
+
+    // Dialogue box
+    const boxW = 280;
+    const boxH = 60;
+    const boxX = cx - boxW / 2;
+    const boxY = cy + 30;
+
+    ctx.fillStyle = 'rgba(25, 20, 15, 0.95)';
+    ctx.strokeStyle = 'rgba(180, 150, 80, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.rect(boxX, boxY, boxW, boxH);
+    ctx.fill();
+    ctx.stroke();
+
+    // Speaker name
+    ctx.fillStyle = '#e8d5a0';
+    ctx.font = `bold 10px ${C.HUD_FONT}`;
+    ctx.textAlign = 'left';
+    ctx.fillText('🧙 Mercador das Sombras', boxX + 8, boxY + 14);
+
+    // Current dialogue line (typewriter)
+    const line = this.vendorDialogueLines[this.vendorDialogueIndex] || '';
+    const displayed = line.slice(0, this.vendorDialogueCharIndex);
+    ctx.fillStyle = '#c8b888';
+    ctx.font = `11px ${C.HUD_FONT}`;
+    ctx.fillText(`"${displayed}"`, boxX + 10, boxY + 34);
+
+    // Cursor blink
+    if (this.vendorDialogueCharIndex < line.length) {
+      const blink = Math.sin(Date.now() / 200) > 0;
+      if (blink) {
+        ctx.fillStyle = '#c8b888';
+        ctx.fillText('▌', boxX + 10 + ctx.measureText(`"${displayed}"`).width + 2, boxY + 34);
+      }
+    }
+
+    // Prompt
+    ctx.fillStyle = 'rgba(200, 180, 120, 0.5)';
+    ctx.font = `9px ${C.HUD_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('clique para continuar', cx, boxY + boxH - 6);
     ctx.textAlign = 'left';
   }
 
@@ -1406,6 +1539,11 @@ export class GameEngine {
 
     // Boss intro overlay
     renderBossIntro(ctx, this.gameTime, vp);
+
+    // Vendor dialogue overlay
+    if (this.vendorDialogueActive) {
+      this.renderVendorDialogue(ctx);
+    }
 
     ctx.restore(); // game offset translate
 

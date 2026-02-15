@@ -163,6 +163,8 @@ export interface DungeonRoom {
   trapType?: TrapType;
   // Hidden traps (new system)
   hiddenTraps?: import('./traps').HiddenTrap[];
+  // Vendor shop inventory (persisted per room)
+  shopItems?: ShopItem[];
 }
 
 export interface HorrorEvent {
