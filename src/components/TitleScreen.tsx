@@ -86,7 +86,6 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
                 fontFamily: "'Cinzel', serif",
                 color: '#c45555',
                 letterSpacing: '0.12em',
-                WebkitTextStroke: '1px rgba(0,0,0,0.4)',
               }}
             >
               DUNGEON
@@ -97,7 +96,6 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
                 fontFamily: "'Cinzel', serif",
                 color: '#8870a8',
                 letterSpacing: '0.3em',
-                WebkitTextStroke: '0.5px rgba(0,0,0,0.3)',
               }}
             >
               OF SHADOWS

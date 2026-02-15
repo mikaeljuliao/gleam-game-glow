@@ -77,7 +77,6 @@ const GameOverScreen = ({ stats, onRestart }: Props) => {
               fontFamily: "'Cinzel', serif",
               color: '#bb3333',
               letterSpacing: '0.12em',
-              WebkitTextStroke: '1px rgba(0,0,0,0.4)',
               fontSize: compact ? '24px' : '40px',
             }}
           >
