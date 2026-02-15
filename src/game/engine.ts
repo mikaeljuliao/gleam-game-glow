@@ -1666,4 +1666,11 @@ export class GameEngine {
     this.offsetY = Math.floor((dh - this.renderHeight * this.scale) / 2);
     this.input.setTransform(this.scale, this.offsetX, this.offsetY);
   }
+
+  getAmuletDamageMult(): number {
+    if (isAmuletEquipped(this.amuletInventory, 'soul_collector')) {
+      return 1 + getSoulCollectorBonus(this.player.souls);
+    }
+    return 1;
+  }
 }
