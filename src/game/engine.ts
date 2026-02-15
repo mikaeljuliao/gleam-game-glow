@@ -11,7 +11,7 @@ import { SFX, initAudio } from './audio';
 import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive } from './horror';
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
 import { checkTrapCollision, activateTrap, updateTrapEffects, resetTrapEffects, getLightsOutTimer, getPanicTimer, getDoorsLockedTimer, hasEffect } from './traps';
-import { AmuletInventory, createAmuletInventory, getRandomBossAmuletDrop, isAmuletEquipped, WarRhythmState, createWarRhythmState, getSoulCollectorBonus, AMULET_DEFS } from './amulets';
+import { AmuletInventory, createAmuletInventory, getRandomBossAmuletDrop, isAmuletEquipped, WarRhythmState, createWarRhythmState, getSoulCollectorBonus, AMULET_DEFS, addAmulet } from './amulets';
 import * as C from './constants';
 
 export class GameEngine {
@@ -71,6 +71,8 @@ export class GameEngine {
   warRhythm: WarRhythmState = createWarRhythmState();
   lastAttackWasMelee = false;
   cruelRepTimer = 0;
+  cruelRepIsMelee = false;
+  cruelRepTarget = { x: 0, y: 0 };
 
   constructor(displayCanvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     this.displayCanvas = displayCanvas;
@@ -139,6 +141,7 @@ export class GameEngine {
     this.player.baseDamage = C.MELEE_DAMAGE + (floor - 1) * 8;
     this.player.projectileDamage = C.RANGED_DAMAGE + (floor - 1) * 5;
     this.player.attackSpeedMult = 1 + (floor - 1) * 0.15;
+    this._baseAttackSpeedMult = this.player.attackSpeedMult;
     this.player.moveSpeedMult = 1 + (floor - 1) * 0.1;
     this.player.damageMultiplier = 1 + (floor - 1) * 0.3;
     this.player.projectileCount = Math.min(1 + Math.floor((floor - 1) / 2), 4);
@@ -170,6 +173,8 @@ export class GameEngine {
     upgrade.apply(this.player);
     this.player.upgrades.push(upgrade.id);
     this.stats.upgradesCollected++;
+    // Track base attack speed for War Rhythm
+    this._baseAttackSpeedMult = this.player.attackSpeedMult;
     
     const tags = getOwnedTags([], this.player.upgrades);
     const newSynergies = checkSynergies(tags);
@@ -180,6 +185,8 @@ export class GameEngine {
       this.callbacks.onSynergyActivated(s);
       SFX.synergyActivated();
     }
+    // Update base attack speed after synergies too
+    this._baseAttackSpeedMult = this.player.attackSpeedMult;
     this.resume();
   }
 
@@ -199,6 +206,27 @@ export class GameEngine {
         cost: C.SHOP_PRICES[u.rarity] || 30,
         sold: false,
       }));
+      // Add one random unowned amulet to shop (expensive)
+      const amuletId = getRandomBossAmuletDrop(this.amuletInventory);
+      if (amuletId) {
+        const def = AMULET_DEFS.find(a => a.id === amuletId);
+        if (def) {
+          this.shopItems.push({
+            upgrade: {
+              id: `amulet_${def.id}`,
+              name: `${def.icon} ${def.name}`,
+              description: def.description,
+              rarity: 'legendary',
+              icon: def.icon,
+              synergyTags: [],
+              apply: () => {},
+            },
+            cost: 600 + Math.floor(Math.random() * 200),
+            sold: false,
+            amuletId: def.id,
+          });
+        }
+      }
       // Persist to room
       room.shopItems = this.shopItems;
     }
@@ -280,9 +308,19 @@ export class GameEngine {
     if (!item || item.sold || this.player.souls < item.cost) return false;
     this.player.souls -= item.cost;
     item.sold = true;
+
+    // Amulet purchase
+    if (item.amuletId) {
+      addAmulet(this.amuletInventory, item.amuletId);
+      this.callbacks.onAmuletDrop(item.amuletId);
+      SFX.shopBuy();
+      return true;
+    }
+
     item.upgrade.apply(this.player);
     this.player.upgrades.push(item.upgrade.id);
     this.stats.upgradesCollected++;
+    this._baseAttackSpeedMult = this.player.attackSpeedMult;
     SFX.shopBuy();
     
     // Check synergies
@@ -515,6 +553,12 @@ export class GameEngine {
         this.lastAttackWasMelee = true;
         this.doMeleeHit();
         SFX.meleeSwing();
+        // Cruel Repetition — 30% chance to auto-repeat
+        if (isAmuletEquipped(this.amuletInventory, 'cruel_repetition') && Math.random() < 0.3) {
+          this.cruelRepTimer = 0.15;
+          this.cruelRepIsMelee = true;
+          this.cruelRepTarget = { ...mouse };
+        }
       }
     }
 
@@ -527,6 +571,34 @@ export class GameEngine {
         const projs = createPlayerProjectile(this.player, mouse.x, mouse.y);
         this.projectiles.push(...projs);
         SFX.rangedShoot();
+        // Cruel Repetition — 30% chance to auto-repeat
+        if (isAmuletEquipped(this.amuletInventory, 'cruel_repetition') && Math.random() < 0.3) {
+          this.cruelRepTimer = 0.15;
+          this.cruelRepIsMelee = false;
+          this.cruelRepTarget = { ...mouse };
+        }
+      }
+    }
+
+    // Cruel Repetition auto-repeat
+    if (this.cruelRepTimer > 0) {
+      this.cruelRepTimer -= dt;
+      if (this.cruelRepTimer <= 0) {
+        if (this.cruelRepIsMelee) {
+          this.player.meleeCooldown = 0; // force allow
+          if (tryMelee(this.player, this.cruelRepTarget.x, this.cruelRepTarget.y)) {
+            this.doMeleeHit();
+            SFX.meleeSwing();
+            spawnDamageText(this.particles, this.player.x, this.player.y - 16, '🔁', '#aa88ff');
+          }
+        } else {
+          this.player.rangedCooldown = 0;
+          doRangedAttack(this.player);
+          const projs = createPlayerProjectile(this.player, this.cruelRepTarget.x, this.cruelRepTarget.y);
+          this.projectiles.push(...projs);
+          SFX.rangedShoot();
+          spawnDamageText(this.particles, this.player.x, this.player.y - 16, '🔁', '#aa88ff');
+        }
       }
     }
 
@@ -847,12 +919,19 @@ export class GameEngine {
     }
 
     // === AMULET TICK EFFECTS ===
-    // War Rhythm: decay stacks when not killing
-    if (isAmuletEquipped(this.amuletInventory, 'war_rhythm') && this.warRhythm.stacks > 0) {
-      this.warRhythm.decayTimer -= dt;
-      if (this.warRhythm.decayTimer <= 0) {
-        this.warRhythm.stacks = Math.max(0, this.warRhythm.stacks - 1);
-        this.warRhythm.decayTimer = 1; // lose 1 stack per second after delay
+    // War Rhythm: apply attack speed bonus from stacks, decay when not killing
+    if (isAmuletEquipped(this.amuletInventory, 'war_rhythm')) {
+      // Apply War Rhythm attack speed bonus: reset base then add bonus
+      const warBonus = 1 + this.warRhythm.stacks * this.warRhythm.bonusPerStack;
+      // We store the war rhythm multiplier separately and apply each frame
+      this.player.attackSpeedMult = this.getBaseAttackSpeedMult() * warBonus;
+
+      if (this.warRhythm.stacks > 0) {
+        this.warRhythm.decayTimer -= dt;
+        if (this.warRhythm.decayTimer <= 0) {
+          this.warRhythm.stacks = Math.max(0, this.warRhythm.stacks - 1);
+          this.warRhythm.decayTimer = 1;
+        }
       }
     }
 
@@ -966,7 +1045,7 @@ export class GameEngine {
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
       if (Math.abs(angleDiff) > C.MELEE_ARC / 2) continue;
 
-      let dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier);
+      let dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier * this.getAmuletDamageMult());
       // Berserker
       if (this.player.berserker && this.player.hp / this.player.maxHp < 0.3) {
         dmg = Math.floor(dmg * 1.8);
@@ -1672,5 +1751,15 @@ export class GameEngine {
       return 1 + getSoulCollectorBonus(this.player.souls);
     }
     return 1;
+  }
+
+  // Base attack speed (without War Rhythm bonus)
+  private _baseAttackSpeedMult = 1;
+  getBaseAttackSpeedMult(): number {
+    return this._baseAttackSpeedMult;
+  }
+  setBaseAttackSpeedMult(val: number) {
+    this._baseAttackSpeedMult = val;
+    this.player.attackSpeedMult = val;
   }
 }

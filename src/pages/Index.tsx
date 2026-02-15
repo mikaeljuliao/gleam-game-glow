@@ -101,11 +101,11 @@ const Index = () => {
   }, []);
 
   const handleAmuletDrop = useCallback((amuletId: string) => {
-    setAmuletInv(prev => {
-      const next = { ...prev, owned: [...prev.owned] };
-      addAmulet(next, amuletId);
-      return next;
-    });
+    const engine = engineRef.current;
+    if (engine) {
+      addAmulet(engine.amuletInventory, amuletId);
+      setAmuletInv({ ...engine.amuletInventory, owned: [...engine.amuletInventory.owned] });
+    }
     const def = getAmuletDef(amuletId);
     if (def) {
       setAmuletNotif(`🔮 Amuleto obtido: ${def.icon} ${def.name}`);
@@ -128,11 +128,8 @@ const Index = () => {
   const handleToggleEquip = useCallback((defId: string) => {
     const engine = engineRef.current;
     if (!engine) return;
-    setAmuletInv(prev => {
-      const next = { ...prev, owned: prev.owned.map(a => ({ ...a })) };
-      toggleEquip(next, defId, engine.player);
-      return next;
-    });
+    toggleEquip(engine.amuletInventory, defId, engine.player);
+    setAmuletInv({ ...engine.amuletInventory, owned: engine.amuletInventory.owned.map(a => ({ ...a })) });
   }, []);
 
   const handleRestart = useCallback(() => {
