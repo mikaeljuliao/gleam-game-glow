@@ -370,11 +370,12 @@ export const SFX = {
 
   // === NEW: Comprehensive interaction sounds ===
 
-  // Footsteps — very subtle, soft tap with natural variation
+  // Footsteps — soft, airy, agile character feel
   footstep() {
-    const pitch = 60 + Math.random() * 30;
-    playNoise(0.025, 0.012 + Math.random() * 0.008, 600 + Math.random() * 400);
-    playTone(pitch, 0.02, 'sine', 0.008);
+    const pitch = 180 + Math.random() * 80;
+    const vol = 0.014 + Math.random() * 0.006;
+    playNoise(0.018, vol * 0.6, 1200 + Math.random() * 800);
+    playTone(pitch, 0.015, 'sine', vol * 0.5);
   },
 
   // Critical hit — sharp metallic impact + high pitch accent

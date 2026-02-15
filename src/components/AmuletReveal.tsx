@@ -12,15 +12,15 @@ const AmuletReveal = ({ amuletId, onComplete }: AmuletRevealProps) => {
   const def = getAmuletDef(amuletId);
 
   useEffect(() => {
-    // Phase timings
-    const t1 = setTimeout(() => setPhase('reveal'), 600);
-    const t2 = setTimeout(() => setPhase('details'), 1800);
-    const t3 = setTimeout(() => onComplete(), 4000);
+    // Phase timings — ~3 seconds total then auto-dismiss
+    const t1 = setTimeout(() => setPhase('reveal'), 400);
+    const t2 = setTimeout(() => setPhase('details'), 1200);
+    const t3 = setTimeout(() => onComplete(), 3200);
     // Reward sound
     const t4 = setTimeout(() => {
       SFX.amuletEquip();
-      setTimeout(() => SFX.levelUp(), 300);
-    }, 500);
+      setTimeout(() => SFX.levelUp(), 200);
+    }, 350);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
   }, [onComplete]);
 

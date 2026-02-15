@@ -39,7 +39,6 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
   const { gox, goy, rw, rh } = vp;
   const ts = C.TILE_SIZE;
   
-  // Calculate tile range that covers the full viewport (in game-translated coords)
   const startCol = Math.floor(-gox / ts) - 1;
   const endCol = Math.ceil((rw - gox) / ts) + 1;
   const startRow = Math.floor(-goy / ts) - 1;
@@ -47,45 +46,93 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
   
   for (let row = startRow; row < endRow; row++) {
     for (let col = startCol; col < endCol; col++) {
-      // Skip tiles that are inside the game area (those are rendered by renderFloor)
       if (row >= 0 && row < C.dims.rr && col >= 0 && col < C.dims.rc) continue;
       
       const x = col * ts;
       const y = row * ts;
-      
-      // Stone wall texture with variation
       const hash = ((row * 7 + col * 13) & 0xFF);
-      const darkness = 0.6 + (hash % 10) * 0.02;
-      const r = Math.floor(14 * darkness);
-      const g = Math.floor(14 * darkness);
-      const b = Math.floor(22 * darkness);
+      
+      // Warmer, more visible stone walls — not too dark, not too bright
+      const darkness = 0.75 + (hash % 10) * 0.025;
+      const r = Math.floor(22 * darkness);
+      const g = Math.floor(20 * darkness);
+      const b = Math.floor(30 * darkness);
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(x, y, ts, ts);
       
-      // Stone brick lines
+      // Stone brick mortar lines
       if ((row + col) % 2 === 0) {
-        ctx.fillStyle = 'rgba(30, 30, 48, 0.4)';
+        ctx.fillStyle = 'rgba(35, 30, 50, 0.5)';
         ctx.fillRect(x, y, ts, 1);
         ctx.fillRect(x, y, 1, ts);
       }
+      // Alternate brick pattern
+      if ((row + col) % 2 === 1) {
+        ctx.fillStyle = 'rgba(25, 22, 38, 0.3)';
+        ctx.fillRect(x + ts / 2, y, 1, ts);
+      }
       
-      // Random cracks
+      // Cracks & details
       if (hash % 11 === 0) {
-        ctx.fillStyle = 'rgba(8, 8, 15, 0.5)';
-        ctx.fillRect(x + 3, y + 5, 4, 1);
+        ctx.fillStyle = 'rgba(10, 8, 18, 0.5)';
+        ctx.fillRect(x + 3, y + 5, 5, 1);
+        ctx.fillRect(x + 5, y + 5, 1, 3);
       }
       if (hash % 13 === 0) {
-        ctx.fillStyle = 'rgba(8, 8, 15, 0.4)';
-        ctx.fillRect(x + 8, y + 3, 1, 5);
+        ctx.fillStyle = 'rgba(10, 8, 18, 0.4)';
+        ctx.fillRect(x + 9, y + 3, 1, 6);
       }
       
-      // Occasional moss
-      if (hash % 29 === 0) {
-        ctx.fillStyle = 'rgba(20, 40, 20, 0.15)';
-        ctx.fillRect(x + 2, y + ts - 4, 6, 3);
+      // Moss patches
+      if (hash % 23 === 0) {
+        ctx.fillStyle = 'rgba(25, 50, 25, 0.2)';
+        ctx.fillRect(x + 1, y + ts - 4, 7, 3);
+      }
+      
+      // Pillar columns every ~6 tiles along arena edge
+      const distToArenaCol = col < 0 ? -col : col - C.dims.rc + 1;
+      const distToArenaRow = row < 0 ? -row : row - C.dims.rr + 1;
+      const nearEdge = (distToArenaCol === 1 || distToArenaRow === 1);
+      
+      if (nearEdge && (col % 6 === 0 || row % 5 === 0)) {
+        // Pillar stone — slightly brighter
+        ctx.fillStyle = 'rgba(40, 35, 55, 0.7)';
+        ctx.fillRect(x + 2, y, ts - 4, ts);
+        ctx.fillStyle = 'rgba(55, 48, 70, 0.5)';
+        ctx.fillRect(x + 3, y, 2, ts);
+        // Pillar cap highlight
+        ctx.fillStyle = 'rgba(70, 60, 90, 0.4)';
+        ctx.fillRect(x + 1, y, ts - 2, 2);
       }
     }
   }
+  
+  // Soft fog/mist along margins — atmospheric glow
+  const fogAlpha = 0.04 + Math.sin(time * 0.5) * 0.015;
+  // Top fog
+  const topFog = ctx.createLinearGradient(0, -goy, 0, 0);
+  topFog.addColorStop(0, `rgba(30, 25, 50, ${fogAlpha})`);
+  topFog.addColorStop(1, 'rgba(30, 25, 50, 0)');
+  ctx.fillStyle = topFog;
+  ctx.fillRect(-gox, -goy, rw, goy + 20);
+  // Bottom fog
+  const botFog = ctx.createLinearGradient(0, C.dims.gh, 0, C.dims.gh + (rh - goy - C.dims.gh));
+  botFog.addColorStop(0, 'rgba(30, 25, 50, 0)');
+  botFog.addColorStop(1, `rgba(30, 25, 50, ${fogAlpha})`);
+  ctx.fillStyle = botFog;
+  ctx.fillRect(-gox, C.dims.gh - 10, rw, rh - goy - C.dims.gh + 20);
+  // Left fog
+  const leftFog = ctx.createLinearGradient(-gox, 0, 0, 0);
+  leftFog.addColorStop(0, `rgba(30, 25, 50, ${fogAlpha})`);
+  leftFog.addColorStop(1, 'rgba(30, 25, 50, 0)');
+  ctx.fillStyle = leftFog;
+  ctx.fillRect(-gox, -goy, gox + 20, rh);
+  // Right fog
+  const rightFog = ctx.createLinearGradient(C.dims.gw, 0, C.dims.gw + (rw - gox - C.dims.gw), 0);
+  rightFog.addColorStop(0, 'rgba(30, 25, 50, 0)');
+  rightFog.addColorStop(1, `rgba(30, 25, 50, ${fogAlpha})`);
+  ctx.fillStyle = rightFog;
+  ctx.fillRect(C.dims.gw - 10, -goy, rw - gox - C.dims.gw + 20, rh);
 }
 import { roomKey, getCurrentRoom } from './dungeon';
 
@@ -127,6 +174,26 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number) {
           ctx.fillStyle = 'rgba(180, 170, 150, 0.12)';
           ctx.fillRect(x + 6, y + 8, 6, 2);
           ctx.fillRect(x + 8, y + 6, 2, 6);
+        }
+        // Subtle stone debris
+        if ((row * 3 + col * 19) % 41 === 0) {
+          ctx.fillStyle = 'rgba(60, 55, 70, 0.15)';
+          ctx.fillRect(x + 10, y + 10, 3, 2);
+          ctx.fillRect(x + 11, y + 9, 1, 4);
+        }
+        // Faint rune markings
+        if ((row * 23 + col * 7) % 53 === 0) {
+          ctx.fillStyle = 'rgba(80, 60, 120, 0.06)';
+          ctx.beginPath();
+          ctx.arc(x + C.TILE_SIZE / 2, y + C.TILE_SIZE / 2, 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillRect(x + C.TILE_SIZE / 2 - 1, y + C.TILE_SIZE / 2 - 5, 2, 10);
+        }
+        // Tiny pebbles
+        if ((row * 13 + col * 17) % 31 === 0) {
+          ctx.fillStyle = 'rgba(45, 40, 55, 0.2)';
+          ctx.fillRect(x + 4, y + 12, 2, 1);
+          ctx.fillRect(x + 12, y + 3, 1, 2);
         }
       }
     }

@@ -75,6 +75,7 @@ export class GameEngine {
   cruelRepTimer = 0;
   cruelRepIsMelee = false;
   cruelRepTarget = { x: 0, y: 0 };
+  _pendingBossAmuletId: string | null = null;
 
   constructor(displayCanvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     this.displayCanvas = displayCanvas;
@@ -546,12 +547,12 @@ export class GameEngine {
       }
     }
 
-    // Footstep sounds — softer, less frequent
+    // Footstep sounds — light, agile, comfortable frequency
     if (isPlayerMoving && !this.player.isDashing) {
       if (!this._footstepTimer) this._footstepTimer = 0;
       this._footstepTimer -= dt;
       if (this._footstepTimer <= 0) {
-        this._footstepTimer = 0.38 + Math.random() * 0.12;
+        this._footstepTimer = 0.32 + Math.random() * 0.08;
         SFX.footstep();
       }
     }
@@ -1155,14 +1156,12 @@ export class GameEngine {
       if (amuletId) {
         this.callbacks.onAmuletDrop(amuletId);
         spawnDamageText(this.particles, e.x, e.y - 20, '🔮 AMULETO!', '#cc88ff');
-        // Trigger dramatic reveal sequence
-        this.pause();
-        setTimeout(() => {
-          this.callbacks.onAmuletReveal(amuletId);
-        }, 800);
+        // Show amulet reveal, then level-up after it completes
+        this._pendingBossAmuletId = amuletId;
+      } else {
+        // No amulet to show, go straight to level-up
+        this.handleBossLevelUp();
       }
-      // Boss kill auto-level: force level up with guaranteed legendary
-      this.handleBossLevelUp();
     } else {
       spawnExplosion(this.particles, e.x, e.y, 10);
       SFX.enemyDeath();
@@ -1212,7 +1211,7 @@ export class GameEngine {
     }
   }
 
-  private handleBossLevelUp() {
+  handleBossLevelUp() {
     // Auto level-up regardless of XP
     this.player.level++;
     this.player.xp = 0;
@@ -1373,7 +1372,8 @@ export class GameEngine {
     const atkInterval = hasAmulet ? 0.5 : 0.8;
     const dmgMult = hasAmulet ? 0.8 : 0.5;
     const projCount = hasAmulet ? 2 : 1;
-    const healOnHit = hasAmulet ? 1 : 0;
+    // Heal on hit: very weak, only every 3rd attack when amulet equipped
+    const healOnHit = hasAmulet && this.discipleAttackTimer <= 0 && Math.random() < 0.33 ? 1 : 0;
 
     this.discipleAttackTimer -= dt;
     if (this.discipleAttackTimer <= 0) {
@@ -1429,21 +1429,30 @@ export class GameEngine {
   }
 
   private bossKillSequence() {
-    // Start victory countdown — 5 seconds of calm before next floor
-    this.victoryActive = true;
-    this.victoryCountdown = this.victoryCountdownMax;
-    
     // Kill impact effects
     this.slowMoTimer = 0.8;
     this.slowMoFactor = 0.2;
     this.addEffect('flash', 1, 0.5, 'rgb(255, 255, 200)');
     this.addEffect('shake', 12, 0.6);
     spawnExplosion(this.particles, C.dims.gw / 2, C.dims.gh / 2, 30);
-    
-    // Play calm victory tone after initial impact
-    setTimeout(() => {
-      SFX.bossKill(this.bossKillFloor);
-    }, 300);
+
+    // If there's a pending amulet reveal, show it then level-up
+    if (this._pendingBossAmuletId) {
+      const amuletId = this._pendingBossAmuletId;
+      this._pendingBossAmuletId = null;
+      // Brief delay then show reveal overlay
+      setTimeout(() => {
+        this.pause();
+        this.callbacks.onAmuletReveal(amuletId);
+      }, 600);
+    } else {
+      // No amulet — just do level-up after brief delay
+      this.handleBossLevelUp();
+    }
+
+    // Start victory countdown — 5 seconds of calm before next floor
+    this.victoryActive = true;
+    this.victoryCountdown = this.victoryCountdownMax;
   }
   
   private updateVictoryCountdown(dt: number) {
@@ -1568,14 +1577,16 @@ export class GameEngine {
   // Public method for sanctuary heal — triggered by [T] key
   trySanctuaryHeal() {
     // Guard: don't heal during dialogue, shop, or paused states
-    if (this.vendorDialogueActive || this.shopOpen) return;
+    if (this.vendorDialogueActive || this.shopOpen || this.paused) return;
     const room = getCurrentRoom(this.dungeon);
     if (room.type !== 'vendor') return;
+    if (!this.inVendorRoom) return;
     const p = this.player;
-    const shrineX = C.dims.gw * 0.18;
+    // Sanctuary is near vendor center — wider detection radius
+    const shrineX = C.dims.gw * 0.5;
     const shrineY = C.dims.gh * 0.5;
     const shrineDist = Math.sqrt((p.x - shrineX) ** 2 + (p.y - shrineY) ** 2);
-    if (shrineDist > 35) return;
+    if (shrineDist > 60) return;
     if (this.shrineCooldown) return;
     const healCost = 50 + this.dungeon.floor * 10;
     if (p.souls < healCost || p.hp >= p.maxHp) return;
