@@ -759,7 +759,7 @@ export function renderHorrorEvents(ctx: CanvasRenderingContext2D, events: Horror
 }
 
 // Render special room visuals
-export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: string, time: number, collected: boolean, trapType?: string) {
+export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: string, time: number, collected: boolean, trapType?: string, playerX?: number, playerY?: number) {
   const cx = C.dims.gw / 2;
   const cy = C.dims.gh / 2;
   const pulse = Math.sin(time * 3) * 0.3 + 0.7;
@@ -932,6 +932,29 @@ export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: strin
     ctx.fillStyle = `rgba(100, 170, 255, ${pulse * 0.5})`;
     ctx.font = `7px ${C.HUD_FONT}`;
     ctx.fillText('Cura por Almas', shrineX, shrineY + 30);
+
+    // [T] interaction prompt when player is near
+    if (playerX !== undefined && playerY !== undefined) {
+      const shrineDist = Math.sqrt((playerX - shrineX) ** 2 + (playerY - shrineY) ** 2);
+      if (shrineDist < 35) {
+        const promptPulse = Math.sin(time * 4) * 0.3 + 0.7;
+        // Prompt background
+        ctx.fillStyle = `rgba(10, 20, 40, ${0.85 * promptPulse})`;
+        const promptW = 90;
+        const promptH = 16;
+        ctx.beginPath();
+        ctx.rect(shrineX - promptW / 2, shrineY - 32 + sFloat, promptW, promptH);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(80, 160, 255, ${0.6 * promptPulse})`;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(shrineX - promptW / 2, shrineY - 32 + sFloat, promptW, promptH);
+        // Key hint
+        ctx.fillStyle = `rgba(140, 200, 255, ${promptPulse})`;
+        ctx.font = `bold 8px ${C.HUD_FONT}`;
+        ctx.fillText('[T] Usar Santuário', shrineX, shrineY - 22 + sFloat);
+      }
+    }
+
     ctx.textAlign = 'left';
 
     return;

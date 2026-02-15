@@ -5,13 +5,14 @@ import UpgradeSelection from '@/components/UpgradeSelection';
 import GameOverScreen from '@/components/GameOverScreen';
 import ShopOverlay from '@/components/ShopOverlay';
 import AmuletInventoryOverlay from '@/components/AmuletInventory';
+import CartographerMap from '@/components/CartographerMap';
 import { GameEngine } from '@/game/engine';
 import { initAudio } from '@/game/audio';
-import { Upgrade, Synergy, GameStats, ShopItem } from '@/game/types';
+import { Upgrade, Synergy, GameStats, ShopItem, DungeonMap } from '@/game/types';
 import { hasSave, clearSave } from '@/game/save';
-import { AmuletInventory, createAmuletInventory, addAmulet, toggleEquip, getAmuletDef } from '@/game/amulets';
+import { AmuletInventory, createAmuletInventory, addAmulet, toggleEquip, getAmuletDef, isAmuletEquipped } from '@/game/amulets';
 
-type GameState = 'title' | 'playing' | 'upgrading' | 'gameOver' | 'shopping' | 'inventory';
+type GameState = 'title' | 'playing' | 'upgrading' | 'gameOver' | 'shopping' | 'inventory' | 'cartographer';
 
 const Index = () => {
   const [gameState, setGameState] = useState<GameState>('title');
@@ -27,6 +28,7 @@ const Index = () => {
   const [shopCoins, setShopCoins] = useState(0);
   const [amuletInv, setAmuletInv] = useState<AmuletInventory>(createAmuletInventory());
   const [prevGameState, setPrevGameState] = useState<GameState>('playing');
+  const [cartoDungeon, setCartoDungeon] = useState<DungeonMap | null>(null);
 
   useEffect(() => {
     document.title = 'Dungeon of Shadows';
@@ -148,10 +150,11 @@ const Index = () => {
     }
   }, [loadSave, devFloor, gameKey]);
 
-  // Keyboard shortcut for inventory
+  // Keyboard shortcut for inventory and cartographer map
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'i') {
+      const key = e.key.toLowerCase();
+      if (key === 'i') {
         if (gameState === 'inventory') {
           handleInventoryClose();
         } else if (gameState === 'playing') {
@@ -159,12 +162,36 @@ const Index = () => {
           handleInventoryOpen();
         }
       }
+      if (key === 'm') {
+        if (gameState === 'cartographer') {
+          setGameState('playing');
+          engineRef.current?.resume();
+        } else if (gameState === 'playing') {
+          const engine = engineRef.current;
+          if (engine && isAmuletEquipped(engine.amuletInventory, 'cartographer')) {
+            engine.pause();
+            setCartoDungeon(engine.dungeon);
+            setGameState('cartographer');
+          }
+        }
+      }
+      if (key === 't' && gameState === 'playing') {
+        const engine = engineRef.current;
+        if (engine) {
+          engine.trySanctuaryHeal();
+        }
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [gameState, handleInventoryOpen, handleInventoryClose]);
 
-  const isGameActive = gameState === 'playing' || gameState === 'upgrading' || gameState === 'shopping' || gameState === 'inventory';
+  const handleCartoClose = useCallback(() => {
+    setGameState('playing');
+    engineRef.current?.resume();
+  }, []);
+
+  const isGameActive = gameState === 'playing' || gameState === 'upgrading' || gameState === 'shopping' || gameState === 'inventory' || gameState === 'cartographer';
 
   return (
     <div className="w-screen h-screen overflow-hidden" style={{ background: '#000' }}>
@@ -208,6 +235,12 @@ const Index = () => {
                 souls={engineRef.current?.player.souls ?? 0}
                 onToggleEquip={handleToggleEquip}
                 onClose={handleInventoryClose}
+              />
+            )}
+            {gameState === 'cartographer' && cartoDungeon && (
+              <CartographerMap
+                dungeon={cartoDungeon}
+                onClose={handleCartoClose}
               />
             )}
             {synergyNotif && (
