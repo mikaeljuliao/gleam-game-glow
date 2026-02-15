@@ -1,5 +1,6 @@
 import { Upgrade } from '@/game/types';
 import { useEffect, useState } from 'react';
+import { SFX } from '@/game/audio';
 
 interface Props {
   choices: Upgrade[];
@@ -76,7 +77,7 @@ const UpgradeSelection = ({ choices, onSelect }: Props) => {
           return (
             <button
               key={upgrade.id}
-              onClick={() => onSelect(upgrade)}
+              onClick={() => { SFX.upgradeSelect(); onSelect(upgrade); }}
               style={{
                 display: 'flex',
                 flexDirection: isSmall && !isLandscape ? 'row' : 'column',

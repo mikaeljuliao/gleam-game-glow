@@ -368,7 +368,113 @@ export const SFX = {
     setTimeout(() => playTone(350, 0.12, 'sine', 0.03), 120);
   },
 
-  // ambientDrone removed — replaced by psychological horror system in horror.ts
+  // === NEW: Comprehensive interaction sounds ===
+
+  // Footsteps — subtle, with pitch variation
+  footstep() {
+    const pitch = 80 + Math.random() * 40;
+    playNoise(0.04, 0.03 + Math.random() * 0.02, 1200 + Math.random() * 800);
+    playTone(pitch, 0.03, 'sine', 0.02);
+  },
+
+  // Critical hit — sharp metallic impact + high pitch accent
+  criticalHit() {
+    playTone(1400, 0.06, 'square', 0.1);
+    playNoise(0.06, 0.1, 6000);
+    playTone(2000, 0.04, 'sine', 0.08);
+    setTimeout(() => playTone(1800, 0.08, 'sine', 0.05), 40);
+  },
+
+  // Melee miss / swing whiff — lighter than meleeSwing
+  meleeWhiff() {
+    playFreqSweep(300, 100, 0.08, 'sine', 0.04);
+    playNoise(0.05, 0.03, 3000);
+  },
+
+  // Room enter — subtle atmospheric shift
+  roomEnter() {
+    playTone(150, 0.2, 'sine', 0.04);
+    playNoise(0.1, 0.02, 800);
+    setTimeout(() => playTone(200, 0.15, 'sine', 0.03), 100);
+  },
+
+  // UI open — generic interface open
+  uiOpen() {
+    playTone(600, 0.08, 'sine', 0.05);
+    setTimeout(() => playTone(800, 0.06, 'sine', 0.04), 50);
+  },
+
+  // UI close — generic interface close
+  uiClose() {
+    playTone(700, 0.06, 'sine', 0.04);
+    setTimeout(() => playTone(500, 0.08, 'sine', 0.03), 40);
+  },
+
+  // Upgrade select — satisfying confirmation
+  upgradeSelect() {
+    playTone(500, 0.1, 'sine', 0.07);
+    setTimeout(() => playTone(700, 0.08, 'sine', 0.06), 60);
+    setTimeout(() => playTone(1000, 0.12, 'sine', 0.05), 120);
+  },
+
+  // Can't afford / action blocked — dull reject
+  actionBlocked() {
+    playTone(120, 0.12, 'square', 0.06);
+    setTimeout(() => playTone(100, 0.12, 'square', 0.05), 80);
+  },
+
+  // Soul collect — with pitch variation for life
+  soulCollect() {
+    const pitch = 900 + Math.random() * 300;
+    playTone(pitch, 0.06, 'sine', 0.04);
+    setTimeout(() => playTone(pitch + 200, 0.05, 'sine', 0.03), 40);
+  },
+
+  // Chest/treasure open
+  chestOpen() {
+    playFreqSweep(200, 600, 0.2, 'sine', 0.06);
+    playNoise(0.1, 0.04, 2000);
+    setTimeout(() => {
+      playTone(800, 0.12, 'sine', 0.06);
+      playTone(1000, 0.1, 'sine', 0.05);
+    }, 120);
+  },
+
+  // Trap spring — alarming
+  trapActivate() {
+    playTone(200, 0.15, 'square', 0.1);
+    playFreqSweep(600, 100, 0.15, 'sawtooth', 0.08);
+    playNoise(0.1, 0.08, 4000);
+  },
+
+  // Sanctuary heal — spiritual warmth
+  sanctuaryHeal() {
+    const notes = [400, 500, 600, 800];
+    notes.forEach((f, i) => {
+      setTimeout(() => playTone(f, 0.2, 'sine', 0.06), i * 70);
+    });
+    playNoise(0.3, 0.02, 1500);
+  },
+
+  // Projectile impact (enemy bullet hitting player already uses playerHit, this is for visual feedback)
+  projectileImpact() {
+    playTone(300 + Math.random() * 100, 0.05, 'square', 0.05);
+    playNoise(0.03, 0.04, 4000);
+  },
+
+  // Shop hover / item select
+  shopSelect() {
+    playTone(700, 0.04, 'sine', 0.03);
+  },
+
+  // Revive
+  revive() {
+    const notes = [300, 400, 500, 700, 900];
+    notes.forEach((f, i) => {
+      setTimeout(() => playTone(f, 0.2, 'sine', 0.08), i * 80);
+    });
+    playNoise(0.2, 0.04, 3000);
+  },
 };
 
 // Initialize audio on first user interaction
