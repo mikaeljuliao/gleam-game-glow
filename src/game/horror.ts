@@ -286,7 +286,7 @@ export function getCombatIntensity(): number {
   return combatIntensity;
 }
 
-// ── Vendor room ambient (calm, melodic music) ───────────
+// ── Vendor room ambient (mysterious refuge) ─────────────
 let vendorAmbienceActive = false;
 let vendorNodes: (OscillatorNode | GainNode | AudioBufferSourceNode)[] = [];
 let vendorMelodyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -296,18 +296,28 @@ export function startVendorAmbience() {
   vendorAmbienceActive = true;
   const ctx = getBgCtx();
 
-  // --- Warm pad layer (sustained chord) ---
-  const padNotes = [261.6, 329.6, 392.0, 523.3]; // C4, E4, G4, C5
+  // --- Deep pad layer (minor chord with tension) ---
+  // Am7 voicing: A2, C3, E3, G3 - warm but uneasy
+  const padNotes = [110.0, 130.8, 164.8, 196.0];
   for (const freq of padNotes) {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     const filter = ctx.createBiquadFilter();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    // Slow subtle detuning for organic feel
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(0.15 + Math.random() * 0.1, ctx.currentTime);
+    lfoGain.gain.setValueAtTime(1.5, ctx.currentTime);
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+    lfo.start();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(800, ctx.currentTime);
+    filter.frequency.setValueAtTime(600, ctx.currentTime);
     gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.025, ctx.currentTime + 2);
+    gain.gain.linearRampToValueAtTime(0.035, ctx.currentTime + 3);
     osc.connect(filter);
     filter.connect(gain);
     gain.connect(ctx.destination);
@@ -315,52 +325,83 @@ export function startVendorAmbience() {
     vendorNodes.push(osc, gain);
   }
 
-  // --- Gentle melody arpeggio (repeating pattern) ---
-  const melodyNotes = [523.3, 659.3, 784.0, 659.3, 587.3, 523.3, 392.0, 440.0];
+  // --- Mysterious melody (minor pentatonic, deliberate pacing) ---
+  // A minor pentatonic: A3, C4, D4, E4, G4, A4
+  const melodyNotes = [220.0, 261.6, 293.7, 329.6, 392.0, 440.0];
+  const melodyPattern = [0, 2, 4, 3, 1, 4, 5, 3, 2, 0]; // indices into melodyNotes
   let noteIndex = 0;
   function playMelodyNote() {
     if (!vendorAmbienceActive) return;
     const ctx2 = getBgCtx();
-    const freq = melodyNotes[noteIndex % melodyNotes.length];
+    const idx = melodyPattern[noteIndex % melodyPattern.length];
+    const freq = melodyNotes[idx];
     noteIndex++;
     const osc = ctx2.createOscillator();
     const gain = ctx2.createGain();
     const filter = ctx2.createBiquadFilter();
-    osc.type = 'triangle';
+    // Alternate between triangle and sine for variety
+    osc.type = noteIndex % 3 === 0 ? 'sine' : 'triangle';
     osc.frequency.setValueAtTime(freq, ctx2.currentTime);
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(1200, ctx2.currentTime);
-    const vol = 0.04 + Math.random() * 0.015;
-    gain.gain.setValueAtTime(vol, ctx2.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 1.2);
+    filter.frequency.setValueAtTime(1000, ctx2.currentTime);
+    const vol = 0.045 + Math.random() * 0.02;
+    gain.gain.setValueAtTime(0, ctx2.currentTime);
+    gain.gain.linearRampToValueAtTime(vol, ctx2.currentTime + 0.08);
+    gain.gain.setValueAtTime(vol * 0.8, ctx2.currentTime + 0.3);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 1.8);
     osc.connect(filter);
     filter.connect(gain);
     gain.connect(ctx2.destination);
     osc.start();
-    osc.stop(ctx2.currentTime + 1.3);
-    vendorMelodyTimer = setTimeout(playMelodyNote, 600 + Math.random() * 200);
+    osc.stop(ctx2.currentTime + 2.0);
+    // Irregular timing for intrigue
+    const delay = 800 + Math.random() * 600 + (noteIndex % 3 === 0 ? 400 : 0);
+    vendorMelodyTimer = setTimeout(playMelodyNote, delay);
   }
-  vendorMelodyTimer = setTimeout(playMelodyNote, 800);
+  vendorMelodyTimer = setTimeout(playMelodyNote, 1200);
 
-  // --- Soft shimmer/chime layer ---
-  function playShimmer() {
+  // --- Sub-bass pulse (anticipation / heartbeat-like) ---
+  function playSubPulse() {
     if (!vendorAmbienceActive) return;
     const ctx2 = getBgCtx();
-    const shimmerFreqs = [1046.5, 1318.5, 1568.0]; // C6, E6, G6
-    const f = shimmerFreqs[Math.floor(Math.random() * shimmerFreqs.length)];
     const osc = ctx2.createOscillator();
     const gain = ctx2.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(f, ctx2.currentTime);
-    gain.gain.setValueAtTime(0.015, ctx2.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 2);
+    osc.frequency.setValueAtTime(55, ctx2.currentTime); // A1
+    osc.frequency.exponentialRampToValueAtTime(40, ctx2.currentTime + 0.6);
+    gain.gain.setValueAtTime(0.05, ctx2.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 0.6);
     osc.connect(gain);
     gain.connect(ctx2.destination);
     osc.start();
-    osc.stop(ctx2.currentTime + 2.1);
-    setTimeout(playShimmer, 2000 + Math.random() * 3000);
+    osc.stop(ctx2.currentTime + 0.7);
+    setTimeout(playSubPulse, 3000 + Math.random() * 4000);
   }
-  setTimeout(playShimmer, 1500);
+  setTimeout(playSubPulse, 2000);
+
+  // --- Ethereal chime (rare, magical shimmer) ---
+  function playShimmer() {
+    if (!vendorAmbienceActive) return;
+    const ctx2 = getBgCtx();
+    const shimmerFreqs = [880.0, 1046.5, 1318.5]; // A5, C6, E6
+    const f = shimmerFreqs[Math.floor(Math.random() * shimmerFreqs.length)];
+    const osc = ctx2.createOscillator();
+    const gain = ctx2.createGain();
+    const reverb = ctx2.createBiquadFilter();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(f, ctx2.currentTime);
+    reverb.type = 'highpass';
+    reverb.frequency.setValueAtTime(600, ctx2.currentTime);
+    gain.gain.setValueAtTime(0.02, ctx2.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 2.5);
+    osc.connect(reverb);
+    reverb.connect(gain);
+    gain.connect(ctx2.destination);
+    osc.start();
+    osc.stop(ctx2.currentTime + 2.6);
+    setTimeout(playShimmer, 3000 + Math.random() * 5000);
+  }
+  setTimeout(playShimmer, 2500);
 }
 
 export function stopVendorAmbience() {

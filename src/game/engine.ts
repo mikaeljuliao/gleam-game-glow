@@ -213,17 +213,21 @@ export class GameEngine {
     if (this.vendorFirstMeet) {
       this.vendorFirstMeet = false;
       this.vendorDialogueLines = [
-        'Ah… um sobrevivente.',
-        'Poucos chegam até mim.',
-        'Eu negocio poder.',
-        'Mas nada aqui é de graça.',
+        'Então é você…',
+        'O viajante que está fazendo o andar tremer.',
+        'Poucos chegam até mim ainda vivos.',
+        'A maioria vira lembrança… ou alimento para as criaturas daqui.',
+        'Este lugar corrói coragem, esperança… e ossos.',
+        'Eu sou conhecido como O Mercador.',
+        'Negocio oportunidades para aqueles teimosos o bastante para continuar subindo.',
+        'E se pretende ir mais longe…',
+        'vai precisar do que eu tenho.',
       ];
     } else {
       const shortLines = [
-        ['Voltou vivo.', 'Precisa de mais força?'],
-        ['Tenho algo útil…', '…por um preço.'],
-        ['Você sobreviveu… impressionante.', 'Vamos negociar.'],
-        ['As sombras estão ficando mais famintas.', 'Melhor se preparar.'],
+        ['Ainda vivo. Impressionante.', 'Selecionei algumas coisas que você possa gostar.', 'Veja o que eu tenho.'],
+        ['Você voltou.', 'Gosto de clientes que sobrevivem.', 'Dê uma olhada.'],
+        ['Você continua me surpreendendo.', 'Poucos passam tantas vezes por esta porta.', 'Vamos negociar.'],
       ];
       this.vendorDialogueLines = shortLines[Math.floor(Math.random() * shortLines.length)];
     }
