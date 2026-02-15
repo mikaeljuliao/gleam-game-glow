@@ -7,7 +7,7 @@ const VENDOR_DIALOGUES = [
   "Não garanto que verá o próximo andar.",
   "Escolha com cuidado.",
   "As sombras estão ficando mais famintas.",
-  "Moedas por poder... um bom negócio, não?",
+  "Almas por poder... um bom negócio, não?",
   "Cada item aqui custou a vida de alguém.",
   "Não se demore... eles podem sentir seu cheiro.",
 ];
@@ -35,12 +35,12 @@ const RARITY_LABELS: Record<string, string> = {
 
 interface ShopOverlayProps {
   items: ShopItem[];
-  coins: number;
+  coins: number; // actually souls now
   onBuy: (index: number) => void;
   onClose: () => void;
 }
 
-const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
+const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) => {
   const [dialogue, setDialogue] = useState('');
   const [displayedText, setDisplayedText] = useState('');
   const [buyFlash, setBuyFlash] = useState<number | null>(null);
@@ -60,7 +60,7 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
 
   const handleBuy = (index: number) => {
     const item = items[index];
-    if (item.sold || coins < item.cost) return;
+    if (item.sold || souls < item.cost) return;
     onBuy(index);
     setBuyFlash(index);
     setTimeout(() => setBuyFlash(null), 300);
@@ -99,8 +99,8 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
             className="text-lg font-medium"
             style={{
               color: '#d4c090',
-              fontFamily: "'Cinzel', serif",
-              letterSpacing: '0.1em',
+              fontFamily: "'Montserrat', sans-serif",
+              letterSpacing: '0.08em',
             }}
           >
             Mercador das Sombras
@@ -113,7 +113,7 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
           style={{
             background: 'rgba(0, 0, 0, 0.3)',
             color: '#b8a878',
-            fontFamily: "'Cinzel', serif",
+            fontFamily: "'Montserrat', sans-serif",
             fontSize: '13px',
             letterSpacing: '0.04em',
             minHeight: '36px',
@@ -125,32 +125,32 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
           <span style={{ opacity: displayedText.length < dialogue.length ? 1 : 0 }}>▌</span>
         </div>
 
-        {/* Coins */}
+        {/* Souls */}
         <div
           className="flex items-center gap-2 mb-4 px-4 py-1 rounded"
           style={{
-            background: 'rgba(180, 150, 50, 0.1)',
-            border: '1px solid rgba(180, 150, 50, 0.25)',
+            background: 'rgba(100, 180, 255, 0.08)',
+            border: '1px solid rgba(100, 180, 255, 0.2)',
           }}
         >
-          <span style={{ fontSize: '18px' }}>🪙</span>
+          <span style={{ fontSize: '18px' }}>👻</span>
           <span
             style={{
-              color: '#d4b44a',
-              fontFamily: 'monospace',
+              color: '#88ccff',
+              fontFamily: "'Montserrat', sans-serif",
               fontSize: '16px',
               fontWeight: 500,
               letterSpacing: '0.08em',
             }}
           >
-            {coins}
+            {souls} Almas
           </span>
         </div>
 
         {/* Items */}
         <div className="w-full space-y-2 mb-4">
           {items.map((item, idx) => {
-            const canAfford = coins >= item.cost;
+            const canAfford = souls >= item.cost;
             const isSold = item.sold;
             return (
               <button
@@ -177,6 +177,7 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
                     <span
                       style={{
                         color: isSold ? '#666' : RARITY_COLORS[item.upgrade.rarity],
+                        fontFamily: "'Montserrat', sans-serif",
                         fontSize: '13px',
                         fontWeight: 500,
                         letterSpacing: '0.06em',
@@ -197,7 +198,7 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
                       {RARITY_LABELS[item.upgrade.rarity]}
                     </span>
                   </div>
-                  <span style={{ color: isSold ? '#555' : '#909090', fontSize: '11px', letterSpacing: '0.02em' }}>
+                  <span style={{ color: isSold ? '#555' : '#909090', fontFamily: "'Montserrat', sans-serif", fontSize: '11px', letterSpacing: '0.02em' }}>
                     {isSold ? 'VENDIDO' : item.upgrade.description}
                   </span>
                 </div>
@@ -205,13 +206,13 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
                   className="flex items-center gap-1 px-2 py-1 rounded"
                   style={{
                     background: 'rgba(0, 0, 0, 0.3)',
-                    color: isSold ? '#555' : canAfford ? '#d4b44a' : '#cc5555',
-                    fontFamily: 'monospace',
+                    color: isSold ? '#555' : canAfford ? '#88ccff' : '#cc5555',
+                    fontFamily: "'Montserrat', sans-serif",
                     fontSize: '13px',
                     fontWeight: 500,
                   }}
                 >
-                  🪙 {item.cost}
+                  👻 {item.cost}
                 </div>
               </button>
             );
@@ -226,6 +227,7 @@ const ShopOverlay = ({ items, coins, onBuy, onClose }: ShopOverlayProps) => {
             background: 'rgba(80, 60, 30, 0.5)',
             color: '#d4c090',
             border: '1px solid rgba(160, 130, 70, 0.3)',
+            fontFamily: "'Montserrat', sans-serif",
             fontSize: '13px',
             letterSpacing: '0.1em',
           }}

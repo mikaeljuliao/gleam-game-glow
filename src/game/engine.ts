@@ -11,6 +11,7 @@ import { SFX, initAudio } from './audio';
 import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive } from './horror';
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
 import { checkTrapCollision, activateTrap, updateTrapEffects, resetTrapEffects, getLightsOutTimer, getPanicTimer, getDoorsLockedTimer, hasEffect } from './traps';
+import { AmuletInventory, createAmuletInventory, getRandomBossAmuletDrop, isAmuletEquipped, WarRhythmState, createWarRhythmState, getSoulCollectorBonus, AMULET_DEFS } from './amulets';
 import * as C from './constants';
 
 export class GameEngine {
@@ -65,6 +66,11 @@ export class GameEngine {
   vendorDialogueIndex = 0;
   vendorDialogueCharIndex = 0;
   vendorDialogueTimer = 0;
+  // Amulet system
+  amuletInventory: AmuletInventory = createAmuletInventory();
+  warRhythm: WarRhythmState = createWarRhythmState();
+  lastAttackWasMelee = false;
+  cruelRepTimer = 0;
 
   constructor(displayCanvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     this.displayCanvas = displayCanvas;
@@ -196,7 +202,7 @@ export class GameEngine {
       // Persist to room
       room.shopItems = this.shopItems;
     }
-    this.callbacks.onShopOpen(this.shopItems, this.player.coins);
+    this.callbacks.onShopOpen(this.shopItems, this.player.souls);
   }
 
   closeShop() {
@@ -271,8 +277,8 @@ export class GameEngine {
 
   buyShopItem(index: number): boolean {
     const item = this.shopItems[index];
-    if (!item || item.sold || this.player.coins < item.cost) return false;
-    this.player.coins -= item.cost;
+    if (!item || item.sold || this.player.souls < item.cost) return false;
+    this.player.souls -= item.cost;
     item.sold = true;
     item.upgrade.apply(this.player);
     this.player.upgrades.push(item.upgrade.id);
@@ -291,8 +297,8 @@ export class GameEngine {
     return true;
   }
 
-  private getCoinsForEnemy(type: string): number {
-    const range = C.COIN_DROPS[type] || [1, 3];
+  private getSoulsForEnemy(type: string): number {
+    const range = C.SOUL_DROPS[type] || [1, 3];
     return range[0] + Math.floor(Math.random() * (range[1] - range[0] + 1));
   }
 
@@ -506,6 +512,7 @@ export class GameEngine {
     if (this.input.isMouseJustPressed(0)) {
       const mouse = this.input.getMousePos();
       if (tryMelee(this.player, mouse.x, mouse.y)) {
+        this.lastAttackWasMelee = true;
         this.doMeleeHit();
         SFX.meleeSwing();
       }
@@ -514,6 +521,7 @@ export class GameEngine {
     // Combat - ranged
     if (this.input.isMouseJustPressed(2) || this.input.isDown('e')) {
       if (canRangedAttack(this.player)) {
+        this.lastAttackWasMelee = false;
         doRangedAttack(this.player);
         const mouse = this.input.getMousePos();
         const projs = createPlayerProjectile(this.player, mouse.x, mouse.y);
@@ -685,7 +693,7 @@ export class GameEngine {
           if (projDeadEnemies.has(e)) continue;
           if (e.spawnTimer > 0) continue;
           if (this.circleCollide(p.x, p.y, p.size, e.x, e.y, e.width / 2)) {
-            let dmg = Math.floor(p.damage * this.player.damageMultiplier);
+            let dmg = Math.floor(p.damage * this.player.damageMultiplier * this.getAmuletDamageMult());
             // Berserker
             if (this.player.berserker && this.player.hp / this.player.maxHp < 0.3) {
               dmg = Math.floor(dmg * 1.8);
@@ -836,6 +844,16 @@ export class GameEngine {
     // Shadow clone AI
     if (this.player.shadowClone) {
       this.updateShadowClone(dt);
+    }
+
+    // === AMULET TICK EFFECTS ===
+    // War Rhythm: decay stacks when not killing
+    if (isAmuletEquipped(this.amuletInventory, 'war_rhythm') && this.warRhythm.stacks > 0) {
+      this.warRhythm.decayTimer -= dt;
+      if (this.warRhythm.decayTimer <= 0) {
+        this.warRhythm.stacks = Math.max(0, this.warRhythm.stacks - 1);
+        this.warRhythm.decayTimer = 1; // lose 1 stack per second after delay
+      }
     }
 
     // Doom execute - check all enemies below 15% HP
@@ -993,10 +1011,10 @@ export class GameEngine {
     const xpAmount = getXPForEnemy(e.type);
     spawnXPParticle(this.particles, e.x, e.y, 4);
     
-    // Coin drop
-    const coinAmount = this.getCoinsForEnemy(e.type);
-    this.player.coins += coinAmount;
-    spawnDamageText(this.particles, e.x, e.y + 10, `+${coinAmount} 🪙`, '#ffd700');
+    // Soul drop
+    const soulAmount = this.getSoulsForEnemy(e.type);
+    this.player.souls += soulAmount;
+    spawnDamageText(this.particles, e.x, e.y + 10, `+${soulAmount} 👻`, '#88ccff');
     SFX.coinPickup();
     
     if (e.type === 'boss') {
@@ -1016,9 +1034,21 @@ export class GameEngine {
       setTimeout(() => this.addEffect('flash', 0.8, 0.3, 'rgb(255, 200, 100)'), 200);
       setTimeout(() => this.addEffect('flash', 0.6, 0.2, 'rgb(255, 100, 50)'), 400);
       SFX.bossKill(this.bossKillFloor);
+      // Drop amulet
+      const amuletId = getRandomBossAmuletDrop(this.amuletInventory);
+      if (amuletId) {
+        this.callbacks.onAmuletDrop(amuletId);
+        spawnDamageText(this.particles, e.x, e.y - 20, '🔮 AMULETO!', '#cc88ff');
+      }
     } else {
       spawnExplosion(this.particles, e.x, e.y, 10);
       SFX.enemyDeath();
+    }
+
+    // War Rhythm amulet — gain attack speed on kill
+    if (isAmuletEquipped(this.amuletInventory, 'war_rhythm')) {
+      this.warRhythm.stacks = Math.min(this.warRhythm.maxStacks, this.warRhythm.stacks + 1);
+      this.warRhythm.decayTimer = this.warRhythm.decayDelay;
     }
 
     // Melee kill reward: small heal + brief speed boost

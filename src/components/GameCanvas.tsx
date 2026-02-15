@@ -8,12 +8,15 @@ interface GameCanvasProps {
   onGameOver: (stats: GameStats) => void;
   onSynergyActivated: (synergy: Synergy) => void;
   onFloorChange: (floor: number) => void;
-  onShopOpen: (items: ShopItem[], coins: number) => void;
+  onShopOpen: (items: ShopItem[], souls: number) => void;
   onShopClose: () => void;
+  onAmuletDrop: (amuletId: string) => void;
+  onInventoryOpen: () => void;
+  onInventoryClose: () => void;
   engineRef: React.MutableRefObject<GameEngine | null>;
 }
 
-const GameCanvas = ({ onLevelUp, onGameOver, onSynergyActivated, onFloorChange, onShopOpen, onShopClose, engineRef }: GameCanvasProps) => {
+const GameCanvas = ({ onLevelUp, onGameOver, onSynergyActivated, onFloorChange, onShopOpen, onShopClose, onAmuletDrop, onInventoryOpen, onInventoryClose, engineRef }: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -27,6 +30,9 @@ const GameCanvas = ({ onLevelUp, onGameOver, onSynergyActivated, onFloorChange, 
       onFloorChange,
       onShopOpen,
       onShopClose,
+      onAmuletDrop,
+      onInventoryOpen,
+      onInventoryClose,
     };
 
     const engine = new GameEngine(canvas, callbacks);

@@ -135,8 +135,8 @@ export const DOOR_WIDTH = 28;
 export const LIGHT_RADIUS = 130;
 export const VENDOR_LIGHT_RADIUS = 300;
 
-// Coin drops per enemy type
-export const COIN_DROPS: Record<string, [number, number]> = {
+// Soul drops per enemy type (almas)
+export const SOUL_DROPS: Record<string, [number, number]> = {
   swarm: [1, 2],
   chaser: [2, 4],
   shooter: [2, 4],
@@ -154,13 +154,16 @@ export const COIN_DROPS: Record<string, [number, number]> = {
   boss: [20, 35],
 };
 
-// Shop prices by rarity
+// Shop prices by rarity (in souls)
 export const SHOP_PRICES: Record<string, number> = {
   common: 15,
   rare: 30,
   epic: 60,
   legendary: 120,
 };
+
+// Amulet shop prices (expensive — 600+)
+export const AMULET_SHOP_PRICE = 600;
 export const COLORS = {
   bg: '#08080f',
   floor1: '#121218',

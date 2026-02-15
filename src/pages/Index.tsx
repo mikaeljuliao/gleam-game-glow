@@ -4,12 +4,14 @@ import GameCanvas from '@/components/GameCanvas';
 import UpgradeSelection from '@/components/UpgradeSelection';
 import GameOverScreen from '@/components/GameOverScreen';
 import ShopOverlay from '@/components/ShopOverlay';
+import AmuletInventoryOverlay from '@/components/AmuletInventory';
 import { GameEngine } from '@/game/engine';
 import { initAudio } from '@/game/audio';
 import { Upgrade, Synergy, GameStats, ShopItem } from '@/game/types';
 import { hasSave, clearSave } from '@/game/save';
+import { AmuletInventory, createAmuletInventory, addAmulet, toggleEquip, getAmuletDef } from '@/game/amulets';
 
-type GameState = 'title' | 'playing' | 'upgrading' | 'gameOver' | 'shopping';
+type GameState = 'title' | 'playing' | 'upgrading' | 'gameOver' | 'shopping' | 'inventory';
 
 const Index = () => {
   const [gameState, setGameState] = useState<GameState>('title');
@@ -17,11 +19,14 @@ const Index = () => {
   const [gameStats, setGameStats] = useState<GameStats | null>(null);
   const [synergyNotif, setSynergyNotif] = useState<string | null>(null);
   const [floorNotif, setFloorNotif] = useState<string | null>(null);
+  const [amuletNotif, setAmuletNotif] = useState<string | null>(null);
   const [gameKey, setGameKey] = useState(0);
   const [loadSave, setLoadSave] = useState(false);
   const engineRef = useRef<GameEngine | null>(null);
   const [shopItems, setShopItems] = useState<ShopItem[]>([]);
   const [shopCoins, setShopCoins] = useState(0);
+  const [amuletInv, setAmuletInv] = useState<AmuletInventory>(createAmuletInventory());
+  const [prevGameState, setPrevGameState] = useState<GameState>('playing');
 
   useEffect(() => {
     document.title = 'Dungeon of Shadows';
@@ -36,6 +41,7 @@ const Index = () => {
     setGameState('playing');
     setGameStats(null);
     setGameKey(k => k + 1);
+    setAmuletInv(createAmuletInventory());
   }, []);
 
   const handleStartFloor = useCallback((floor: number) => {
@@ -45,6 +51,7 @@ const Index = () => {
     setGameState('playing');
     setGameStats(null);
     setGameKey(k => k + 1);
+    setAmuletInv(createAmuletInventory());
   }, []);
 
   const handleLevelUp = useCallback((choices: Upgrade[]) => {
@@ -72,9 +79,9 @@ const Index = () => {
     setTimeout(() => setFloorNotif(null), 2500);
   }, []);
 
-  const handleShopOpen = useCallback((items: ShopItem[], coins: number) => {
+  const handleShopOpen = useCallback((items: ShopItem[], souls: number) => {
     setShopItems(items);
-    setShopCoins(coins);
+    setShopCoins(souls);
     setGameState('shopping');
   }, []);
 
@@ -88,10 +95,44 @@ const Index = () => {
     if (!engine) return;
     const success = engine.buyShopItem(index);
     if (success) {
-      // Update local state
-      setShopCoins(engine.player.coins);
+      setShopCoins(engine.player.souls);
       setShopItems(prev => prev.map((item, i) => i === index ? { ...item, sold: true } : item));
     }
+  }, []);
+
+  const handleAmuletDrop = useCallback((amuletId: string) => {
+    setAmuletInv(prev => {
+      const next = { ...prev, owned: [...prev.owned] };
+      addAmulet(next, amuletId);
+      return next;
+    });
+    const def = getAmuletDef(amuletId);
+    if (def) {
+      setAmuletNotif(`🔮 Amuleto obtido: ${def.icon} ${def.name}`);
+      setTimeout(() => setAmuletNotif(null), 4000);
+    }
+  }, []);
+
+  const handleInventoryOpen = useCallback(() => {
+    setGameState(prev => {
+      setPrevGameState(prev);
+      return 'inventory';
+    });
+  }, []);
+
+  const handleInventoryClose = useCallback(() => {
+    setGameState('playing');
+    engineRef.current?.resume();
+  }, []);
+
+  const handleToggleEquip = useCallback((defId: string) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    setAmuletInv(prev => {
+      const next = { ...prev, owned: prev.owned.map(a => ({ ...a })) };
+      toggleEquip(next, defId, engine.player);
+      return next;
+    });
   }, []);
 
   const handleRestart = useCallback(() => {
@@ -110,13 +151,31 @@ const Index = () => {
     }
   }, [loadSave, devFloor, gameKey]);
 
+  // Keyboard shortcut for inventory
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'i') {
+        if (gameState === 'inventory') {
+          handleInventoryClose();
+        } else if (gameState === 'playing') {
+          engineRef.current?.pause();
+          handleInventoryOpen();
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [gameState, handleInventoryOpen, handleInventoryClose]);
+
+  const isGameActive = gameState === 'playing' || gameState === 'upgrading' || gameState === 'shopping' || gameState === 'inventory';
+
   return (
     <div className="w-screen h-screen overflow-hidden" style={{ background: '#000' }}>
       {gameState === 'title' && (
         <TitleScreen onStart={handleStart} onStartFloor={handleStartFloor} hasSave={hasSave()} />
       )}
 
-      {(gameState === 'playing' || gameState === 'upgrading' || gameState === 'shopping') && (
+      {isGameActive && (
         <div className="relative w-full h-full flex flex-col items-center justify-center">
           <div className="relative w-full h-[64vh] md:h-full">
             <GameCanvas
@@ -127,6 +186,9 @@ const Index = () => {
               onFloorChange={handleFloorChange}
               onShopOpen={handleShopOpen}
               onShopClose={handleShopClose}
+              onAmuletDrop={handleAmuletDrop}
+              onInventoryOpen={handleInventoryOpen}
+              onInventoryClose={handleInventoryClose}
               engineRef={engineRef}
             />
             {gameState === 'upgrading' && upgradeChoices.length > 0 && (
@@ -141,6 +203,14 @@ const Index = () => {
                 coins={shopCoins}
                 onBuy={handleShopBuy}
                 onClose={handleShopClose}
+              />
+            )}
+            {gameState === 'inventory' && (
+              <AmuletInventoryOverlay
+                inventory={amuletInv}
+                souls={engineRef.current?.player.souls ?? 0}
+                onToggleEquip={handleToggleEquip}
+                onClose={handleInventoryClose}
               />
             )}
             {synergyNotif && (
@@ -167,7 +237,7 @@ const Index = () => {
                   background: 'rgba(180, 130, 50, 0.25)',
                   borderColor: '#997733',
                   color: '#ddc088',
-                  fontFamily: "'Cinzel', serif",
+                  fontFamily: "'Montserrat', sans-serif",
                   fontSize: '18px',
                   letterSpacing: '0.1em',
                   animation: 'fadeIn 0.3s ease-out',
@@ -175,6 +245,23 @@ const Index = () => {
                 }}
               >
                 {floorNotif}
+              </div>
+            )}
+            {amuletNotif && (
+              <div
+                className="absolute top-28 left-1/2 z-30 px-6 py-2 rounded border pointer-events-none"
+                style={{
+                  background: 'rgba(80, 40, 140, 0.4)',
+                  borderColor: '#8855cc',
+                  color: '#ddbbff',
+                  fontFamily: "'Montserrat', sans-serif",
+                  fontSize: '14px',
+                  letterSpacing: '0.05em',
+                  animation: 'fadeIn 0.3s ease-out',
+                  transform: 'translateX(-50%)',
+                }}
+              >
+                {amuletNotif}
               </div>
             )}
           </div>

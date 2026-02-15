@@ -69,7 +69,7 @@ export interface PlayerState {
   shadowCloneX: number;
   shadowCloneY: number;
   shadowCloneAngle: number;
-  coins: number;
+  souls: number;
 }
 
 export type EnemyType = 'chaser' | 'shooter' | 'tank' | 'boss' | 'wraith' | 'bomber' | 'swarm' | 'necromancer' | 'stalker' | 'phantom' | 'flash_hunter' | 'distortion' | 'flicker_fiend' | 'warper' | 'accelerator';
@@ -239,6 +239,9 @@ export interface GameCallbacks {
   onGameOver: (stats: GameStats) => void;
   onSynergyActivated: (synergy: Synergy) => void;
   onFloorChange: (floor: number) => void;
-  onShopOpen: (items: ShopItem[], coins: number) => void;
+  onShopOpen: (items: ShopItem[], souls: number) => void;
   onShopClose: () => void;
+  onAmuletDrop: (amuletId: string) => void;
+  onInventoryOpen: () => void;
+  onInventoryClose: () => void;
 }
