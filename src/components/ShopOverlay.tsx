@@ -197,6 +197,21 @@ const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) 
                     >
                       {RARITY_LABELS[item.upgrade.rarity]}
                     </span>
+                    {item.amuletId && (
+                      <span
+                        style={{
+                          color: '#cc88ff',
+                          fontSize: '9px',
+                          background: 'rgba(140, 80, 220, 0.2)',
+                          padding: '1px 5px',
+                          borderRadius: '3px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.1em',
+                        }}
+                      >
+                        Amuleto
+                      </span>
+                    )}
                   </div>
                   <span style={{ color: isSold ? '#555' : '#909090', fontFamily: "'Montserrat', sans-serif", fontSize: '11px', letterSpacing: '0.02em' }}>
                     {isSold ? 'VENDIDO' : item.upgrade.description}

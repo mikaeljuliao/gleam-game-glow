@@ -232,6 +232,7 @@ export interface ShopItem {
   upgrade: Upgrade;
   cost: number;
   sold: boolean;
+  amuletId?: string; // if this is an amulet shop item
 }
 
 export interface GameCallbacks {
