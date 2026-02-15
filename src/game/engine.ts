@@ -1475,28 +1475,68 @@ export class GameEngine {
       } else if (dist < 30) {
         this.startVendorDialogue();
       }
-      // Sanctuary interaction — heal at a shrine within vendor room
-      // Shrine is at the left side of the room
-      const shrineX = C.dims.gw * 0.18;
-      const shrineY = C.dims.gh * 0.5;
-      const shrineDist = Math.sqrt((p.x - shrineX) ** 2 + (p.y - shrineY) ** 2);
-      if (shrineDist < 25 && !this.shrineCooldown) {
-        const healCost = 50 + this.dungeon.floor * 10;
-        if (p.souls >= healCost && p.hp < p.maxHp) {
-          p.souls -= healCost;
-          const healAmount = Math.floor(p.maxHp * 0.25);
-          p.hp = Math.min(p.maxHp, p.hp + healAmount);
-          spawnDamageText(this.particles, p.x, p.y - 10, `+${healAmount} HP`, C.COLORS.healText);
-          spawnDamageText(this.particles, p.x, p.y - 25, `-${healCost} Almas`, '#6688cc');
-          spawnSoulCollectParticle(this.particles, shrineX, shrineY, p.x, p.y, 4);
-          spawnExplosion(this.particles, shrineX, shrineY, 10);
-          this.addEffect('flash', 0.6, 0.2, 'rgb(80, 150, 255)');
-          SFX.levelUp();
-          this.shrineCooldown = true;
-          setTimeout(() => { this.shrineCooldown = false; }, 2000);
-        }
-      }
     }
+  }
+
+  // Public method for sanctuary heal — triggered by [T] key
+  trySanctuaryHeal() {
+    const room = getCurrentRoom(this.dungeon);
+    if (room.type !== 'vendor') return;
+    const p = this.player;
+    const shrineX = C.dims.gw * 0.18;
+    const shrineY = C.dims.gh * 0.5;
+    const shrineDist = Math.sqrt((p.x - shrineX) ** 2 + (p.y - shrineY) ** 2);
+    if (shrineDist > 35) return;
+    if (this.shrineCooldown) return;
+    const healCost = 50 + this.dungeon.floor * 10;
+    if (p.souls < healCost || p.hp >= p.maxHp) return;
+
+    p.souls -= healCost;
+    const healAmount = Math.floor(p.maxHp * 0.25);
+    p.hp = Math.min(p.maxHp, p.hp + healAmount);
+
+    // Healing particles: souls flowing OUT from player (cost), then green heal IN
+    // Blue soul particles fly from player toward shrine (cost visualization)
+    for (let i = 0; i < 6; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      this.particles.push({
+        x: p.x + Math.cos(angle) * 5,
+        y: p.y + Math.sin(angle) * 5,
+        vx: (shrineX - p.x) * (0.8 + Math.random() * 0.4),
+        vy: (shrineY - p.y) * (0.8 + Math.random() * 0.4),
+        life: 0.5 + Math.random() * 0.3,
+        maxLife: 0.8,
+        size: 2 + Math.random() * 1.5,
+        color: 'rgba(80, 150, 255, 0.8)',
+        type: 'soul',
+      });
+    }
+    // Green heal particles flow into player
+    setTimeout(() => {
+      for (let i = 0; i < 8; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 15 + Math.random() * 20;
+        this.particles.push({
+          x: p.x + Math.cos(angle) * dist,
+          y: p.y + Math.sin(angle) * dist,
+          vx: -Math.cos(angle) * 30,
+          vy: -Math.sin(angle) * 30 - 10,
+          life: 0.6 + Math.random() * 0.3,
+          maxLife: 0.9,
+          size: 2 + Math.random() * 1,
+          color: `rgba(80, 255, 140, ${0.6 + Math.random() * 0.3})`,
+          type: 'ghost',
+        });
+      }
+    }, 200);
+
+    spawnDamageText(this.particles, p.x, p.y - 10, `+${healAmount} HP`, C.COLORS.healText);
+    spawnDamageText(this.particles, p.x, p.y - 25, `-${healCost} Almas`, '#6688cc');
+    spawnExplosion(this.particles, shrineX, shrineY, 10);
+    this.addEffect('flash', 0.6, 0.2, 'rgb(80, 200, 150)');
+    HorrorSFX.shrineActivate();
+    this.shrineCooldown = true;
+    setTimeout(() => { this.shrineCooldown = false; }, 2000);
   }
 
   private circleCollide(x1: number, y1: number, r1: number, x2: number, y2: number, r2: number): boolean {
@@ -1670,7 +1710,7 @@ export class GameEngine {
     renderDoors(ctx, room, this.gameTime, getDoorsLockedTimer() > 0, this.dungeon);
     renderObstacles(ctx, room.obstacles);
     const isCollected = room.treasureCollected || room.shrineUsed || room.trapTriggered || false;
-    renderSpecialRoom(ctx, room.type, this.gameTime, isCollected, room.trapType);
+    renderSpecialRoom(ctx, room.type, this.gameTime, isCollected, room.trapType, this.player.x, this.player.y);
 
     for (const p of this.projectiles) renderProjectile(ctx, p, this.gameTime);
     for (const e of this.enemies) renderEnemy(ctx, e, this.gameTime);

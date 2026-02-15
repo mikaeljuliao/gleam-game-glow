@@ -20,10 +20,17 @@ const RARITY_COLORS: Record<string, string> = {
 };
 
 const RARITY_BG: Record<string, string> = {
-  common: 'rgba(120, 120, 120, 0.1)',
-  rare: 'rgba(68, 136, 255, 0.1)',
-  epic: 'rgba(187, 68, 255, 0.1)',
-  legendary: 'rgba(255, 170, 0, 0.1)',
+  common: 'rgba(120, 120, 120, 0.08)',
+  rare: 'rgba(68, 136, 255, 0.08)',
+  epic: 'rgba(187, 68, 255, 0.08)',
+  legendary: 'rgba(255, 170, 0, 0.08)',
+};
+
+const RARITY_GLOW: Record<string, string> = {
+  common: 'none',
+  rare: '0 0 8px rgba(68, 136, 255, 0.15)',
+  epic: '0 0 10px rgba(187, 68, 255, 0.2)',
+  legendary: '0 0 14px rgba(255, 170, 0, 0.25)',
 };
 
 const RARITY_LABELS: Record<string, string> = {
@@ -35,7 +42,7 @@ const RARITY_LABELS: Record<string, string> = {
 
 interface ShopOverlayProps {
   items: ShopItem[];
-  coins: number; // actually souls now
+  coins: number;
   onBuy: (index: number) => void;
   onClose: () => void;
 }
@@ -44,6 +51,7 @@ const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) 
   const [dialogue, setDialogue] = useState('');
   const [displayedText, setDisplayedText] = useState('');
   const [buyFlash, setBuyFlash] = useState<number | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const text = VENDOR_DIALOGUES[Math.floor(Math.random() * VENDOR_DIALOGUES.length)];
@@ -80,182 +88,369 @@ const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) 
     }, 35);
   };
 
+  const selectedItem = selectedIndex !== null ? items[selectedIndex] : null;
+
   return (
     <div
       className="absolute inset-0 z-40 flex items-center justify-center"
-      style={{ background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(2px)' }}
+      style={{ background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(3px)' }}
     >
       <div
-        className="relative flex flex-col items-center p-6 rounded-lg border max-w-md w-full mx-4"
+        className="relative flex flex-col max-w-2xl w-full mx-4 rounded-lg border overflow-hidden"
         style={{
-          background: 'linear-gradient(180deg, rgba(30, 25, 20, 0.97) 0%, rgba(20, 18, 15, 0.98) 100%)',
-          borderColor: 'rgba(160, 130, 70, 0.3)',
+          background: 'linear-gradient(180deg, rgba(22, 18, 14, 0.98) 0%, rgba(14, 12, 10, 0.99) 100%)',
+          borderColor: 'rgba(160, 130, 70, 0.25)',
+          maxHeight: '90vh',
         }}
       >
-        {/* Vendor title */}
-        <div className="flex items-center gap-3 mb-3">
-          <span style={{ fontSize: '28px' }}>🧙</span>
-          <h2
-            className="text-lg font-medium"
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-5 py-3"
+          style={{
+            borderBottom: '1px solid rgba(160, 130, 70, 0.15)',
+            background: 'rgba(40, 30, 15, 0.4)',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <span style={{ fontSize: 22 }}>🧙</span>
+            <h2
+              style={{
+                color: '#d4c090',
+                fontFamily: "'Montserrat', sans-serif",
+                fontSize: 14,
+                fontWeight: 600,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                margin: 0,
+              }}
+            >
+              Mercador das Sombras
+            </h2>
+          </div>
+
+          {/* Soul counter */}
+          <div
+            className="flex items-center gap-2 px-3 py-1.5 rounded"
             style={{
-              color: '#d4c090',
-              fontFamily: "'Montserrat', sans-serif",
-              letterSpacing: '0.08em',
+              background: 'rgba(40, 80, 160, 0.12)',
+              border: '1px solid rgba(60, 120, 200, 0.25)',
             }}
           >
-            Mercador das Sombras
-          </h2>
+            <svg width="14" height="14" viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
+              <polygon points="7,1 12,7 7,13 2,7" fill="#5599dd" />
+              <polygon points="7,3 10,7 7,11 4,7" fill="#88ccff" />
+            </svg>
+            <span
+              style={{
+                color: '#88ccff',
+                fontFamily: "'Montserrat', sans-serif",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              {souls}
+            </span>
+          </div>
         </div>
 
         {/* Dialogue */}
         <div
-          className="w-full px-4 py-2 mb-4 rounded text-center italic"
+          className="px-5 py-2"
           style={{
-            background: 'rgba(0, 0, 0, 0.3)',
-            color: '#b8a878',
-            fontFamily: "'Montserrat', sans-serif",
-            fontSize: '13px',
-            letterSpacing: '0.04em',
-            minHeight: '36px',
-            borderLeft: '2px solid rgba(160, 130, 70, 0.25)',
-            borderRight: '2px solid rgba(160, 130, 70, 0.25)',
+            borderBottom: '1px solid rgba(160, 130, 70, 0.1)',
           }}
         >
-          "{displayedText}"
-          <span style={{ opacity: displayedText.length < dialogue.length ? 1 : 0 }}>▌</span>
-        </div>
-
-        {/* Souls */}
-        <div
-          className="flex items-center gap-2 mb-4 px-4 py-1.5 rounded"
-          style={{
-            background: 'rgba(40, 80, 160, 0.12)',
-            border: '1px solid rgba(60, 120, 200, 0.25)',
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
-            <polygon points="7,1 12,7 7,13 2,7" fill="#5599dd" />
-            <polygon points="7,3 10,7 7,11 4,7" fill="#88ccff" />
-          </svg>
-          <span
+          <div
+            className="italic text-center"
             style={{
-              color: '#88ccff',
+              color: '#b8a878',
               fontFamily: "'Montserrat', sans-serif",
-              fontSize: '15px',
-              fontWeight: 600,
-              letterSpacing: '0.08em',
+              fontSize: 12,
+              letterSpacing: '0.04em',
+              minHeight: 20,
             }}
           >
-            {souls} Almas
-          </span>
+            "{displayedText}"
+            <span style={{ opacity: displayedText.length < dialogue.length ? 1 : 0 }}>▌</span>
+          </div>
         </div>
 
-        {/* Items */}
-        <div className="w-full space-y-2 mb-4">
-          {items.map((item, idx) => {
-            const canAfford = souls >= item.cost;
-            const isSold = item.sold;
-            return (
-              <button
-                key={idx}
-                onClick={() => handleBuy(idx)}
-                disabled={isSold || !canAfford}
-                className="w-full flex items-center gap-3 p-3 rounded transition-all"
-                style={{
-                  background: isSold
-                    ? 'rgba(30, 30, 30, 0.5)'
-                    : buyFlash === idx
-                    ? 'rgba(220, 190, 80, 0.15)'
-                    : RARITY_BG[item.upgrade.rarity],
-                  border: `1px solid ${isSold ? 'rgba(60, 60, 60, 0.3)' : RARITY_COLORS[item.upgrade.rarity]}40`,
-                  opacity: isSold ? 0.4 : canAfford ? 1 : 0.6,
-                  cursor: isSold || !canAfford ? 'not-allowed' : 'pointer',
-                }}
-              >
-                <span style={{ fontSize: '22px', filter: isSold ? 'grayscale(1)' : 'none' }}>
-                  {item.upgrade.icon}
-                </span>
-                <div className="flex-1 text-left">
-                  <div className="flex items-center gap-2">
+        {/* Content: Grid + Detail panel */}
+        <div className="flex flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+          {/* Item Grid */}
+          <div
+            className="flex-1 overflow-y-auto p-4"
+            style={{
+              borderRight: selectedItem ? '1px solid rgba(160, 130, 70, 0.1)' : 'none',
+            }}
+          >
+            <div
+              className="grid gap-2"
+              style={{
+                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              }}
+            >
+              {items.map((item, idx) => {
+                const canAfford = souls >= item.cost;
+                const isSold = item.sold;
+                const isSelected = selectedIndex === idx;
+                const rarity = item.upgrade.rarity;
+
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedIndex(isSelected ? null : idx)}
+                    className="flex flex-col items-center p-3 rounded transition-all text-center"
+                    style={{
+                      background: isSold
+                        ? 'rgba(25, 25, 25, 0.4)'
+                        : isSelected
+                        ? 'rgba(160, 130, 70, 0.15)'
+                        : buyFlash === idx
+                        ? 'rgba(220, 190, 80, 0.15)'
+                        : RARITY_BG[rarity],
+                      border: `1.5px solid ${
+                        isSold
+                          ? 'rgba(50, 50, 50, 0.3)'
+                          : isSelected
+                          ? RARITY_COLORS[rarity]
+                          : `${RARITY_COLORS[rarity]}40`
+                      }`,
+                      boxShadow: isSelected && !isSold ? RARITY_GLOW[rarity] : 'none',
+                      opacity: isSold ? 0.35 : canAfford ? 1 : 0.5,
+                      cursor: isSold ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {/* Icon */}
                     <span
                       style={{
-                        color: isSold ? '#666' : RARITY_COLORS[item.upgrade.rarity],
+                        fontSize: 24,
+                        filter: isSold ? 'grayscale(1)' : 'none',
+                        marginBottom: 4,
+                      }}
+                    >
+                      {item.upgrade.icon}
+                    </span>
+
+                    {/* Name */}
+                    <span
+                      style={{
+                        color: isSold ? '#555' : RARITY_COLORS[rarity],
                         fontFamily: "'Montserrat', sans-serif",
-                        fontSize: '13px',
-                        fontWeight: 500,
-                        letterSpacing: '0.06em',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        letterSpacing: '0.04em',
                         textDecoration: isSold ? 'line-through' : 'none',
+                        lineHeight: 1.2,
                       }}
                     >
                       {item.upgrade.name}
                     </span>
-                    <span
-                      style={{
-                        color: RARITY_COLORS[item.upgrade.rarity],
-                        fontSize: '9px',
-                        opacity: 0.7,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.1em',
-                      }}
-                    >
-                      {RARITY_LABELS[item.upgrade.rarity]}
-                    </span>
-                    {item.amuletId && (
+
+                    {/* Rarity + amulet tag */}
+                    <div className="flex items-center gap-1 mt-1">
                       <span
                         style={{
-                          color: '#cc88ff',
-                          fontSize: '9px',
-                          background: 'rgba(140, 80, 220, 0.2)',
-                          padding: '1px 5px',
-                          borderRadius: '3px',
+                          color: RARITY_COLORS[rarity],
+                          fontSize: 8,
+                          opacity: 0.7,
                           textTransform: 'uppercase',
-                          letterSpacing: '0.1em',
+                          letterSpacing: '0.08em',
                         }}
                       >
-                        Amuleto
+                        {RARITY_LABELS[rarity]}
                       </span>
-                    )}
-                  </div>
-                  <span style={{ color: isSold ? '#555' : '#909090', fontFamily: "'Montserrat', sans-serif", fontSize: '11px', letterSpacing: '0.02em' }}>
-                    {isSold ? 'VENDIDO' : item.upgrade.description}
-                  </span>
-                </div>
-                <div
-                  className="flex items-center gap-1.5 px-2 py-1 rounded"
+                      {item.amuletId && (
+                        <span
+                          style={{
+                            color: '#cc88ff',
+                            fontSize: 7,
+                            background: 'rgba(140, 80, 220, 0.2)',
+                            padding: '0 4px',
+                            borderRadius: 2,
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          Amuleto
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Price */}
+                    <div
+                      className="flex items-center gap-1 mt-2"
+                      style={{
+                        color: isSold ? '#444' : canAfford ? '#88ccff' : '#cc5555',
+                        fontFamily: "'Montserrat', sans-serif",
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 14 14">
+                        <polygon points="7,1 12,7 7,13 2,7" fill={isSold ? '#444' : canAfford ? '#5599dd' : '#aa4444'} />
+                        <polygon points="7,3 10,7 7,11 4,7" fill={isSold ? '#555' : canAfford ? '#88ccff' : '#cc5555'} />
+                      </svg>
+                      {isSold ? 'VENDIDO' : item.cost}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Detail Panel */}
+          {selectedItem && (
+            <div
+              className="flex flex-col p-4"
+              style={{
+                width: 220,
+                background: 'rgba(15, 12, 8, 0.6)',
+                flexShrink: 0,
+              }}
+            >
+              <div className="flex flex-col items-center mb-4">
+                <span style={{ fontSize: 36, marginBottom: 8 }}>{selectedItem.upgrade.icon}</span>
+                <h3
                   style={{
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    color: isSold ? '#555' : canAfford ? '#88ccff' : '#cc5555',
+                    color: RARITY_COLORS[selectedItem.upgrade.rarity],
                     fontFamily: "'Montserrat', sans-serif",
-                    fontSize: '13px',
-                    fontWeight: 500,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    letterSpacing: '0.06em',
+                    textAlign: 'center',
+                    margin: 0,
                   }}
                 >
-                  <svg width="12" height="12" viewBox="0 0 14 14">
-                    <polygon points="7,1 12,7 7,13 2,7" fill={isSold ? '#555' : canAfford ? '#5599dd' : '#aa4444'} />
-                    <polygon points="7,3 10,7 7,11 4,7" fill={isSold ? '#666' : canAfford ? '#88ccff' : '#cc5555'} />
+                  {selectedItem.upgrade.name}
+                </h3>
+                <span
+                  style={{
+                    color: RARITY_COLORS[selectedItem.upgrade.rarity],
+                    fontSize: 9,
+                    opacity: 0.7,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    marginTop: 2,
+                  }}
+                >
+                  {RARITY_LABELS[selectedItem.upgrade.rarity]}
+                </span>
+                {selectedItem.amuletId && (
+                  <span
+                    style={{
+                      color: '#cc88ff',
+                      fontSize: 9,
+                      background: 'rgba(140, 80, 220, 0.2)',
+                      padding: '2px 8px',
+                      borderRadius: 4,
+                      marginTop: 4,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                    }}
+                  >
+                    🔮 Amuleto
+                  </span>
+                )}
+              </div>
+
+              {/* Description */}
+              <div
+                className="flex-1 mb-4"
+                style={{
+                  color: '#909080',
+                  fontFamily: "'Montserrat', sans-serif",
+                  fontSize: 11,
+                  lineHeight: 1.5,
+                  letterSpacing: '0.02em',
+                }}
+              >
+                {selectedItem.upgrade.description}
+              </div>
+
+              {/* Price + Buy button */}
+              <div className="flex flex-col gap-2">
+                <div
+                  className="flex items-center justify-center gap-2 py-2 rounded"
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    border: '1px solid rgba(60, 120, 200, 0.2)',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14">
+                    <polygon points="7,1 12,7 7,13 2,7" fill={selectedItem.sold ? '#555' : souls >= selectedItem.cost ? '#5599dd' : '#aa4444'} />
+                    <polygon points="7,3 10,7 7,11 4,7" fill={selectedItem.sold ? '#666' : souls >= selectedItem.cost ? '#88ccff' : '#cc5555'} />
                   </svg>
-                  {item.cost}
+                  <span
+                    style={{
+                      color: selectedItem.sold ? '#555' : souls >= selectedItem.cost ? '#88ccff' : '#cc5555',
+                      fontFamily: "'Montserrat', sans-serif",
+                      fontSize: 16,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {selectedItem.cost}
+                  </span>
                 </div>
-              </button>
-            );
-          })}
+
+                <button
+                  onClick={() => selectedIndex !== null && handleBuy(selectedIndex)}
+                  disabled={selectedItem.sold || souls < selectedItem.cost}
+                  className="w-full py-2.5 rounded font-medium transition-all hover:brightness-110"
+                  style={{
+                    background: selectedItem.sold
+                      ? 'rgba(40, 40, 40, 0.4)'
+                      : souls >= selectedItem.cost
+                      ? 'rgba(60, 130, 70, 0.5)'
+                      : 'rgba(80, 30, 30, 0.4)',
+                    color: selectedItem.sold
+                      ? '#555'
+                      : souls >= selectedItem.cost
+                      ? '#88ee88'
+                      : '#cc6666',
+                    border: `1px solid ${
+                      selectedItem.sold
+                        ? 'rgba(60, 60, 60, 0.3)'
+                        : souls >= selectedItem.cost
+                        ? 'rgba(80, 180, 100, 0.4)'
+                        : 'rgba(180, 60, 60, 0.3)'
+                    }`,
+                    fontFamily: "'Montserrat', sans-serif",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    letterSpacing: '0.08em',
+                    cursor: selectedItem.sold || souls < selectedItem.cost ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {selectedItem.sold ? 'VENDIDO' : souls >= selectedItem.cost ? 'COMPRAR' : 'ALMAS INSUFICIENTES'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="px-6 py-2 rounded font-medium transition-all hover:brightness-110"
+        {/* Footer */}
+        <div
+          className="flex justify-center px-5 py-3"
           style={{
-            background: 'rgba(80, 60, 30, 0.5)',
-            color: '#d4c090',
-            border: '1px solid rgba(160, 130, 70, 0.3)',
-            fontFamily: "'Montserrat', sans-serif",
-            fontSize: '13px',
-            letterSpacing: '0.1em',
+            borderTop: '1px solid rgba(160, 130, 70, 0.1)',
+            background: 'rgba(30, 25, 15, 0.3)',
           }}
         >
-          Sair da Loja
-        </button>
+          <button
+            onClick={onClose}
+            className="px-6 py-2 rounded font-medium transition-all hover:brightness-110"
+            style={{
+              background: 'rgba(80, 60, 30, 0.4)',
+              color: '#d4c090',
+              border: '1px solid rgba(160, 130, 70, 0.25)',
+              fontFamily: "'Montserrat', sans-serif",
+              fontSize: 12,
+              letterSpacing: '0.1em',
+            }}
+          >
+            Sair da Loja
+          </button>
+        </div>
       </div>
     </div>
   );
