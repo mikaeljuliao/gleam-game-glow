@@ -127,7 +127,10 @@ const Index = () => {
   const handleAmuletRevealComplete = useCallback(() => {
     setRevealAmuletId(null);
     setGameState('playing');
-    // The boss level-up will happen via engine's setTimeout
+    // After reveal completes, trigger boss level-up with guaranteed legendary
+    if (engineRef.current) {
+      (engineRef.current as any).handleBossLevelUp();
+    }
   }, []);
 
   const handleInventoryOpen = useCallback(() => {
