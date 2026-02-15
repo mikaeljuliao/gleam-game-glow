@@ -1,11 +1,15 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { GameEngine } from '@/game/engine';
+import { isAmuletEquipped } from '@/game/amulets';
+import { SFX } from '@/game/audio';
 
 interface MobileHUDProps {
   engineRef: React.MutableRefObject<GameEngine | null>;
+  onOpenInventory: () => void;
+  onOpenMap: () => void;
 }
 
-const MobileHUD = ({ engineRef }: MobileHUDProps) => {
+const MobileHUD = ({ engineRef, onOpenInventory, onOpenMap }: MobileHUDProps) => {
   const [isMobile, setIsMobile] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
 
@@ -53,59 +57,91 @@ const MobileHUD = ({ engineRef }: MobileHUDProps) => {
     engine.input.triggerRanged(aimX, aimY);
   }, [engineRef]);
 
+  const handleInventory = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    SFX.uiOpen();
+    onOpenInventory();
+  }, [onOpenInventory]);
+
+  const handleMap = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const engine = engineRef.current;
+    if (engine && isAmuletEquipped(engine.amuletInventory, 'cartographer')) {
+      SFX.mapOpen();
+      onOpenMap();
+    }
+  }, [engineRef, onOpenMap]);
+
+  const handleSanctuary = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    engineRef.current?.trySanctuaryHeal();
+  }, [engineRef]);
+
   if (!isMobile) return null;
 
   const btnSize = isLandscape ? 56 : 58;
+  const smallBtn = isLandscape ? 40 : 42;
   const safeBottom = isLandscape ? 14 : 64;
   const safeRight = isLandscape ? 16 : 16;
 
+  const btnStyle = (bg: string, border: string, color: string, size = btnSize): React.CSSProperties => ({
+    width: size,
+    height: size,
+    borderRadius: '50%',
+    background: bg,
+    border: `2px solid ${border}`,
+    color,
+    fontSize: isLandscape ? 11 : 10,
+    fontFamily: 'Arial, Helvetica, sans-serif',
+    fontWeight: 'bold',
+    touchAction: 'none',
+    WebkitTapHighlightColor: 'transparent',
+    boxShadow: `0 0 10px ${bg}`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  });
+
   return (
     <div className="absolute inset-0 z-20 pointer-events-none" style={{ touchAction: 'none' }}>
-      {/* Buttons always side by side */}
+      {/* Combat buttons - bottom right */}
       <div
         className="pointer-events-auto absolute flex gap-3"
-        style={{
-          bottom: safeBottom,
-          right: safeRight,
-        }}
+        style={{ bottom: safeBottom, right: safeRight }}
       >
         <button
-          style={{
-            width: btnSize,
-            height: btnSize,
-            borderRadius: '50%',
-            background: 'rgba(150, 50, 255, 0.4)',
-            border: '2.5px solid rgba(180, 100, 255, 0.6)',
-            color: '#cc88ff',
-            fontSize: isLandscape ? 12 : 11,
-            fontFamily: 'Arial, Helvetica, sans-serif',
-            fontWeight: 'bold',
-            touchAction: 'none',
-            WebkitTapHighlightColor: 'transparent',
-            boxShadow: '0 0 12px rgba(150, 50, 255, 0.3)',
-          }}
+          style={btnStyle('rgba(150, 50, 255, 0.4)', 'rgba(180, 100, 255, 0.6)', '#cc88ff')}
           onTouchStart={handleRanged}
         >
           TIRO
         </button>
         <button
-          style={{
-            width: btnSize,
-            height: btnSize,
-            borderRadius: '50%',
-            background: 'rgba(50, 120, 255, 0.4)',
-            border: '2.5px solid rgba(100, 160, 255, 0.6)',
-            color: '#88bbff',
-            fontSize: isLandscape ? 12 : 11,
-            fontFamily: 'Arial, Helvetica, sans-serif',
-            fontWeight: 'bold',
-            touchAction: 'none',
-            WebkitTapHighlightColor: 'transparent',
-            boxShadow: '0 0 12px rgba(50, 120, 255, 0.3)',
-          }}
+          style={btnStyle('rgba(50, 120, 255, 0.4)', 'rgba(100, 160, 255, 0.6)', '#88bbff')}
           onTouchStart={handleDash}
         >
           DASH
+        </button>
+      </div>
+
+      {/* Utility buttons - top right */}
+      <div
+        className="pointer-events-auto absolute flex gap-2"
+        style={{ top: isLandscape ? 8 : 12, right: safeRight }}
+      >
+        <button
+          style={btnStyle('rgba(200, 170, 50, 0.35)', 'rgba(220, 190, 80, 0.5)', '#ddcc66', smallBtn)}
+          onTouchStart={handleInventory}
+        >
+          🎒
+        </button>
+        <button
+          style={btnStyle('rgba(50, 150, 100, 0.35)', 'rgba(80, 180, 130, 0.5)', '#66ddaa', smallBtn)}
+          onTouchStart={handleMap}
+        >
+          🗺️
         </button>
       </div>
 

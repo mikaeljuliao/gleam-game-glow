@@ -57,6 +57,10 @@ export function createPlayer(): PlayerState {
     shadowCloneY: 0,
     shadowCloneAngle: 0,
     souls: 0,
+    hasDisciple: false,
+    discipleX: 0,
+    discipleY: 0,
+    discipleAngle: 0,
   };
 }
 

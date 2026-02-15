@@ -65,11 +65,15 @@ export interface PlayerState {
   berserker: boolean;      // low hp damage boost
   hasRevive: boolean;      // one-time revive
   reviveUsed: boolean;
-  shadowClone: boolean;    // shadow clone active
+  shadowClone: boolean;    // legacy compat
   shadowCloneX: number;
   shadowCloneY: number;
   shadowCloneAngle: number;
   souls: number;
+  hasDisciple: boolean;
+  discipleX: number;
+  discipleY: number;
+  discipleAngle: number;
 }
 
 export type EnemyType = 'chaser' | 'shooter' | 'tank' | 'boss' | 'wraith' | 'bomber' | 'swarm' | 'necromancer' | 'stalker' | 'phantom' | 'flash_hunter' | 'distortion' | 'flicker_fiend' | 'warper' | 'accelerator';
@@ -245,4 +249,5 @@ export interface GameCallbacks {
   onAmuletDrop: (amuletId: string) => void;
   onInventoryOpen: () => void;
   onInventoryClose: () => void;
+  onAmuletReveal: (amuletId: string) => void;
 }

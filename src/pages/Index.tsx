@@ -6,13 +6,14 @@ import GameOverScreen from '@/components/GameOverScreen';
 import ShopOverlay from '@/components/ShopOverlay';
 import AmuletInventoryOverlay from '@/components/AmuletInventory';
 import CartographerMap from '@/components/CartographerMap';
+import AmuletReveal from '@/components/AmuletReveal';
 import { GameEngine } from '@/game/engine';
 import { initAudio, SFX } from '@/game/audio';
 import { Upgrade, Synergy, GameStats, ShopItem, DungeonMap } from '@/game/types';
 import { hasSave, clearSave } from '@/game/save';
 import { AmuletInventory, createAmuletInventory, addAmulet, toggleEquip, getAmuletDef, isAmuletEquipped } from '@/game/amulets';
 
-type GameState = 'title' | 'playing' | 'upgrading' | 'gameOver' | 'shopping' | 'inventory' | 'cartographer';
+type GameState = 'title' | 'playing' | 'upgrading' | 'gameOver' | 'shopping' | 'inventory' | 'cartographer' | 'amuletReveal';
 
 const Index = () => {
   const [gameState, setGameState] = useState<GameState>('title');
@@ -29,6 +30,7 @@ const Index = () => {
   const [amuletInv, setAmuletInv] = useState<AmuletInventory>(createAmuletInventory());
   const [prevGameState, setPrevGameState] = useState<GameState>('playing');
   const [cartoDungeon, setCartoDungeon] = useState<DungeonMap | null>(null);
+  const [revealAmuletId, setRevealAmuletId] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = 'Dungeon of Shadows';
@@ -116,6 +118,18 @@ const Index = () => {
     }
   }, []);
 
+  // Boss kill amulet reveal sequence
+  const handleAmuletReveal = useCallback((amuletId: string) => {
+    setRevealAmuletId(amuletId);
+    setGameState('amuletReveal');
+  }, []);
+
+  const handleAmuletRevealComplete = useCallback(() => {
+    setRevealAmuletId(null);
+    setGameState('playing');
+    // The boss level-up will happen via engine's setTimeout
+  }, []);
+
   const handleInventoryOpen = useCallback(() => {
     SFX.uiOpen();
     setGameState(prev => {
@@ -145,6 +159,16 @@ const Index = () => {
 
   const handleRestart = useCallback(() => {
     setGameState('title');
+  }, []);
+
+  const handleOpenMap = useCallback(() => {
+    const engine = engineRef.current;
+    if (engine && isAmuletEquipped(engine.amuletInventory, 'cartographer')) {
+      SFX.mapOpen();
+      engine.pause();
+      setCartoDungeon(engine.dungeon);
+      setGameState('cartographer');
+    }
   }, []);
 
   // When engine mounts, try to load save if requested
@@ -177,13 +201,7 @@ const Index = () => {
           setGameState('playing');
           engineRef.current?.resume();
         } else if (gameState === 'playing') {
-          const engine = engineRef.current;
-          if (engine && isAmuletEquipped(engine.amuletInventory, 'cartographer')) {
-            SFX.mapOpen();
-            engine.pause();
-            setCartoDungeon(engine.dungeon);
-            setGameState('cartographer');
-          }
+          handleOpenMap();
         }
       }
       if (key === 't' && gameState === 'playing') {
@@ -195,14 +213,15 @@ const Index = () => {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [gameState, handleInventoryOpen, handleInventoryClose]);
+  }, [gameState, handleInventoryOpen, handleInventoryClose, handleOpenMap]);
 
   const handleCartoClose = useCallback(() => {
+    SFX.mapClose();
     setGameState('playing');
     engineRef.current?.resume();
   }, []);
 
-  const isGameActive = gameState === 'playing' || gameState === 'upgrading' || gameState === 'shopping' || gameState === 'inventory' || gameState === 'cartographer';
+  const isGameActive = gameState === 'playing' || gameState === 'upgrading' || gameState === 'shopping' || gameState === 'inventory' || gameState === 'cartographer' || gameState === 'amuletReveal';
 
   return (
     <div className="w-screen h-screen overflow-hidden" style={{ background: '#000' }}>
@@ -224,6 +243,8 @@ const Index = () => {
               onAmuletDrop={handleAmuletDrop}
               onInventoryOpen={handleInventoryOpen}
               onInventoryClose={handleInventoryClose}
+              onAmuletReveal={handleAmuletReveal}
+              onOpenMap={handleOpenMap}
               engineRef={engineRef}
             />
             {gameState === 'upgrading' && upgradeChoices.length > 0 && (
@@ -252,6 +273,12 @@ const Index = () => {
               <CartographerMap
                 dungeon={cartoDungeon}
                 onClose={handleCartoClose}
+              />
+            )}
+            {gameState === 'amuletReveal' && revealAmuletId && (
+              <AmuletReveal
+                amuletId={revealAmuletId}
+                onComplete={handleAmuletRevealComplete}
               />
             )}
             {synergyNotif && (

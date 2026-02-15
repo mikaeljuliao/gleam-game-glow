@@ -65,8 +65,13 @@ export const AMULET_DEFS: AmuletDef[] = [
     icon: '🩸',
     description: 'Quanto mais almas carrega, mais dano e velocidade. Gastar almas reduz os bônus.',
   },
+  {
+    id: 'disciple',
+    name: 'Amuleto do Discípulo',
+    icon: '🧑‍🎓',
+    description: 'Fortalece seu Discípulo: +dano, +velocidade, 2 projéteis e cura leve ao atacar.',
+  },
 ];
-
 export function getAmuletDef(id: string): AmuletDef | undefined {
   return AMULET_DEFS.find(a => a.id === id);
 }

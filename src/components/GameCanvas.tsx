@@ -13,10 +13,12 @@ interface GameCanvasProps {
   onAmuletDrop: (amuletId: string) => void;
   onInventoryOpen: () => void;
   onInventoryClose: () => void;
+  onAmuletReveal: (amuletId: string) => void;
+  onOpenMap: () => void;
   engineRef: React.MutableRefObject<GameEngine | null>;
 }
 
-const GameCanvas = ({ onLevelUp, onGameOver, onSynergyActivated, onFloorChange, onShopOpen, onShopClose, onAmuletDrop, onInventoryOpen, onInventoryClose, engineRef }: GameCanvasProps) => {
+const GameCanvas = ({ onLevelUp, onGameOver, onSynergyActivated, onFloorChange, onShopOpen, onShopClose, onAmuletDrop, onInventoryOpen, onInventoryClose, onAmuletReveal, onOpenMap, engineRef }: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -33,6 +35,7 @@ const GameCanvas = ({ onLevelUp, onGameOver, onSynergyActivated, onFloorChange, 
       onAmuletDrop,
       onInventoryOpen,
       onInventoryClose,
+      onAmuletReveal,
     };
 
     const engine = new GameEngine(canvas, callbacks);
@@ -53,7 +56,11 @@ const GameCanvas = ({ onLevelUp, onGameOver, onSynergyActivated, onFloorChange, 
         style={{ background: '#000', touchAction: 'none' }}
         tabIndex={0}
       />
-      <MobileHUD engineRef={engineRef} />
+      <MobileHUD
+        engineRef={engineRef}
+        onOpenInventory={onInventoryOpen}
+        onOpenMap={onOpenMap}
+      />
     </div>
   );
 };
