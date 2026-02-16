@@ -13,6 +13,7 @@ import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } fro
 import { checkTrapCollision, activateTrap, updateTrapEffects, resetTrapEffects, getLightsOutTimer, getPanicTimer, getDoorsLockedTimer, hasEffect } from './traps';
 import { AmuletInventory, createAmuletInventory, getRandomBossAmuletDrop, isAmuletEquipped, WarRhythmState, createWarRhythmState, getSoulCollectorBonus, getSoulCollectorSpeedBonus, AMULET_DEFS, addAmulet } from './amulets';
 import { initArenaFX, resetArenaFX, updateArenaFX, renderArenaFloorFX, renderArenaOverlayFX, spawnSlashMark, spawnBloodMark, spawnImpactMark, getTorchPositions } from './arena-fx';
+import { applyBrightness } from './brightness';
 import * as C from './constants';
 
 export class GameEngine {
@@ -1969,6 +1970,9 @@ export class GameEngine {
     vignette.addColorStop(1, 'rgba(0,0,0,0.3)');
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, rw, rh);
+
+    // Apply brightness post-processing (last overlay before copy)
+    applyBrightness(ctx, rw, rh);
 
     // Copy to display - scaled to fit with offset
     const scaledW = Math.round(rw * this.scale);

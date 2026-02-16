@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { loadRankData, getRankProgress, RANK_TIERS } from '@/game/rank';
+import BrightnessSettings from '@/components/BrightnessSettings';
 
 const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (continueGame?: boolean) => void; onStartFloor?: (floor: number) => void; hasSave?: boolean }) => {
   const [showDevMenu, setShowDevMenu] = useState(false);
+  const [showBrightness, setShowBrightness] = useState(false);
   const [activeTab, setActiveTab] = useState<'play' | 'stats' | 'help'>('play');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rankData = loadRankData();
@@ -288,21 +290,37 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
             </div>
           </div>
 
-          {/* Dev Mode */}
-          <button
-            onClick={() => setShowDevMenu(true)}
-            className="mt-4 px-3 py-1 text-xs border rounded transition-all duration-300 hover:opacity-80 flex-shrink-0"
-            style={{
-              fontFamily: 'monospace',
-              color: '#444455',
-              letterSpacing: '0.15em',
-              background: 'rgba(30, 30, 50, 0.2)',
-              borderColor: '#222233',
-              fontSize: '10px',
-            }}
-          >
-            🛠️ DEV
-          </button>
+          {/* Settings row */}
+          <div className="flex gap-2 mt-4 flex-shrink-0">
+            <button
+              onClick={() => setShowBrightness(true)}
+              className="px-3 py-1 text-xs border rounded transition-all duration-300 hover:opacity-80"
+              style={{
+                fontFamily: 'monospace',
+                color: '#666677',
+                letterSpacing: '0.1em',
+                background: 'rgba(30, 30, 50, 0.3)',
+                borderColor: '#2a2a44',
+                fontSize: '10px',
+              }}
+            >
+              ☀️ BRILHO
+            </button>
+            <button
+              onClick={() => setShowDevMenu(true)}
+              className="px-3 py-1 text-xs border rounded transition-all duration-300 hover:opacity-80"
+              style={{
+                fontFamily: 'monospace',
+                color: '#444455',
+                letterSpacing: '0.15em',
+                background: 'rgba(30, 30, 50, 0.2)',
+                borderColor: '#222233',
+                fontSize: '10px',
+              }}
+            >
+              🛠️ DEV
+            </button>
+          </div>
 
           <div className="flex-1 min-h-4" />
         </div>
@@ -365,6 +383,8 @@ const TitleScreen = ({ onStart, onStartFloor, hasSave = false }: { onStart: (con
           </div>
         </DialogContent>
       </Dialog>
+      {/* Brightness Settings */}
+      <BrightnessSettings open={showBrightness} onClose={() => setShowBrightness(false)} />
     </div>
   );
 };

@@ -1053,7 +1053,7 @@ function playHPHeartbeat(hpRatio: number) {
   // Slow, gentle heartbeat — barely noticeable
   const bpm = 40 + (1 - hpRatio) * 20; // 40-60 bpm (very slow)
   const interval = 60 / bpm;
-  const vol = 0.02 + (1 - hpRatio) * 0.04; // much quieter (was 0.04 + 0.12)
+  const vol = 0.04 + (1 - hpRatio) * 0.06; // slightly louder to be audible (was 0.02 + 0.04)
   
   for (let i = 0; i < 2; i++) {
     const t = ctx.currentTime + i * interval * 0.3;
