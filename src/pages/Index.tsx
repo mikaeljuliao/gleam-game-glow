@@ -65,6 +65,10 @@ const Index = () => {
 
   const handleUpgradeSelect = useCallback((upgrade: Upgrade) => {
     engineRef.current?.applyUpgrade(upgrade);
+    // If boss room was just cleared, start victory countdown after upgrade selection
+    if (engineRef.current && (engineRef.current as any).pendingNextFloor) {
+      (engineRef.current as any).startVictoryCountdown();
+    }
     setGameState('playing');
   }, []);
 
@@ -213,7 +217,7 @@ const Index = () => {
           engine.trySanctuaryHeal();
         }
       }
-      // [F] to interact with vendor
+      // [F] to interact with vendor (legacy/mobile compat)
       if (key === 'f' && gameState === 'playing') {
         const engine = engineRef.current;
         if (engine) {
