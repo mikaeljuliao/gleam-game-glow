@@ -115,7 +115,7 @@ export function updateEnemy(e: EnemyState, player: PlayerState, dt: number, allE
           x: e.x, y: e.y,
           vx: n.x * C.SHOOTER_PROJ_SPEED, vy: n.y * C.SHOOTER_PROJ_SPEED,
           size: 3, damage: e.damage, isPlayerOwned: false, lifetime: 3,
-          piercing: false, explosive: false, trail: [],
+          piercing: false, explosive: false, trail: [], hitTargets: [], volleyId: Date.now() + Math.random(),
         });
       }
       break;
@@ -164,7 +164,7 @@ export function updateEnemy(e: EnemyState, player: PlayerState, dt: number, allE
         const floatY = Math.cos(e.wobble * 1.7) * 0.5;
         e.x += (n.x * 0.5 + floatX + sepX) * e.speed * dt;
         e.y += (n.y * 0.5 + floatY + sepY) * e.speed * dt;
-        
+
         if (e.attackCooldown <= 0) {
           e.attackCooldown = C.WRAITH_TELEPORT_COOLDOWN;
           e.aiState = 'teleport';

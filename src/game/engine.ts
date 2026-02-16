@@ -800,6 +800,26 @@ export class GameEngine {
           if (projDeadEnemies.has(e)) continue;
           if (e.spawnTimer > 0) continue;
           if (this.circleCollide(p.x, p.y, p.size, e.x, e.y, e.width / 2)) {
+            // Prevent shotgunning: same volley (from multiple projs) cannot hit same enemy
+            if (e.lastVolleyId === p.volleyId) {
+              // Already hit by this volley -> ignore
+              // But we should still "consume" the projectile if it's not piercing?
+              // Actually, if it's a shotgun blast, the other pellets should likely pass through or disappear?
+              // For now, let's just make them pass through (ghost) or disappear without damage.
+              // If we want them to disappear, we return false.
+              // If we want them to pass through, we return true.
+              // Let's make them disappear to avoid visual clutter of "fake" hits.
+              if (!p.piercing) return false;
+              return true;
+            }
+
+            if (!p.hitTargets) p.hitTargets = [];
+            if (p.hitTargets.includes(e)) continue;
+            p.hitTargets.push(e);
+
+            // Mark enemy as hit by this volley
+            e.lastVolleyId = p.volleyId;
+
             let dmg = Math.floor(p.damage * this.player.damageMultiplier * this.getAmuletDamageMult());
             // Berserker
             if (this.player.berserker && this.player.hp / this.player.maxHp < 0.3) {
@@ -812,8 +832,11 @@ export class GameEngine {
               SFX.criticalHit();
             }
             const dx = e.x - p.x, dy = e.y - p.y;
-            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            const dead = damageEnemy(e, dmg, (dx / dist) * 3, (dy / dist) * 3);
+            // Clamp distance to avoid division by near-zero (instability at point-blank range)
+            const dist = Math.max(10, Math.sqrt(dx * dx + dy * dy));
+            // Removed knockback for projectiles (was 1.5, now 0) as per user request
+            // "so tomar o tiro" - no physical displacement
+            const dead = damageEnemy(e, dmg, 0, 0);
             this.stats.damageDealt += dmg;
             spawnDamageText(this.particles, e.x, e.y, `${dmg}`);
             spawnBlood(this.particles, e.x, e.y, 4);
@@ -1432,6 +1455,7 @@ export class GameEngine {
         const edy = closestEnemy.y - p.discipleY;
         const eDist = Math.sqrt(edx * edx + edy * edy) || 1;
         const nx = edx / eDist, ny = edy / eDist;
+        const volleyId = Date.now() + Math.random();
         for (let pi = 0; pi < projCount; pi++) {
           const spread = projCount > 1 ? (pi - 0.5) * 0.3 : 0;
           const cos = Math.cos(spread), sin = Math.sin(spread);
@@ -1441,7 +1465,7 @@ export class GameEngine {
             x: p.discipleX, y: p.discipleY,
             vx, vy, size: 3, damage: baseDmg,
             isPlayerOwned: true, lifetime: 0.8,
-            piercing: false, explosive: false, trail: [],
+            piercing: false, explosive: false, trail: [], hitTargets: [], volleyId,
           });
         }
         spawnSpark(this.particles, p.discipleX, p.discipleY, '#66cc88', 3);

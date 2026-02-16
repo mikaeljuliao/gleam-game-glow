@@ -112,6 +112,7 @@ export interface EnemyState {
   lunging: boolean;
   // Necromancer specific
   summonTimer: number;
+  lastVolleyId?: number;
 }
 
 export interface ProjectileState {
@@ -127,6 +128,10 @@ export interface ProjectileState {
   explosive: boolean;
   // Trail
   trail: Vec2[];
+  // Enemies hit by this projectile (to prevent multi-hits per frame)
+  hitTargets: EnemyState[];
+  // ID shared by all projectiles in a single shot
+  volleyId: number;
 }
 
 export interface Particle {

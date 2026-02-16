@@ -1027,9 +1027,8 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
 
   // Hit jitter / bulge
   if (e.flashTime > 0) {
-    const jitter = Math.sin(time * 60) * 2;
-    ctx.translate(jitter, (Math.random() - 0.5) * 2);
-    ctx.scale(1.1, 1.1); // Bulge on hit
+    // No jitter or scaling as per user request ("nada de distorção ou mexida")
+    // Just the flash effect (handlers below) is enough feedback
   }
 
   // Shadow
