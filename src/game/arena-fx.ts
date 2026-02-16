@@ -187,33 +187,26 @@ export function updateArenaFX(dt: number, time: number, playerX: number, playerY
     }
   }
   
-  // --- Combat marks fade ---
+  // --- Combat marks (blood marks are permanent, no fading) ---
+  // Only remove non-blood marks that expire
   for (let i = combatMarks.length - 1; i >= 0; i--) {
-    combatMarks[i].life -= dt;
-    if (combatMarks[i].life <= 0) {
-      combatMarks.splice(i, 1);
+    if (combatMarks[i].type !== 'blood') {
+      combatMarks[i].life -= dt;
+      if (combatMarks[i].life <= 0) {
+        combatMarks.splice(i, 1);
+      }
     }
   }
 }
 
 // ============ COMBAT MARK SPAWNERS ============
 
-export function spawnSlashMark(x: number, y: number, angle: number) {
-  if (combatMarks.length >= MAX_MARKS) combatMarks.shift();
-  combatMarks.push({
-    x, y, angle,
-    length: rng(12, 22),
-    type: 'slash',
-    alpha: 0.4,
-    life: rng(4, 8),
-    maxLife: 0,
-    color: 'rgba(200, 220, 255, 0.3)',
-    size: rng(1, 2),
-  });
-  combatMarks[combatMarks.length - 1].maxLife = combatMarks[combatMarks.length - 1].life;
+export function spawnSlashMark(_x: number, _y: number, _angle: number) {
+  // Removed — no slash marks on floor
 }
 
 export function spawnBloodMark(x: number, y: number) {
+  // Blood marks are permanent — no life limit
   if (combatMarks.length >= MAX_MARKS) combatMarks.shift();
   combatMarks.push({
     x, y,
@@ -221,28 +214,15 @@ export function spawnBloodMark(x: number, y: number) {
     length: rng(4, 10),
     type: 'blood',
     alpha: 0.25,
-    life: rng(6, 15),
-    maxLife: 0,
+    life: 99999,
+    maxLife: 99999,
     color: 'rgba(120, 15, 15, 0.35)',
     size: rng(3, 7),
   });
-  combatMarks[combatMarks.length - 1].maxLife = combatMarks[combatMarks.length - 1].life;
 }
 
-export function spawnImpactMark(x: number, y: number) {
-  if (combatMarks.length >= MAX_MARKS) combatMarks.shift();
-  combatMarks.push({
-    x, y,
-    angle: 0,
-    length: rng(6, 12),
-    type: 'impact',
-    alpha: 0.35,
-    life: rng(1.5, 3),
-    maxLife: 0,
-    color: 'rgba(255, 200, 100, 0.3)',
-    size: rng(5, 10),
-  });
-  combatMarks[combatMarks.length - 1].maxLife = combatMarks[combatMarks.length - 1].life;
+export function spawnImpactMark(_x: number, _y: number) {
+  // Removed — no impact ripples
 }
 
 // ============ RENDER — FLOOR LAYER (before entities) ============
@@ -251,29 +231,11 @@ export function renderArenaFloorFX(ctx: CanvasRenderingContext2D, time: number) 
   // --- Enhanced floor decorations ---
   renderFloorDecorations(ctx, time);
   
-  // --- Combat marks on floor ---
+  // --- Combat marks on floor (only blood) ---
   for (const m of combatMarks) {
-    const fadeRatio = Math.min(1, m.life / (m.maxLife * 0.3));
-    const alpha = m.alpha * fadeRatio;
-    
-    if (m.type === 'slash') {
-      ctx.strokeStyle = `rgba(180, 200, 240, ${alpha * 0.5})`;
-      ctx.lineWidth = m.size;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(
-        m.x - Math.cos(m.angle) * m.length * 0.5,
-        m.y - Math.sin(m.angle) * m.length * 0.5,
-      );
-      ctx.lineTo(
-        m.x + Math.cos(m.angle) * m.length * 0.5,
-        m.y + Math.sin(m.angle) * m.length * 0.5,
-      );
-      ctx.stroke();
-      ctx.lineCap = 'butt';
-    } else if (m.type === 'blood') {
-      // Blood splatter — irregular shape
-      ctx.fillStyle = `rgba(100, 10, 10, ${alpha})`;
+    if (m.type === 'blood') {
+      // Blood splatter — irregular shape, permanent
+      ctx.fillStyle = `rgba(100, 10, 10, ${m.alpha})`;
       ctx.beginPath();
       ctx.ellipse(m.x, m.y, m.size, m.size * 0.6, m.angle, 0, Math.PI * 2);
       ctx.fill();
@@ -284,27 +246,6 @@ export function renderArenaFloorFX(ctx: CanvasRenderingContext2D, time: number) 
         ctx.beginPath();
         ctx.arc(m.x + dx, m.y + dy, m.size * 0.2, 0, Math.PI * 2);
         ctx.fill();
-      }
-    } else if (m.type === 'impact') {
-      // Impact ring — ripple effect
-      const progress = 1 - (m.life / m.maxLife);
-      const radius = m.size * (0.5 + progress * 1.5);
-      ctx.strokeStyle = `rgba(255, 200, 100, ${alpha * (1 - progress)})`;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(m.x, m.y, radius, 0, Math.PI * 2);
-      ctx.stroke();
-      // Inner crack lines
-      if (progress < 0.5) {
-        ctx.strokeStyle = `rgba(200, 180, 120, ${alpha * 0.4})`;
-        ctx.lineWidth = 0.5;
-        for (let i = 0; i < 4; i++) {
-          const a = (i / 4) * Math.PI * 2 + m.angle;
-          ctx.beginPath();
-          ctx.moveTo(m.x, m.y);
-          ctx.lineTo(m.x + Math.cos(a) * radius * 0.6, m.y + Math.sin(a) * radius * 0.6);
-          ctx.stroke();
-        }
       }
     }
   }
