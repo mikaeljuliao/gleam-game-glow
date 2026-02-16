@@ -379,17 +379,107 @@ export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, ti
 
 export function renderObstacles(ctx: CanvasRenderingContext2D, obstacles: Obstacle[]) {
   for (const o of obstacles) {
-    // Shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.fillRect(o.x + 2, o.y + 2, o.w, o.h);
-    // Body
-    ctx.fillStyle = C.COLORS.obstacle;
+    const hash = ((o.x * 7 + o.y * 13) & 0xFF);
+    
+    // Projected shadow (longer, softer, directional — as if lit from above-left)
+    const shadowOff = 4;
+    const shadowGrad = ctx.createLinearGradient(o.x + shadowOff, o.y + shadowOff, o.x + o.w + shadowOff + 3, o.y + o.h + shadowOff + 3);
+    shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.35)');
+    shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = shadowGrad;
+    ctx.fillRect(o.x + shadowOff, o.y + shadowOff, o.w + 3, o.h + 3);
+    
+    // Base body — slight color variation per pillar
+    const bodyR = 30 + (hash % 8);
+    const bodyG = 28 + (hash % 6);
+    const bodyB = 42 + (hash % 10);
+    ctx.fillStyle = `rgb(${bodyR}, ${bodyG}, ${bodyB})`;
     ctx.fillRect(o.x, o.y, o.w, o.h);
+    
+    // Stone brick lines (horizontal mortar)
+    ctx.fillStyle = 'rgba(15, 12, 25, 0.3)';
+    const brickH = 5;
+    for (let by = o.y + brickH; by < o.y + o.h - 2; by += brickH) {
+      ctx.fillRect(o.x, by, o.w, 1);
+    }
+    // Vertical mortar (offset per row)
+    for (let by = o.y; by < o.y + o.h - 2; by += brickH) {
+      const row = Math.floor((by - o.y) / brickH);
+      const vOff = row % 2 === 0 ? o.w * 0.4 : o.w * 0.7;
+      ctx.fillRect(o.x + vOff, by, 1, brickH);
+    }
+    
+    // Top cap — lighter highlight
     ctx.fillStyle = C.COLORS.obstacleTop;
     ctx.fillRect(o.x, o.y, o.w, 3);
-    // Detail
-    ctx.fillStyle = 'rgba(40, 40, 65, 0.4)';
-    ctx.fillRect(o.x + 3, o.y + 5, 2, 2);
+    // Top bevel highlight
+    ctx.fillStyle = 'rgba(80, 75, 100, 0.3)';
+    ctx.fillRect(o.x, o.y, o.w, 1);
+    
+    // Bottom edge — darker
+    ctx.fillStyle = 'rgba(10, 8, 18, 0.4)';
+    ctx.fillRect(o.x, o.y + o.h - 1, o.w, 1);
+    
+    // Left edge highlight (light source from left)
+    ctx.fillStyle = 'rgba(60, 55, 80, 0.2)';
+    ctx.fillRect(o.x, o.y + 3, 1, o.h - 4);
+    
+    // Right edge shadow
+    ctx.fillStyle = 'rgba(10, 8, 18, 0.25)';
+    ctx.fillRect(o.x + o.w - 1, o.y + 3, 1, o.h - 4);
+    
+    // Cracks — unique per pillar based on hash
+    ctx.strokeStyle = 'rgba(12, 10, 20, 0.35)';
+    ctx.lineWidth = 0.6;
+    if (hash % 3 === 0) {
+      // Diagonal crack from top-left
+      ctx.beginPath();
+      ctx.moveTo(o.x + 2, o.y + 4);
+      ctx.lineTo(o.x + o.w * 0.4, o.y + o.h * 0.35);
+      ctx.lineTo(o.x + o.w * 0.35, o.y + o.h * 0.5);
+      ctx.stroke();
+    }
+    if (hash % 5 === 0) {
+      // Horizontal crack mid-section
+      ctx.beginPath();
+      ctx.moveTo(o.x + o.w * 0.3, o.y + o.h * 0.6);
+      ctx.lineTo(o.x + o.w * 0.8, o.y + o.h * 0.55);
+      ctx.stroke();
+    }
+    if (hash % 7 === 0) {
+      // Small chip/dent
+      ctx.fillStyle = 'rgba(10, 8, 18, 0.3)';
+      ctx.fillRect(o.x + o.w * 0.6, o.y + o.h * 0.3, 3, 2);
+    }
+    
+    // Moss/lichen patches — green growth on stone
+    if (hash % 4 < 2) {
+      // Bottom moss (most common — moisture collects at base)
+      ctx.fillStyle = 'rgba(25, 55, 30, 0.18)';
+      const mossW = 4 + (hash % 5);
+      const mossX = o.x + (hash % 3) * 2;
+      ctx.fillRect(mossX, o.y + o.h - 4, mossW, 4);
+      // Brighter spots
+      ctx.fillStyle = 'rgba(35, 70, 35, 0.1)';
+      ctx.fillRect(mossX + 1, o.y + o.h - 3, mossW * 0.6, 2);
+    }
+    if (hash % 6 === 0) {
+      // Side moss (rarer)
+      ctx.fillStyle = 'rgba(20, 50, 28, 0.15)';
+      ctx.fillRect(o.x, o.y + o.h * 0.5, 3, 6);
+    }
+    if (hash % 9 === 0) {
+      // Top moss patch (very rare — ancient pillar)
+      ctx.fillStyle = 'rgba(22, 48, 25, 0.12)';
+      ctx.fillRect(o.x + 2, o.y + 3, o.w - 4, 2);
+    }
+    
+    // Small stone detail textures
+    ctx.fillStyle = 'rgba(50, 45, 70, 0.15)';
+    ctx.fillRect(o.x + 3, o.y + o.h * 0.4, 2, 1);
+    if (hash % 2 === 0) {
+      ctx.fillRect(o.x + o.w - 5, o.y + o.h * 0.7, 2, 1);
+    }
   }
 }
 

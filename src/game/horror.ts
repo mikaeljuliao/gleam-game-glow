@@ -1050,10 +1050,10 @@ const hpHorror: HPHorrorState = {
 function playHPHeartbeat(hpRatio: number) {
   if (!ambienceActive) return;
   const ctx = getBgCtx();
-  // Faster and louder as HP drops
-  const bpm = 60 + (1 - hpRatio) * 120; // 60-180 bpm
+  // Slow, gentle heartbeat — barely noticeable
+  const bpm = 40 + (1 - hpRatio) * 20; // 40-60 bpm (very slow)
   const interval = 60 / bpm;
-  const vol = 0.04 + (1 - hpRatio) * 0.12;
+  const vol = 0.02 + (1 - hpRatio) * 0.04; // much quieter (was 0.04 + 0.12)
   
   for (let i = 0; i < 2; i++) {
     const t = ctx.currentTime + i * interval * 0.3;
@@ -1166,11 +1166,12 @@ function playDeepGrowl() {
 // === HP-REACTIVE UPDATE (called every frame) ===
 
 export function updateHPHorror(hpRatio: number, dt: number, floor: number) {
-  // Heartbeat — continuous at HP < 40%
-  if (hpRatio < 0.4) {
+  // Heartbeat — slow and gentle at HP < 30%, much slower BPM
+  if (hpRatio < 0.3) {
     hpHorror.heartbeatTimer -= dt;
     if (hpHorror.heartbeatTimer <= 0) {
-      const bpm = 60 + (1 - hpRatio) * 120;
+      // Slow heartbeat: 40-60 BPM max (was 60-180)
+      const bpm = 40 + (1 - hpRatio) * 20;
       hpHorror.heartbeatTimer = 60 / bpm;
       playHPHeartbeat(hpRatio);
     }
@@ -1178,30 +1179,23 @@ export function updateHPHorror(hpRatio: number, dt: number, floor: number) {
     hpHorror.heartbeatTimer = 0;
   }
 
-  // Ghost footsteps — HP < 40%
-  if (hpRatio < 0.4) {
-    hpHorror.ghostFootstepTimer -= dt;
-    if (hpHorror.ghostFootstepTimer <= 0) {
-      hpHorror.ghostFootstepTimer = rng(2, 5) * hpRatio * 2.5;
-      playGhostFootstep();
-    }
-  }
+  // Ghost footsteps — REMOVED (audio pollution)
 
-  // Wall scratching — HP < 25%
-  if (hpRatio < 0.25) {
+  // Wall scratching — HP < 20%, much rarer and quieter
+  if (hpRatio < 0.2) {
     hpHorror.scratchTimer -= dt;
     if (hpHorror.scratchTimer <= 0) {
-      hpHorror.scratchTimer = rng(4, 10);
-      playWallScratch();
+      hpHorror.scratchTimer = rng(12, 30); // much rarer (was 4-10)
+      if (maybe(0.3)) playWallScratch(); // only 30% chance
     }
   }
 
-  // Deep growl — HP < 20%, very rare
-  if (hpRatio < 0.2) {
+  // Deep growl — HP < 15%, extremely rare
+  if (hpRatio < 0.15) {
     hpHorror.growlTimer -= dt;
     if (hpHorror.growlTimer <= 0) {
-      hpHorror.growlTimer = rng(15, 40);
-      if (maybe(0.5)) playDeepGrowl();
+      hpHorror.growlTimer = rng(30, 70); // much rarer (was 15-40)
+      if (maybe(0.3)) playDeepGrowl();
     }
   }
 
@@ -1211,9 +1205,9 @@ export function updateHPHorror(hpRatio: number, dt: number, floor: number) {
     hpHorror.darkPulseTimer = rng(3, 8);
   }
 
-  // Blood drops when critical
-  if (hpRatio < 0.3) {
-    if (maybe(dt * (1 - hpRatio) * 3)) {
+  // Blood drops when critical — much rarer
+  if (hpRatio < 0.2) {
+    if (maybe(dt * (1 - hpRatio) * 0.5)) { // 6x less frequent
       hpHorror.bloodDrops.push({
         x: Math.random(),
         y: 0,
@@ -1300,13 +1294,13 @@ export function renderHPHorror(ctx: CanvasRenderingContext2D, hpRatio: number, t
     }
   }
 
-  // 3. Heartbeat pulse flash — subtle red flash at HP < 25%
-  if (hpRatio < 0.25) {
-    const bpm = 60 + (1 - hpRatio) * 120;
+  // 3. Heartbeat pulse flash — very subtle, slow, at HP < 20%
+  if (hpRatio < 0.2) {
+    const bpm = 40 + (1 - hpRatio) * 20; // match audio BPM (slow)
     const beatPhase = (time * bpm / 60) % 1;
-    const beatFlash = beatPhase < 0.1 ? Math.sin(beatPhase / 0.1 * Math.PI) : 0;
+    const beatFlash = beatPhase < 0.08 ? Math.sin(beatPhase / 0.08 * Math.PI) : 0;
     if (beatFlash > 0) {
-      ctx.fillStyle = `rgba(100, 0, 0, ${beatFlash * 0.06 * (1 - hpRatio) * 2})`;
+      ctx.fillStyle = `rgba(80, 0, 0, ${beatFlash * 0.03 * (1 - hpRatio)})`;
       ctx.fillRect(fx, fy, fw, fh);
     }
   }
@@ -1329,9 +1323,9 @@ export function renderHPHorror(ctx: CanvasRenderingContext2D, hpRatio: number, t
     ctx.globalCompositeOperation = 'source-over';
   }
 
-  // 6. Enhanced shadow figures at low HP — taller, with aura
-  if (hpRatio < 0.4) {
-    const shadowChance = (0.4 - hpRatio) * 0.003;
+  // 6. Enhanced shadow figures at low HP — much rarer, slower
+  if (hpRatio < 0.3) {
+    const shadowChance = (0.3 - hpRatio) * 0.001; // 3x less frequent
     if (maybe(shadowChance)) {
       const sx = Math.random() * C.dims.gw;
       const sy = Math.random() * C.dims.gh;
@@ -1359,9 +1353,9 @@ export function renderHPHorror(ctx: CanvasRenderingContext2D, hpRatio: number, t
     }
   }
 
-  // 7. Multiple eyes in darkness when HP very low
-  if (hpRatio < 0.25) {
-    const eyeCount = Math.floor((0.25 - hpRatio) * 20);
+  // 7. Multiple eyes in darkness when HP very low — fewer, subtler
+  if (hpRatio < 0.2) {
+    const eyeCount = Math.floor((0.2 - hpRatio) * 8); // much fewer (was *20)
     for (let i = 0; i < eyeCount; i++) {
       // Use deterministic positions based on time so they don't flicker every frame
       const seed = Math.sin(i * 127.1 + Math.floor(time * 0.5) * 311.7);
