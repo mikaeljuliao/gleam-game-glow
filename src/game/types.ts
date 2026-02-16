@@ -250,4 +250,6 @@ export interface GameCallbacks {
   onInventoryOpen: () => void;
   onInventoryClose: () => void;
   onAmuletReveal: (amuletId: string) => void;
+  onSanctuaryOpen: () => void;
+  onSanctuaryClose: () => void;
 }

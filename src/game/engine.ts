@@ -173,8 +173,16 @@ export class GameEngine {
     stopBackgroundMusic();
   }
 
-  pause() { this.paused = true; }
-  resume() { this.paused = false; this.lastTime = performance.now(); }
+  pause() {
+    console.log('[ENGINE] Pause requested. Current state:', { paused: this.paused, running: this.running });
+    this.paused = true;
+  }
+
+  resume() {
+    console.log('[ENGINE] Resume requested. Unpausing engine.');
+    this.paused = false;
+    this.lastTime = performance.now();
+  }
 
   applyUpgrade(upgrade: Upgrade) {
     upgrade.apply(this.player);
@@ -366,9 +374,9 @@ export class GameEngine {
           this.slowMoFactor = 1;
         }
       }
+
       if (this.vendorDialogueActive) {
         this.updateVendorDialogue(dt);
-        // Click/key to advance dialogue
         if (this.input.isMouseJustPressed(0) || this.input.isMouseJustPressed(2) || this.input.wantsDash()) {
           this.advanceVendorDialogue();
         }
@@ -1607,90 +1615,65 @@ export class GameEngine {
     this.startVendorDialogue();
   }
 
-  // Public method for sanctuary heal — triggered by [T] key
+  // Public method for sanctuary open — triggered by [T] key
   trySanctuaryHeal() {
-    // Guard: don't heal during shop (but allow during vendor dialogue — close dialogue first)
-    if (this.shopOpen) return;
+    // Guard: don't heal during some states
+    if (this.shopOpen || this.paused) return;
     const room = getCurrentRoom(this.dungeon);
     if (room.type !== 'vendor' || !this.inVendorRoom) return;
-    // If vendor dialogue is active, close it so sanctuary can proceed
-    if (this.vendorDialogueActive) {
-      this.vendorDialogueActive = false;
-      this.resume();
-    }
-    const p = this.player;
-    // Sanctuary is rendered at 18% of game width, 50% height (left side of vendor room)
+
+    // Sanctuary position on the left side of vendor room
     const shrineX = Math.floor(C.dims.gw * 0.18);
     const shrineY = Math.floor(C.dims.gh * 0.5);
-    const shrineDist = Math.sqrt((p.x - shrineX) ** 2 + (p.y - shrineY) ** 2);
+    const shrineDist = Math.sqrt((this.player.x - shrineX) ** 2 + (this.player.y - shrineY) ** 2);
+
     if (shrineDist > 40) {
-      spawnDamageText(this.particles, p.x, p.y - 10, 'Aproxime-se do Santuário', '#888888');
-      return;
-    }
-    if (this.shrineCooldown) {
-      spawnDamageText(this.particles, p.x, p.y - 10, 'Aguarde...', '#888888');
-      return;
-    }
-    if (p.hp >= p.maxHp) {
-      spawnDamageText(this.particles, p.x, p.y - 10, 'Vida cheia', '#88cc88');
-      SFX.uiClose();
-      return;
-    }
-    const healCost = 50 + this.dungeon.floor * 10;
-    if (p.souls < healCost) {
-      spawnDamageText(this.particles, p.x, p.y - 10, `Precisa ${healCost} almas`, '#cc6666');
-      SFX.uiClose();
+      spawnDamageText(this.particles, this.player.x, this.player.y - 10, 'Aproxime-se do Santuário', '#888888');
       return;
     }
 
+    // If vendor dialogue is active, close it first
+    if (this.vendorDialogueActive) {
+      this.vendorDialogueActive = false;
+    }
+
+    // Open sanctuary modal via callback and pause engine
+    console.log('[SANCTUARY] trySanctuaryHeal: opening modal and pausing engine');
+    this.pause();
+    this.callbacks.onSanctuaryOpen();
+  }
+
+  closeSanctuary() {
+    console.log('[SANCTUARY] closeSanctuary called, resuming engine');
+    this.resume();
+    // Removed this.callbacks.onSanctuaryClose() to prevent recursion with Index.tsx handleSanctuaryClose
+  }
+
+  performSanctuaryHeal(): boolean {
+    console.log('[SANCTUARY] performing instant heal');
+    const p = this.player;
+    const floor = this.dungeon?.floor || 1;
+    const healCost = 50 + floor * 10;
+
+    if (p.souls < healCost || p.hp >= p.maxHp) {
+      console.log(`[SANCTUARY] instant heal cancelled: souls=${p.souls}, cost=${healCost}, hp=${p.hp}/${p.maxHp}`);
+      SFX.actionBlocked();
+      return false;
+    }
+
+    // Instant deduction and heal
     p.souls -= healCost;
-    const healAmount = Math.floor(p.maxHp * 0.25);
-    p.hp = Math.min(p.maxHp, p.hp + healAmount);
+    const healAmt = Math.floor(p.maxHp * 0.25);
+    p.hp = Math.min(p.maxHp, p.hp + healAmt);
 
-    // Healing particles: souls flowing OUT from player toward shrine, then green heal IN
-    const healShrineX = shrineX;
-    const healShrineY = shrineY;
-    for (let i = 0; i < 6; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      this.particles.push({
-        x: p.x + Math.cos(angle) * 5,
-        y: p.y + Math.sin(angle) * 5,
-        vx: (healShrineX - p.x) * (0.8 + Math.random() * 0.4),
-        vy: (healShrineY - p.y) * (0.8 + Math.random() * 0.4),
-        life: 0.5 + Math.random() * 0.3,
-        maxLife: 0.8,
-        size: 2 + Math.random() * 1.5,
-        color: 'rgba(80, 150, 255, 0.8)',
-        type: 'soul',
-      });
-    }
-    // Green heal particles flow into player
-    setTimeout(() => {
-      for (let i = 0; i < 8; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 15 + Math.random() * 20;
-        this.particles.push({
-          x: p.x + Math.cos(angle) * dist,
-          y: p.y + Math.sin(angle) * dist,
-          vx: -Math.cos(angle) * 30,
-          vy: -Math.sin(angle) * 30 - 10,
-          life: 0.6 + Math.random() * 0.3,
-          maxLife: 0.9,
-          size: 2 + Math.random() * 1,
-          color: `rgba(80, 255, 140, ${0.6 + Math.random() * 0.3})`,
-          type: 'ghost',
-        });
-      }
-    }, 200);
+    console.log(`[SANCTUARY] SUCCESS: souls deducted, hp restored`);
 
-    spawnDamageText(this.particles, p.x, p.y - 10, `+${healAmount} HP`, C.COLORS.healText);
-    spawnDamageText(this.particles, p.x, p.y - 25, `-${healCost} Almas`, '#6688cc');
-    spawnExplosion(this.particles, healShrineX, healShrineY, 10);
-    this.addEffect('flash', 0.6, 0.2, 'rgb(80, 200, 150)');
+    // Immediate feedback
     SFX.sanctuaryHeal();
-    HorrorSFX.shrineActivate();
-    this.shrineCooldown = true;
-    setTimeout(() => { this.shrineCooldown = false; }, 2000);
+    this.addEffect('flash', 0.5, 0.3, 'rgba(100, 255, 180, 0.3)');
+    spawnDamageText(this.particles, p.x, p.y - 12, 'REVIGORADO', C.COLORS.healText);
+
+    return true;
   }
 
   private circleCollide(x1: number, y1: number, r1: number, x2: number, y2: number, r2: number): boolean {

@@ -160,6 +160,11 @@ export const SFX = {
     setTimeout(() => playTone(400, 0.15, 'sine', 0.06), 150);
   },
 
+  portalOpen() {
+    playFreqSweep(100, 600, 0.5, 'sine', 0.1);
+    playNoise(0.4, 0.08, 1200);
+  },
+
   explosion() {
     playNoise(0.3, 0.15, 800);
     playTone(60, 0.4, 'sine', 0.12);
@@ -224,7 +229,7 @@ export const SFX = {
     // Base kill impact — powerful for all bosses
     playTone(40, 0.6, 'sine', 0.18);
     playNoise(0.4, 0.15, 800);
-    
+
     switch (floor) {
       case 1: // Sombra — demonic wail descending
         playFreqSweep(800, 30, 0.8, 'sawtooth', 0.12);
@@ -471,9 +476,30 @@ export const SFX = {
   sanctuaryHeal() {
     const notes = [400, 500, 600, 800];
     notes.forEach((f, i) => {
-      setTimeout(() => playTone(f, 0.2, 'sine', 0.06), i * 70);
+      setTimeout(() => playTone(f, 0.25, 'sine', 0.08, true), i * 70);
     });
-    playNoise(0.3, 0.02, 1500);
+    playNoise(0.4, 0.03, 1200);
+  },
+
+  sanctuarySoulDrain() {
+    // Soft wispy reverse-whoosh for souls leaving
+    playFreqSweep(1200, 400, 0.4, 'sine', 0.03);
+    playNoise(0.3, 0.02, 3000);
+  },
+
+  sanctuaryRitualFlow() {
+    // Soft undulating mystical hum
+    playTone(220, 0.1, 'sine', 0.04, true);
+    playFreqSweep(440, 660, 0.08, 'sine', 0.02);
+  },
+
+  sanctuaryRitualEnd() {
+    // Impactful but soft divine chime
+    playTone(523, 0.6, 'sine', 0.12);
+    playTone(659, 0.6, 'sine', 0.08);
+    playTone(784, 0.6, 'sine', 0.06);
+    playNoise(0.4, 0.05, 3000);
+    playFreqSweep(100, 300, 0.4, 'sine', 0.08);
   },
 
   // Projectile impact (enemy bullet hitting player already uses playerHit, this is for visual feedback)

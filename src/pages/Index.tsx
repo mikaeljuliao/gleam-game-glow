@@ -7,13 +7,14 @@ import ShopOverlay from '@/components/ShopOverlay';
 import AmuletInventoryOverlay from '@/components/AmuletInventory';
 import CartographerMap from '@/components/CartographerMap';
 import AmuletReveal from '@/components/AmuletReveal';
+import SanctuaryOverlay from '@/components/SanctuaryOverlay';
 import { GameEngine } from '@/game/engine';
 import { initAudio, SFX } from '@/game/audio';
 import { Upgrade, Synergy, GameStats, ShopItem, DungeonMap } from '@/game/types';
 import { hasSave, clearSave } from '@/game/save';
 import { AmuletInventory, createAmuletInventory, addAmulet, toggleEquip, getAmuletDef, isAmuletEquipped } from '@/game/amulets';
 
-type GameState = 'title' | 'playing' | 'upgrading' | 'gameOver' | 'shopping' | 'inventory' | 'cartographer' | 'amuletReveal';
+type GameState = 'title' | 'playing' | 'upgrading' | 'gameOver' | 'shopping' | 'inventory' | 'cartographer' | 'amuletReveal' | 'sanctuary';
 
 const Index = () => {
   const [gameState, setGameState] = useState<GameState>('title');
@@ -180,6 +181,34 @@ const Index = () => {
     }
   }, []);
 
+  const handleSanctuaryOpen = useCallback(() => {
+    console.log('[INDEX] handleSanctuaryOpen: syncing souls and opening overlay');
+    if (engineRef.current) {
+      setShopCoins(engineRef.current.player.souls);
+    }
+    setGameState('sanctuary');
+  }, []);
+
+  const handleSanctuaryClose = useCallback(() => {
+    setGameState('playing');
+    engineRef.current?.closeSanctuary();
+  }, []);
+
+  const handleSanctuaryHeal = useCallback(() => {
+    console.log('[INDEX] handleSanctuaryHeal triggered');
+    const engine = engineRef.current;
+    if (!engine) {
+      console.error('[INDEX] Engine ref is null during heal!');
+      return false;
+    }
+    const success = engine.performSanctuaryHeal();
+    if (success) {
+      console.log('[INDEX] Heal ritual initiated in engine, syncing souls...');
+      setShopCoins(engine.player.souls);
+    }
+    return success;
+  }, []);
+
   // When engine mounts, try to load save if requested
   useEffect(() => {
     if (loadSave && engineRef.current) {
@@ -231,7 +260,7 @@ const Index = () => {
     engineRef.current?.resume();
   }, []);
 
-  const isGameActive = gameState === 'playing' || gameState === 'upgrading' || gameState === 'shopping' || gameState === 'inventory' || gameState === 'cartographer' || gameState === 'amuletReveal';
+  const isGameActive = gameState === 'playing' || gameState === 'upgrading' || gameState === 'shopping' || gameState === 'inventory' || gameState === 'cartographer' || gameState === 'amuletReveal' || gameState === 'sanctuary';
 
   return (
     <div className="w-screen h-screen overflow-hidden" style={{ background: '#000' }}>
@@ -255,6 +284,8 @@ const Index = () => {
               onInventoryClose={handleInventoryClose}
               onAmuletReveal={handleAmuletReveal}
               onOpenMap={handleOpenMap}
+              onSanctuaryOpen={handleSanctuaryOpen}
+              onSanctuaryClose={handleSanctuaryClose}
               engineRef={engineRef}
             />
             {gameState === 'upgrading' && upgradeChoices.length > 0 && (
@@ -289,6 +320,16 @@ const Index = () => {
               <AmuletReveal
                 amuletId={revealAmuletId}
                 onComplete={handleAmuletRevealComplete}
+              />
+            )}
+            {gameState === 'sanctuary' && engineRef.current && (
+              <SanctuaryOverlay
+                souls={engineRef.current.player.souls}
+                hp={engineRef.current.player.hp}
+                maxHp={engineRef.current.player.maxHp}
+                floor={engineRef.current.dungeon.floor}
+                onHeal={handleSanctuaryHeal}
+                onClose={handleSanctuaryClose}
               />
             )}
             {synergyNotif && (
