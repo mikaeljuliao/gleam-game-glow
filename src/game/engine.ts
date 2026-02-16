@@ -1157,7 +1157,7 @@ export class GameEngine {
       spawnDamageText(this.particles, e.x, e.y, `${dmg}`);
       spawnBlood(this.particles, e.x, e.y, 8);
       spawnSpark(this.particles, e.x, e.y, C.COLORS.playerLight, 8);
-      spawnSpark(this.particles, e.x, e.y, '#ffffff', 4);
+      spawnSpark(this.particles, e.x, e.y, '#88ccff', 4); // Blue spark instead of white
       spawnSlashMark(e.x, e.y, this.player.meleeAngle);
       spawnImpactMark(e.x, e.y);
       hitAny = true;

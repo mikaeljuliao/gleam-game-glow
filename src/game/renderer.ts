@@ -790,10 +790,10 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
         const layerRange = range + (i * 2);
         const grad = ctx.createRadialGradient(x, y, range * 0.4, x, y, layerRange);
         const alpha = trailAlpha / (i + 1);
-        grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-        grad.addColorStop(0.7, `rgba(200, 230, 255, ${alpha * 0.5})`);
-        grad.addColorStop(0.9, `rgba(255, 255, 255, ${alpha})`);
-        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        grad.addColorStop(0, 'rgba(135, 206, 250, 0)'); // Blue transparent
+        grad.addColorStop(0.7, `rgba(100, 180, 255, ${alpha * 0.5})`); // Sky blue layer
+        grad.addColorStop(0.9, `rgba(135, 206, 250, ${alpha})`); // Light blue core
+        grad.addColorStop(1, 'rgba(135, 206, 250, 0)'); // Fade out to blue transparent
 
         ctx.fillStyle = grad;
         ctx.beginPath();
@@ -955,8 +955,8 @@ function drawLongsword(ctx: CanvasRenderingContext2D, length: number, isAttackin
   const bladeGrad = ctx.createLinearGradient(0, -bladeWidth, 0, bladeWidth);
   bladeGrad.addColorStop(0, '#444444');
   bladeGrad.addColorStop(0.3, '#bbbbbb');
-  bladeGrad.addColorStop(0.48, '#ffffff'); // Razor sharp edge highlight
-  bladeGrad.addColorStop(0.52, '#ffffff');
+  bladeGrad.addColorStop(0.48, '#e0f0ff'); // Blue-ish edge highlight
+  bladeGrad.addColorStop(0.52, '#e0f0ff'); // Blue-ish edge highlight
   bladeGrad.addColorStop(0.7, '#999999');
   bladeGrad.addColorStop(1, '#333333');
 
@@ -981,9 +981,9 @@ function drawLongsword(ctx: CanvasRenderingContext2D, length: number, isAttackin
   const shinePos = (Math.sin(time * shineSpeed) * 0.5 + 0.5) * (bladeLen - 10) + 10;
 
   const g = ctx.createRadialGradient(shinePos, 0, 0, shinePos, 0, 12);
-  g.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
-  g.addColorStop(0.2, 'rgba(200, 230, 255, 0.4)');
-  g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  g.addColorStop(0, 'rgba(135, 206, 250, 0.9)'); // Light Sky Blue
+  g.addColorStop(0.2, 'rgba(100, 180, 255, 0.5)');
+  g.addColorStop(1, 'rgba(100, 200, 255, 0)');
 
   // Glint shape
   ctx.save();
