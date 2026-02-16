@@ -1246,31 +1246,31 @@ export function renderHPHorror(ctx: CanvasRenderingContext2D, hpRatio: number, t
   const fw = vp.rw;
   const fh = vp.rh;
 
-  // 1. HP-reactive vignette — darkens and reddens as HP drops
-  if (hpRatio < 0.7) {
-    const intensity = (0.7 - hpRatio) / 0.7; // 0 at 70%, 1 at 0%
-    const redShift = Math.min(1, intensity * 1.5);
-    const r = Math.floor(80 + redShift * 120);
-    const g = Math.floor(10 * (1 - redShift));
-    const b = Math.floor(10 * (1 - redShift));
-    const baseAlpha = intensity * 0.5;
+  // 1. HP-reactive vignette — subtle darkening at edges, starts at 40%
+  if (hpRatio < 0.4) {
+    const intensity = (0.4 - hpRatio) / 0.4; // 0 at 40%, 1 at 0%
+    const redShift = Math.min(1, intensity * 1.2);
+    const r = Math.floor(40 + redShift * 50);
+    const g = 0;
+    const b = 0;
+    const baseAlpha = intensity * 0.2; // much lighter max alpha
     
     const vignette = ctx.createRadialGradient(
-      fw / 2 + fx, fh / 2 + fy, fw * 0.15,
-      fw / 2 + fx, fh / 2 + fy, fw * 0.55
+      fw / 2 + fx, fh / 2 + fy, fw * 0.25,
+      fw / 2 + fx, fh / 2 + fy, fw * 0.6
     );
     vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vignette.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, ${baseAlpha * 0.3})`);
+    vignette.addColorStop(0.7, `rgba(${r}, ${g}, ${b}, ${baseAlpha * 0.15})`);
     vignette.addColorStop(1, `rgba(${r}, ${g}, ${b}, ${baseAlpha})`);
     ctx.fillStyle = vignette;
     ctx.fillRect(fx, fy, fw, fh);
   }
 
-  // 2. Blood overlay — edge stains when HP < 50%
-  if (hpRatio < 0.5) {
-    const bloodIntensity = (0.5 - hpRatio) / 0.5;
+  // 2. Blood overlay — very subtle edge stains when HP < 35%
+  if (hpRatio < 0.35) {
+    const bloodIntensity = (0.35 - hpRatio) / 0.35;
     
-    // Corner blood stains
+    // Corner blood stains — much smaller and more transparent
     const corners = [
       { x: fx, y: fy },
       { x: fx + fw, y: fy },
@@ -1279,12 +1279,12 @@ export function renderHPHorror(ctx: CanvasRenderingContext2D, hpRatio: number, t
     ];
     for (let i = 0; i < corners.length; i++) {
       const c = corners[i];
-      const radius = 60 + bloodIntensity * 80;
+      const radius = 30 + bloodIntensity * 40;
       const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, radius);
-      const alpha = bloodIntensity * 0.25 + Math.sin(time * 2 + i) * 0.05;
-      grad.addColorStop(0, `rgba(120, 0, 0, ${alpha})`);
-      grad.addColorStop(0.5, `rgba(80, 0, 0, ${alpha * 0.4})`);
-      grad.addColorStop(1, 'rgba(60, 0, 0, 0)');
+      const alpha = bloodIntensity * 0.1 + Math.sin(time * 2 + i) * 0.02;
+      grad.addColorStop(0, `rgba(80, 0, 0, ${alpha})`);
+      grad.addColorStop(0.6, `rgba(50, 0, 0, ${alpha * 0.3})`);
+      grad.addColorStop(1, 'rgba(30, 0, 0, 0)');
       ctx.fillStyle = grad;
       ctx.fillRect(c.x - radius, c.y - radius, radius * 2, radius * 2);
     }
@@ -1300,13 +1300,13 @@ export function renderHPHorror(ctx: CanvasRenderingContext2D, hpRatio: number, t
     }
   }
 
-  // 3. Heartbeat pulse flash — rhythmic red flash at HP < 30%
-  if (hpRatio < 0.3) {
+  // 3. Heartbeat pulse flash — subtle red flash at HP < 25%
+  if (hpRatio < 0.25) {
     const bpm = 60 + (1 - hpRatio) * 120;
     const beatPhase = (time * bpm / 60) % 1;
     const beatFlash = beatPhase < 0.1 ? Math.sin(beatPhase / 0.1 * Math.PI) : 0;
     if (beatFlash > 0) {
-      ctx.fillStyle = `rgba(150, 0, 0, ${beatFlash * 0.12 * (1 - hpRatio) * 3})`;
+      ctx.fillStyle = `rgba(100, 0, 0, ${beatFlash * 0.06 * (1 - hpRatio) * 2})`;
       ctx.fillRect(fx, fy, fw, fh);
     }
   }
