@@ -2,15 +2,34 @@
 // All sounds generated programmatically - no external assets needed
 
 let audioCtx: AudioContext | null = null;
+let masterGainNode: GainNode | null = null;
 
 function getCtx(): AudioContext {
   if (!audioCtx) {
     audioCtx = new AudioContext();
+    masterGainNode = audioCtx.createGain();
+    masterGainNode.gain.value = 0.5; // Default 50% volume
+    masterGainNode.connect(audioCtx.destination);
   }
   if (audioCtx.state === 'suspended') {
     audioCtx.resume();
   }
   return audioCtx;
+}
+
+export function setMasterVolume(value: number) {
+  const ctx = getCtx();
+  if (masterGainNode) {
+    // exponential volume for better perception; clamp low end
+    const vol = Math.max(0.0001, value);
+    masterGainNode.gain.cancelScheduledValues(ctx.currentTime);
+    masterGainNode.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + 0.1);
+  }
+}
+
+export function getMasterVolume(): number {
+  if (!masterGainNode) return 0.5;
+  return masterGainNode.gain.value;
 }
 
 function playTone(freq: number, duration: number, type: OscillatorType = 'square', volume = 0.15, decay = true) {
@@ -24,7 +43,7 @@ function playTone(freq: number, duration: number, type: OscillatorType = 'square
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
   }
   osc.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(masterGainNode!); // Connect to master gain
   osc.start(ctx.currentTime);
   osc.stop(ctx.currentTime + duration);
 }
@@ -47,7 +66,7 @@ function playNoise(duration: number, volume = 0.1, filterFreq = 3000) {
   gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
   source.connect(filter);
   filter.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(masterGainNode!); // Connect to master gain
   source.start();
 }
 
@@ -61,7 +80,7 @@ function playFreqSweep(startFreq: number, endFreq: number, duration: number, typ
   gain.gain.setValueAtTime(volume, ctx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
   osc.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(masterGainNode!); // Connect to master gain
   osc.start(ctx.currentTime);
   osc.stop(ctx.currentTime + duration);
 }
