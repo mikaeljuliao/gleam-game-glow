@@ -217,13 +217,7 @@ const Index = () => {
           engine.trySanctuaryHeal();
         }
       }
-      // [F] to interact with vendor (legacy/mobile compat)
-      if (key === 'f' && gameState === 'playing') {
-        const engine = engineRef.current;
-        if (engine) {
-          engine.tryVendorInteract();
-        }
-      }
+      // [F] key removed — vendor triggers automatically by proximity
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
