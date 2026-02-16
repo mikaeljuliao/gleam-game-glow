@@ -121,18 +121,33 @@ function renderDungeonPreview(ctx: CanvasRenderingContext2D, w: number, h: numbe
   // Central lighting (player area simulation)
   const cx = w / 2;
   const cy = h / 2;
-  const lightR = Math.min(w, h) * 0.45;
+
+  // Get current brightness for real-time preview sync
+  const brightness = getBrightness();
+
+  // Dynamic FOV sync: Shrink the light radius further if brightness is very low
+  let lightR = Math.min(w, h) * 0.45;
+  if (brightness < -0.2) {
+    const radiusFactor = Math.max(0.4, 1 + (brightness + 0.2) * 2);
+    lightR *= radiusFactor;
+  }
+
+  // Standard room lighting sync
+  // Map brightness to darknessMult exactly like in renderer.ts
+  const darknessMult = Math.max(0.6, 1 - (brightness + 0.1) * 1.5);
 
   // Darkness vignette (simulates dungeon lighting)
-  const darkness = ctx.createRadialGradient(cx, cy, lightR * 0.3, cx, cy, lightR);
-  darkness.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  darkness.addColorStop(0.6, 'rgba(0, 0, 0, 0.3)');
-  darkness.addColorStop(1, 'rgba(0, 0, 0, 0.7)');
+  const darkness = ctx.createRadialGradient(cx, cy, lightR * 0.15, cx, cy, lightR);
+  darkness.addColorStop(0, 'rgba(5, 3, 10, 0)');
+  darkness.addColorStop(0.3, `rgba(5, 3, 10, ${0.3 * darknessMult})`);
+  darkness.addColorStop(0.5, `rgba(5, 3, 10, ${0.65 * darknessMult})`);
+  darkness.addColorStop(0.8, `rgba(5, 3, 10, ${0.9 * darknessMult})`);
+  darkness.addColorStop(1, `rgba(5, 3, 10, ${0.98 * darknessMult})`);
   ctx.fillStyle = darkness;
   ctx.fillRect(0, 0, w, h);
 
   // Simulated player (small glow in center)
-  const playerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 20);
+  const playerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 20 * (lightR / (Math.min(w, h) * 0.45)));
   playerGlow.addColorStop(0, 'rgba(180, 160, 220, 0.08)');
   playerGlow.addColorStop(1, 'rgba(180, 160, 220, 0)');
   ctx.fillStyle = playerGlow;
@@ -142,7 +157,7 @@ function renderDungeonPreview(ctx: CanvasRenderingContext2D, w: number, h: numbe
   ctx.arc(cx, cy, 4, 0, Math.PI * 2);
   ctx.fill();
 
-  // Apply gamma correction
+  // Apply gamma correction (legacy overlay is disabled in brightness.ts, doing nothing here now)
   applyBrightnessToCanvas(ctx);
 }
 

@@ -1,6 +1,7 @@
 import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, DungeonRoom, Obstacle, ScreenEffect, Viewport } from './types';
 import { HiddenTrap } from './traps';
 import * as C from './constants';
+import { getBrightness } from './brightness';
 
 /** Draw text with letter-spacing by rendering each character individually */
 function drawSpacedText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, spacing: number, stroke = false) {
@@ -38,20 +39,20 @@ function drawHudText(ctx: CanvasRenderingContext2D, text: string, x: number, y: 
 export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: number, vp: Viewport) {
   const { gox, goy, rw, rh } = vp;
   const ts = C.TILE_SIZE;
-  
+
   const startCol = Math.floor(-gox / ts) - 1;
   const endCol = Math.ceil((rw - gox) / ts) + 1;
   const startRow = Math.floor(-goy / ts) - 1;
   const endRow = Math.ceil((rh - goy) / ts) + 1;
-  
+
   for (let row = startRow; row < endRow; row++) {
     for (let col = startCol; col < endCol; col++) {
       if (row >= 0 && row < C.dims.rr && col >= 0 && col < C.dims.rc) continue;
-      
+
       const x = col * ts;
       const y = row * ts;
       const hash = ((row * 7 + col * 13) & 0xFF);
-      
+
       // Warmer, more visible stone walls — not too dark, not too bright
       const darkness = 0.75 + (hash % 10) * 0.025;
       const r = Math.floor(22 * darkness);
@@ -59,7 +60,7 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
       const b = Math.floor(30 * darkness);
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(x, y, ts, ts);
-      
+
       // Stone brick mortar lines
       if ((row + col) % 2 === 0) {
         ctx.fillStyle = 'rgba(35, 30, 50, 0.5)';
@@ -71,7 +72,7 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
         ctx.fillStyle = 'rgba(25, 22, 38, 0.3)';
         ctx.fillRect(x + ts / 2, y, 1, ts);
       }
-      
+
       // Cracks & details
       if (hash % 11 === 0) {
         ctx.fillStyle = 'rgba(10, 8, 18, 0.5)';
@@ -82,18 +83,18 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
         ctx.fillStyle = 'rgba(10, 8, 18, 0.4)';
         ctx.fillRect(x + 9, y + 3, 1, 6);
       }
-      
+
       // Moss patches
       if (hash % 23 === 0) {
         ctx.fillStyle = 'rgba(25, 50, 25, 0.2)';
         ctx.fillRect(x + 1, y + ts - 4, 7, 3);
       }
-      
+
       // Pillar columns every ~6 tiles along arena edge
       const distToArenaCol = col < 0 ? -col : col - C.dims.rc + 1;
       const distToArenaRow = row < 0 ? -row : row - C.dims.rr + 1;
       const nearEdge = (distToArenaCol === 1 || distToArenaRow === 1);
-      
+
       if (nearEdge && (col % 6 === 0 || row % 5 === 0)) {
         // Pillar stone — slightly brighter
         ctx.fillStyle = 'rgba(40, 35, 55, 0.7)';
@@ -106,7 +107,7 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
       }
     }
   }
-  
+
   // Soft fog/mist along margins — atmospheric glow
   const fogAlpha = 0.04 + Math.sin(time * 0.5) * 0.015;
   // Top fog
@@ -214,7 +215,7 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number) {
   for (let ti = 0; ti < torchPositions.length; ti++) {
     const t = torchPositions[ti];
     const localFlicker = ti % 2 === 0 ? flicker : flicker2;
-    
+
     // Warm light pool on floor around torch
     const floorGlow = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 40);
     floorGlow.addColorStop(0, `rgba(255, 130, 40, ${0.06 * localFlicker})`);
@@ -222,7 +223,7 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number) {
     floorGlow.addColorStop(1, 'rgba(255, 80, 10, 0)');
     ctx.fillStyle = floorGlow;
     ctx.fillRect(t.x - 40, t.y - 40, 80, 80);
-    
+
     // Torch light glow (closer, brighter)
     const g = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 20);
     g.addColorStop(0, `rgba(255, 160, 60, ${0.2 * localFlicker})`);
@@ -230,14 +231,14 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number) {
     g.addColorStop(1, 'rgba(255, 100, 30, 0)');
     ctx.fillStyle = g;
     ctx.fillRect(t.x - 20, t.y - 20, 40, 40);
-    
+
     // Torch bracket (metal)
     ctx.fillStyle = '#3a3030';
     ctx.fillRect(t.x - 1.5, t.y - 1, 3, 5);
     // Torch body (wood)
     ctx.fillStyle = '#553311';
     ctx.fillRect(t.x - 1, t.y - 4, 3, 5);
-    
+
     // Flame layers (more detailed)
     // Outer flame
     const fSway = Math.sin(time * 12 + ti * 2) * 1;
@@ -280,10 +281,10 @@ export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, ti
   const drawDoor = (x: number, y: number, w: number, h: number, dir: 'north' | 'south' | 'east' | 'west') => {
     const cx = x + w / 2;
     const cy = y + h / 2;
-    
+
     if (isOpen) {
       const visited = isNeighborVisited(dir);
-      
+
       if (visited) {
         // GREEN — already visited room
         ctx.fillStyle = `rgba(50, 255, 100, ${0.25 * pulse})`;
@@ -299,10 +300,10 @@ export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, ti
         ctx.fillStyle = `rgba(50, 255, 100, ${0.95 * pulse})`;
         ctx.beginPath();
         const arrowSize = 8;
-        if (dir === 'north') { ctx.moveTo(cx, cy - arrowSize); ctx.lineTo(cx - arrowSize, cy + arrowSize/2); ctx.lineTo(cx + arrowSize, cy + arrowSize/2); }
-        else if (dir === 'south') { ctx.moveTo(cx, cy + arrowSize); ctx.lineTo(cx - arrowSize, cy - arrowSize/2); ctx.lineTo(cx + arrowSize, cy - arrowSize/2); }
-        else if (dir === 'west') { ctx.moveTo(cx - arrowSize, cy); ctx.lineTo(cx + arrowSize/2, cy - arrowSize); ctx.lineTo(cx + arrowSize/2, cy + arrowSize); }
-        else { ctx.moveTo(cx + arrowSize, cy); ctx.lineTo(cx - arrowSize/2, cy - arrowSize); ctx.lineTo(cx - arrowSize/2, cy + arrowSize); }
+        if (dir === 'north') { ctx.moveTo(cx, cy - arrowSize); ctx.lineTo(cx - arrowSize, cy + arrowSize / 2); ctx.lineTo(cx + arrowSize, cy + arrowSize / 2); }
+        else if (dir === 'south') { ctx.moveTo(cx, cy + arrowSize); ctx.lineTo(cx - arrowSize, cy - arrowSize / 2); ctx.lineTo(cx + arrowSize, cy - arrowSize / 2); }
+        else if (dir === 'west') { ctx.moveTo(cx - arrowSize, cy); ctx.lineTo(cx + arrowSize / 2, cy - arrowSize); ctx.lineTo(cx + arrowSize / 2, cy + arrowSize); }
+        else { ctx.moveTo(cx + arrowSize, cy); ctx.lineTo(cx - arrowSize / 2, cy - arrowSize); ctx.lineTo(cx - arrowSize / 2, cy + arrowSize); }
         ctx.closePath();
         ctx.fill();
         // Label
@@ -329,10 +330,10 @@ export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, ti
         ctx.fillStyle = `rgba(255, 180, 30, ${0.95 * pulse})`;
         ctx.beginPath();
         const arrowSize = 8;
-        if (dir === 'north') { ctx.moveTo(cx, cy - arrowSize); ctx.lineTo(cx - arrowSize, cy + arrowSize/2); ctx.lineTo(cx + arrowSize, cy + arrowSize/2); }
-        else if (dir === 'south') { ctx.moveTo(cx, cy + arrowSize); ctx.lineTo(cx - arrowSize, cy - arrowSize/2); ctx.lineTo(cx + arrowSize, cy - arrowSize/2); }
-        else if (dir === 'west') { ctx.moveTo(cx - arrowSize, cy); ctx.lineTo(cx + arrowSize/2, cy - arrowSize); ctx.lineTo(cx + arrowSize/2, cy + arrowSize); }
-        else { ctx.moveTo(cx + arrowSize, cy); ctx.lineTo(cx - arrowSize/2, cy - arrowSize); ctx.lineTo(cx - arrowSize/2, cy + arrowSize); }
+        if (dir === 'north') { ctx.moveTo(cx, cy - arrowSize); ctx.lineTo(cx - arrowSize, cy + arrowSize / 2); ctx.lineTo(cx + arrowSize, cy + arrowSize / 2); }
+        else if (dir === 'south') { ctx.moveTo(cx, cy + arrowSize); ctx.lineTo(cx - arrowSize, cy - arrowSize / 2); ctx.lineTo(cx + arrowSize, cy - arrowSize / 2); }
+        else if (dir === 'west') { ctx.moveTo(cx - arrowSize, cy); ctx.lineTo(cx + arrowSize / 2, cy - arrowSize); ctx.lineTo(cx + arrowSize / 2, cy + arrowSize); }
+        else { ctx.moveTo(cx + arrowSize, cy); ctx.lineTo(cx - arrowSize / 2, cy - arrowSize); ctx.lineTo(cx - arrowSize / 2, cy + arrowSize); }
         ctx.closePath();
         ctx.fill();
         // Label
@@ -380,7 +381,7 @@ export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, ti
 export function renderObstacles(ctx: CanvasRenderingContext2D, obstacles: Obstacle[]) {
   for (const o of obstacles) {
     const hash = ((o.x * 7 + o.y * 13) & 0xFF);
-    
+
     // Projected shadow (longer, softer, directional — as if lit from above-left)
     const shadowOff = 4;
     const shadowGrad = ctx.createLinearGradient(o.x + shadowOff, o.y + shadowOff, o.x + o.w + shadowOff + 3, o.y + o.h + shadowOff + 3);
@@ -388,14 +389,14 @@ export function renderObstacles(ctx: CanvasRenderingContext2D, obstacles: Obstac
     shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = shadowGrad;
     ctx.fillRect(o.x + shadowOff, o.y + shadowOff, o.w + 3, o.h + 3);
-    
+
     // Base body — slight color variation per pillar
     const bodyR = 30 + (hash % 8);
     const bodyG = 28 + (hash % 6);
     const bodyB = 42 + (hash % 10);
     ctx.fillStyle = `rgb(${bodyR}, ${bodyG}, ${bodyB})`;
     ctx.fillRect(o.x, o.y, o.w, o.h);
-    
+
     // Stone brick lines (horizontal mortar)
     ctx.fillStyle = 'rgba(15, 12, 25, 0.3)';
     const brickH = 5;
@@ -408,26 +409,26 @@ export function renderObstacles(ctx: CanvasRenderingContext2D, obstacles: Obstac
       const vOff = row % 2 === 0 ? o.w * 0.4 : o.w * 0.7;
       ctx.fillRect(o.x + vOff, by, 1, brickH);
     }
-    
+
     // Top cap — lighter highlight
     ctx.fillStyle = C.COLORS.obstacleTop;
     ctx.fillRect(o.x, o.y, o.w, 3);
     // Top bevel highlight
     ctx.fillStyle = 'rgba(80, 75, 100, 0.3)';
     ctx.fillRect(o.x, o.y, o.w, 1);
-    
+
     // Bottom edge — darker
     ctx.fillStyle = 'rgba(10, 8, 18, 0.4)';
     ctx.fillRect(o.x, o.y + o.h - 1, o.w, 1);
-    
+
     // Left edge highlight (light source from left)
     ctx.fillStyle = 'rgba(60, 55, 80, 0.2)';
     ctx.fillRect(o.x, o.y + 3, 1, o.h - 4);
-    
+
     // Right edge shadow
     ctx.fillStyle = 'rgba(10, 8, 18, 0.25)';
     ctx.fillRect(o.x + o.w - 1, o.y + 3, 1, o.h - 4);
-    
+
     // Cracks — unique per pillar based on hash
     ctx.strokeStyle = 'rgba(12, 10, 20, 0.35)';
     ctx.lineWidth = 0.6;
@@ -451,7 +452,7 @@ export function renderObstacles(ctx: CanvasRenderingContext2D, obstacles: Obstac
       ctx.fillStyle = 'rgba(10, 8, 18, 0.3)';
       ctx.fillRect(o.x + o.w * 0.6, o.y + o.h * 0.3, 3, 2);
     }
-    
+
     // Moss/lichen patches — green growth on stone
     if (hash % 4 < 2) {
       // Bottom moss (most common — moisture collects at base)
@@ -473,7 +474,7 @@ export function renderObstacles(ctx: CanvasRenderingContext2D, obstacles: Obstac
       ctx.fillStyle = 'rgba(22, 48, 25, 0.12)';
       ctx.fillRect(o.x + 2, o.y + 3, o.w - 4, 2);
     }
-    
+
     // Small stone detail textures
     ctx.fillStyle = 'rgba(50, 45, 70, 0.15)';
     ctx.fillRect(o.x + 3, o.y + o.h * 0.4, 2, 1);
@@ -1202,7 +1203,7 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
       const breathe = Math.sin(time * 2) * 1;
       // Import floor from bosses module
       const bossFloor = (window as any).__bossFloor || 1;
-      
+
       switch (bossFloor) {
         case 2: {
           // O CAÇADOR — sleek orange predator with speed lines
@@ -1495,22 +1496,44 @@ export function renderParticles(ctx: CanvasRenderingContext2D, particles: Partic
 }
 
 export function renderLighting(ctx: CanvasRenderingContext2D, px: number, py: number, radius: number, vp: Viewport, isVendorRoom: boolean = false) {
+  const brightness = getBrightness(); // Range [-0.5, 0.5]
+
+  // Dynamic FOV: Shrink the light radius further if brightness is very low
+  // When brightness starts going below -0.2, we close the field of vision
+  let effectiveRadius = radius;
+  if (brightness < -0.2) {
+    const radiusFactor = Math.max(0.4, 1 + (brightness + 0.2) * 2); // At -0.5, radius is 40%
+    effectiveRadius *= radiusFactor;
+  }
+
   if (isVendorRoom) {
     // Vendor room: very bright, warm light
-    const gradient = ctx.createRadialGradient(px, py, radius * 0.5, px, py, radius * 1.5);
+    // Scale the ambient shadow opacity based on brightness
+    const baseAlpha = 0.4;
+    const alphaScale = Math.max(0, 1 - (brightness + 0.5)); // +0.5 brightness -> alpha 0
+    const finalAlpha = baseAlpha * alphaScale;
+
+    const gradient = ctx.createRadialGradient(px, py, effectiveRadius * 0.5, px, py, effectiveRadius * 1.5);
     gradient.addColorStop(0, 'rgba(5, 3, 10, 0)');
-    gradient.addColorStop(0.6, 'rgba(5, 3, 10, 0.1)');
-    gradient.addColorStop(1, 'rgba(5, 3, 10, 0.4)');
+    gradient.addColorStop(0.6, `rgba(5, 3, 10, ${finalAlpha * 0.25})`);
+    gradient.addColorStop(1, `rgba(5, 3, 10, ${finalAlpha})`);
     ctx.fillStyle = gradient;
     ctx.fillRect(-vp.gox, -vp.goy, vp.rw, vp.rh);
     return;
   }
-  const gradient = ctx.createRadialGradient(px, py, radius * 0.15, px, py, radius);
+
+  // Standard room lighting
+  // Base darkness alphas at key stops
+  // Map brightness [-0.5, 0.5] to a multiplier that reduces shadow intensity
+  // CAP: Never let darknessMult go below 0.6 (ensures 60% darkness / 40% visibility max)
+  const darknessMult = Math.max(0.6, 1 - (brightness + 0.1) * 1.5);
+
+  const gradient = ctx.createRadialGradient(px, py, effectiveRadius * 0.15, px, py, effectiveRadius);
   gradient.addColorStop(0, 'rgba(5, 3, 10, 0)');
-  gradient.addColorStop(0.3, 'rgba(5, 3, 10, 0.3)');
-  gradient.addColorStop(0.5, 'rgba(5, 3, 10, 0.65)');
-  gradient.addColorStop(0.7, 'rgba(5, 3, 10, 0.88)');
-  gradient.addColorStop(1, 'rgba(5, 3, 10, 0.97)');
+  gradient.addColorStop(0.3, `rgba(5, 3, 10, ${0.3 * darknessMult})`);
+  gradient.addColorStop(0.5, `rgba(5, 3, 10, ${0.65 * darknessMult})`);
+  gradient.addColorStop(0.7, `rgba(5, 3, 10, ${0.88 * darknessMult})`);
+  gradient.addColorStop(1, `rgba(5, 3, 10, ${0.97 * darknessMult})`);
   ctx.fillStyle = gradient;
   ctx.fillRect(-vp.gox, -vp.goy, vp.rw, vp.rh);
 }
@@ -1637,9 +1660,9 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   const objFontSize = Math.round(isMobile ? 16 : 12);
   const objBarH = Math.round(isMobile ? 26 : 18);
   if (enemyCount > 0) {
-    const objText = room.isBossRoom ? 'DERROTE O BOSS!' : 
+    const objText = room.isBossRoom ? 'DERROTE O BOSS!' :
       room.type === 'trap' ? '⚠ CUIDADO COM O CHÃO ⚠' :
-      room.type === 'treasure' ? 'PROTEJA O TESOURO!' : 'Elimine todos os inimigos!';
+        room.type === 'treasure' ? 'PROTEJA O TESOURO!' : 'Elimine todos os inimigos!';
     const objColor = room.isBossRoom ? '#ff4444' : room.type === 'trap' ? '#ff6644' : '#ffcc44';
     const objW = Math.round(240 * ms);
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
@@ -1765,8 +1788,10 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
   const ox = isMobile ? visLeft + pad + 6 : visRight - mapW - pad - 8;
   const oy = visBottom - mapH - pad - (isMobile ? 42 : 28);
 
-  // Background panel — brighter, more visible
-  ctx.fillStyle = 'rgba(20, 22, 35, 0.92)';
+  // Background panel — brightness-reactive
+  const brightness = getBrightness();
+  const mapDarkness = Math.max(0.7, 1 - (brightness + 0.5) * 0.4);
+  ctx.fillStyle = `rgba(20, 22, 35, ${0.92 * mapDarkness})`;
   const panelX = ox - pad;
   const panelY = oy - pad - 16;
   const panelW = mapW + pad * 2;
@@ -1833,7 +1858,7 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
     if (!room.visited) {
       // Adjacent-to-visited rooms: brighter fog of war
       let adjacentVisited = false;
-      const dirs = [{dx:0,dy:-1},{dx:0,dy:1},{dx:-1,dy:0},{dx:1,dy:0}];
+      const dirs = [{ dx: 0, dy: -1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }, { dx: 1, dy: 0 }];
       for (const d of dirs) {
         const nk = roomKey(room.gridX + d.dx, room.gridY + d.dy);
         const nr = dungeon.rooms.get(nk);
@@ -2003,16 +2028,16 @@ export function renderHiddenTraps(ctx: CanvasRenderingContext2D, traps: HiddenTr
     // RED tile hint — clearly different but player must still pay attention
     const tileX = trap.x - C.TILE_SIZE / 2;
     const tileY = trap.y - C.TILE_SIZE / 2;
-    
+
     // Dark red tile overlay
     ctx.fillStyle = 'rgba(120, 20, 20, 0.25)';
     ctx.fillRect(tileX, tileY, C.TILE_SIZE, C.TILE_SIZE);
-    
+
     // Subtle red border
     ctx.strokeStyle = 'rgba(180, 30, 30, 0.2)';
     ctx.lineWidth = 0.5;
     ctx.strokeRect(tileX + 1, tileY + 1, C.TILE_SIZE - 2, C.TILE_SIZE - 2);
-    
+
     // Small red crack/mark
     const seed = trap.hintSeed;
     const markType = Math.floor(seed) % 3;

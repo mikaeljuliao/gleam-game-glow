@@ -25,13 +25,13 @@ export class GameEngine {
   stats: GameStats;
   effects: ScreenEffect[] = [];
   horrorEvents: HorrorEvent[] = [];
-  
+
   input: InputManager;
   gameCanvas: HTMLCanvasElement;
   gameCtx: CanvasRenderingContext2D;
   displayCanvas: HTMLCanvasElement;
   displayCtx: CanvasRenderingContext2D;
-  
+
   callbacks: GameCallbacks;
   running = false;
   paused = false;
@@ -83,10 +83,10 @@ export class GameEngine {
     this.displayCanvas = displayCanvas;
     this.displayCtx = displayCanvas.getContext('2d')!;
     this.dpr = window.devicePixelRatio || 1;
-    
+
     // Set active game dimensions based on screen aspect ratio BEFORE creating game content
     C.setActiveDimensions(displayCanvas.clientWidth, displayCanvas.clientHeight);
-    
+
     this.gameCanvas = document.createElement('canvas');
     this.gameCanvas.width = C.dims.gw * this.dpr;
     this.gameCanvas.height = C.dims.gh * this.dpr;
@@ -183,7 +183,7 @@ export class GameEngine {
     // Track base speeds for amulet bonuses
     this._baseAttackSpeedMult = this.player.attackSpeedMult;
     this._baseMoveSpeedMult = this.player.moveSpeedMult;
-    
+
     const tags = getOwnedTags([], this.player.upgrades);
     const newSynergies = checkSynergies(tags);
     for (const s of newSynergies) {
@@ -228,7 +228,7 @@ export class GameEngine {
               rarity: 'legendary',
               icon: def.icon,
               synergyTags: [],
-              apply: () => {},
+              apply: () => { },
             },
             cost: 600 + Math.floor(Math.random() * 200),
             sold: false,
@@ -331,7 +331,7 @@ export class GameEngine {
     this.stats.upgradesCollected++;
     this._baseAttackSpeedMult = this.player.attackSpeedMult;
     SFX.shopBuy();
-    
+
     // Check synergies
     const tags = getOwnedTags([], this.player.upgrades);
     const newSynergies = checkSynergies(tags);
@@ -388,7 +388,7 @@ export class GameEngine {
   private bossKillFloor = 1;
   private slowMoTimer = 0;
   private slowMoFactor = 1;
-  
+
   // Victory countdown state
   private victoryCountdown = 0;
   private victoryCountdownMax = 5;
@@ -399,7 +399,7 @@ export class GameEngine {
     this.enemies = [];
     this.bossWasSpawned = false;
     resetTrapEffects();
-    
+
     // Handle vendor room ambient
     const wasInVendor = this.inVendorRoom;
     this.inVendorRoom = room.type === 'vendor';
@@ -410,7 +410,7 @@ export class GameEngine {
       stopVendorAmbience();
       startBackgroundMusic();
     }
-    
+
     if (!room.cleared) {
       for (const spawn of room.enemies) {
         if (spawn.type === 'boss') {
@@ -468,9 +468,9 @@ export class GameEngine {
     if (this.tutorialTimer > 0) {
       this.tutorialTimer -= dt;
       // Dismiss tutorial on any key press or mouse click
-      if (this.input.getMoveDir().x !== 0 || this.input.getMoveDir().y !== 0 || 
-          this.input.isMouseJustPressed(0) || this.input.isMouseJustPressed(2) ||
-          this.input.wantsDash()) {
+      if (this.input.getMoveDir().x !== 0 || this.input.getMoveDir().y !== 0 ||
+        this.input.isMouseJustPressed(0) || this.input.isMouseJustPressed(2) ||
+        this.input.wantsDash()) {
         this.tutorialTimer = 0;
       }
     }
@@ -627,17 +627,17 @@ export class GameEngine {
 
     // Update enemies — collect dead enemies, remove after loop to avoid splice corruption
     const deadEnemySet = new Set<EnemyState>();
-    
+
     for (const enemy of this.enemies) {
       if (deadEnemySet.has(enemy)) continue;
       const result = updateEnemy(enemy, this.player, dt, this.enemies);
-      
+
       // Add trails for projectiles from enemies
       for (const proj of result.projectiles) {
         proj.trail = [];
       }
       this.projectiles.push(...result.projectiles);
-      
+
       this.collideWithObstacles(enemy, room.obstacles);
 
       // Bomber explosion
@@ -736,7 +736,7 @@ export class GameEngine {
         }
       }
     }
-    
+
     // Remove dead enemies after all processing
     if (deadEnemySet.size > 0) {
       this.enemies = this.enemies.filter(e => !deadEnemySet.has(e));
@@ -802,8 +802,8 @@ export class GameEngine {
             spawnDamageText(this.particles, e.x, e.y, `${dmg}`);
             spawnBlood(this.particles, e.x, e.y, 4);
             SFX.enemyHit();
-            
-            
+
+
             // Chain lightning
             if (this.player.chainBounces > 0 && dead === false) {
               this.doChainBounce(e, dmg, this.player.chainBounces, projDeadEnemies);
@@ -856,7 +856,7 @@ export class GameEngine {
 
     // Particles
     this.particles = updateParticles(this.particles, dt);
-    
+
     // Arena ambient FX
     updateArenaFX(dt, this.gameTime, this.player.x, this.player.y, getTorchPositions());
 
@@ -1085,7 +1085,7 @@ export class GameEngine {
     this.addEffect('shake', 5, 0.12);
     let hitAny = false;
     const meleeDeadSet = new Set<EnemyState>();
-    
+
     for (const e of this.enemies) {
       if (e.spawnTimer > 0) continue;
       const dx = e.x - this.player.x;
@@ -1128,7 +1128,7 @@ export class GameEngine {
         meleeDeadSet.add(e);
       }
     }
-    
+
     if (meleeDeadSet.size > 0) {
       this.enemies = this.enemies.filter(e => !meleeDeadSet.has(e));
     }
@@ -1147,7 +1147,7 @@ export class GameEngine {
   private onEnemyKilled(e: EnemyState, byMelee = false) {
     this.stats.enemiesDefeated++;
     const xpAmount = getXPForEnemy(e.type);
-    
+
     // Soul drop — elegant blue energy animation flying to player
     const soulAmount = this.getSoulsForEnemy(e.type);
     this.player.souls += soulAmount;
@@ -1155,7 +1155,7 @@ export class GameEngine {
     spawnDamageText(this.particles, e.x, e.y + 10, `+${soulAmount}`, '#66aaff');
     SFX.soulCollect();
     spawnBloodMark(e.x, e.y);
-    
+
     if (e.type === 'boss') {
       // BOSS KILL IMPACT — massive explosion + slow-mo
       this.slowMoTimer = 1.2;
@@ -1475,7 +1475,7 @@ export class GameEngine {
       this.handleBossLevelUp();
     }
   }
-  
+
   private updateVictoryCountdown(dt: number) {
     if (!this.victoryActive) return;
     this.victoryCountdown -= dt;
@@ -1488,7 +1488,7 @@ export class GameEngine {
 
   private handleHiddenTraps(room: DungeonRoom) {
     if (!room.hiddenTraps || room.hiddenTraps.length === 0) return;
-    
+
     const trap = checkTrapCollision(this.player, room.hiddenTraps);
     if (!trap) return;
 
@@ -1724,24 +1724,24 @@ export class GameEngine {
     ctx.fillRect(-this.gameOffsetX, -this.gameOffsetY, this.renderWidth, this.renderHeight);
 
     ctx.textAlign = 'center';
-    
+
     // "Boss defeated" message
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(C.dims.gw / 2 - 160, C.dims.gh / 2 - 35, 320, 70);
     ctx.strokeStyle = 'rgba(200, 180, 80, 0.6)';
     ctx.lineWidth = 1;
     ctx.strokeRect(C.dims.gw / 2 - 160, C.dims.gh / 2 - 35, 320, 70);
-    
+
     ctx.fillStyle = '#ffcc44';
     ctx.font = `500 16px ${C.HUD_FONT}`;
     ctx.fillText('Parabéns, você derrotou o boss!', C.dims.gw / 2, C.dims.gh / 2 - 10);
-    
+
     // Countdown
     const secs = Math.ceil(Math.max(0, this.victoryCountdown));
     ctx.fillStyle = '#aaccaa';
     ctx.font = `12px ${C.HUD_FONT}`;
     ctx.fillText(`Indo para o próximo andar em ${secs}...`, C.dims.gw / 2, C.dims.gh / 2 + 15);
-    
+
     ctx.textAlign = 'left';
   }
 
@@ -1835,7 +1835,7 @@ export class GameEngine {
     const dCtx = this.displayCtx;
 
     this.updateDisplaySize();
-    
+
     const rw = this.renderWidth;
     const rh = this.renderHeight;
     const gox = this.gameOffsetX;
@@ -1992,7 +1992,7 @@ export class GameEngine {
     this.renderHeight = C.dims.gh;
     this.gameOffsetX = 0;
     this.gameOffsetY = 0;
-    
+
     // Resize game canvas if needed
     const physGW = Math.round(this.renderWidth * this.dpr);
     const physGH = Math.round(this.renderHeight * this.dpr);
@@ -2002,7 +2002,7 @@ export class GameEngine {
       this.gameCtx.scale(this.dpr, this.dpr);
       this.gameCtx.imageSmoothingEnabled = false;
     }
-    
+
     // Scale to fit display (contain-fit, perfect on initial aspect)
     this.scale = Math.min(dw / this.renderWidth, dh / this.renderHeight);
     this.offsetX = Math.floor((dw - this.renderWidth * this.scale) / 2);
