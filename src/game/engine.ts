@@ -899,23 +899,13 @@ export class GameEngine {
       const evt = createHorrorEvent();
       if (evt) {
         this.horrorEvents.push(evt);
-        // More likely to play SFX at low HP
-        const sfxBoost = hpRatio < 0.3 ? 2 : 1;
-        if (evt.type === 'whisper' && Math.random() < 0.4 * sfxBoost) HorrorSFX.whisper();
-        else if (evt.type === 'heartbeat' && Math.random() < 0.3 * sfxBoost) HorrorSFX.heartbeat();
-        else if (evt.type === 'scream' && Math.random() < 0.15 * sfxBoost) {
-          HorrorSFX.distantScream();
-          // Chromatic distortion on scream at low HP
-          if (hpRatio < 0.4) {
-            this.addEffect('flash', 0.3, 0.1, 'rgb(100, 0, 150)');
-          }
+        // Audio triggers removed — only visual horror events remain
+        // (whisper, heartbeat, scream, metalCreak SFX all removed as audio pollution)
+        if (evt.type === 'flicker' && hpRatio < 0.3) {
+          this.addEffect('flash', 0.5, 0.08, 'rgb(0, 0, 0)');
         }
-        else if (evt.type === 'flicker') {
-          // Aggressive flickering at low HP
-          if (hpRatio < 0.3) {
-            this.addEffect('flash', 0.5, 0.08, 'rgb(0, 0, 0)');
-          }
-          if (Math.random() < 0.3 * sfxBoost) HorrorSFX.metalCreak();
+        if (evt.type === 'scream' && hpRatio < 0.4) {
+          this.addEffect('flash', 0.3, 0.1, 'rgb(100, 0, 150)');
         }
       }
     }
@@ -1947,6 +1937,10 @@ export class GameEngine {
 
     applyScreenEffects(ctx, this.effects, vp);
     renderTrapEffectOverlay(ctx, this.gameTime, getPanicTimer(), getLightsOutTimer(), getDoorsLockedTimer(), vp);
+
+    // Apply brightness gamma correction BEFORE HUD so UI text stays crisp
+    applyBrightness(ctx);
+
     renderHUD(ctx, this.player, this.dungeon, this.stats.timePlayed, this.enemies.length, this.tutorialTimer, this.input.isMobile, vp);
 
     // Victory countdown overlay
@@ -1971,8 +1965,7 @@ export class GameEngine {
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, rw, rh);
 
-    // Apply brightness post-processing (last overlay before copy)
-    applyBrightness(ctx, rw, rh);
+    // Brightness already applied before HUD — no second pass needed
 
     // Copy to display - scaled to fit with offset
     const scaledW = Math.round(rw * this.scale);
