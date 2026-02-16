@@ -1022,6 +1022,374 @@ export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: strin
   }
 }
 
+// ============ HP-REACTIVE HORROR SYSTEM ============
+// All effects scale with player HP ratio — lower HP = more intense horror
+
+interface HPHorrorState {
+  heartbeatTimer: number;
+  ghostFootstepTimer: number;
+  scratchTimer: number;
+  growlTimer: number;
+  darkPulseTimer: number;
+  bloodDrops: { x: number; y: number; size: number; alpha: number; speed: number }[];
+  chromaticTimer: number;
+}
+
+const hpHorror: HPHorrorState = {
+  heartbeatTimer: 0,
+  ghostFootstepTimer: 0,
+  scratchTimer: 0,
+  growlTimer: 0,
+  darkPulseTimer: 0,
+  bloodDrops: [],
+  chromaticTimer: 0,
+};
+
+// === HP-REACTIVE AUDIO ===
+
+function playHPHeartbeat(hpRatio: number) {
+  if (!ambienceActive) return;
+  const ctx = getBgCtx();
+  // Faster and louder as HP drops
+  const bpm = 60 + (1 - hpRatio) * 120; // 60-180 bpm
+  const interval = 60 / bpm;
+  const vol = 0.04 + (1 - hpRatio) * 0.12;
+  
+  for (let i = 0; i < 2; i++) {
+    const t = ctx.currentTime + i * interval * 0.3;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(i === 0 ? 45 : 60, t);
+    osc.frequency.exponentialRampToValueAtTime(i === 0 ? 20 : 30, t + 0.15);
+    gain.gain.setValueAtTime(i === 0 ? vol : vol * 0.7, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.2);
+  }
+}
+
+function playGhostFootstep() {
+  if (!ambienceActive) return;
+  const ctx = getBgCtx();
+  const panner = ctx.createStereoPanner();
+  panner.pan.setValueAtTime(rng(-0.9, 0.9), ctx.currentTime);
+  
+  // Soft footstep behind the player
+  const noise = createNoise(ctx, 0.06);
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(rng(300, 800), ctx.currentTime);
+  filter.Q.setValueAtTime(3, ctx.currentTime);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(rng(0.02, 0.04), ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(panner);
+  panner.connect(ctx.destination);
+  noise.start();
+}
+
+function playWallScratch() {
+  if (!ambienceActive) return;
+  const ctx = getBgCtx();
+  const dur = rng(0.3, 0.8);
+  const osc = ctx.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(rng(1500, 3000), ctx.currentTime);
+  osc.frequency.linearRampToValueAtTime(rng(800, 1500), ctx.currentTime + dur);
+  
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(2000, ctx.currentTime);
+  filter.Q.setValueAtTime(6, ctx.currentTime);
+  
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(rng(0.015, 0.03), ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+  
+  const panner = ctx.createStereoPanner();
+  panner.pan.setValueAtTime(rng(-1, 1), ctx.currentTime);
+  
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(panner);
+  panner.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + dur);
+}
+
+function playDeepGrowl() {
+  if (!ambienceActive) return;
+  const ctx = getBgCtx();
+  const dur = rng(0.6, 1.2);
+  
+  // Deep resonant growl
+  const osc = ctx.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(rng(30, 50), ctx.currentTime);
+  osc.frequency.linearRampToValueAtTime(rng(20, 35), ctx.currentTime + dur);
+  
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(100, ctx.currentTime);
+  
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(rng(0.06, 0.1), ctx.currentTime + dur * 0.3);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+  
+  // Sub-rumble
+  const noise = createNoise(ctx, dur);
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = 'lowpass';
+  noiseFilter.frequency.setValueAtTime(60, ctx.currentTime);
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.03, ctx.currentTime);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+  
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + dur);
+  
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
+  noise.start();
+}
+
+// === HP-REACTIVE UPDATE (called every frame) ===
+
+export function updateHPHorror(hpRatio: number, dt: number, floor: number) {
+  // Heartbeat — continuous at HP < 40%
+  if (hpRatio < 0.4) {
+    hpHorror.heartbeatTimer -= dt;
+    if (hpHorror.heartbeatTimer <= 0) {
+      const bpm = 60 + (1 - hpRatio) * 120;
+      hpHorror.heartbeatTimer = 60 / bpm;
+      playHPHeartbeat(hpRatio);
+    }
+  } else {
+    hpHorror.heartbeatTimer = 0;
+  }
+
+  // Ghost footsteps — HP < 40%
+  if (hpRatio < 0.4) {
+    hpHorror.ghostFootstepTimer -= dt;
+    if (hpHorror.ghostFootstepTimer <= 0) {
+      hpHorror.ghostFootstepTimer = rng(2, 5) * hpRatio * 2.5;
+      playGhostFootstep();
+    }
+  }
+
+  // Wall scratching — HP < 25%
+  if (hpRatio < 0.25) {
+    hpHorror.scratchTimer -= dt;
+    if (hpHorror.scratchTimer <= 0) {
+      hpHorror.scratchTimer = rng(4, 10);
+      playWallScratch();
+    }
+  }
+
+  // Deep growl — HP < 20%, very rare
+  if (hpRatio < 0.2) {
+    hpHorror.growlTimer -= dt;
+    if (hpHorror.growlTimer <= 0) {
+      hpHorror.growlTimer = rng(15, 40);
+      if (maybe(0.5)) playDeepGrowl();
+    }
+  }
+
+  // Random darkness pulses
+  hpHorror.darkPulseTimer -= dt;
+  if (hpHorror.darkPulseTimer <= 0) {
+    hpHorror.darkPulseTimer = rng(3, 8);
+  }
+
+  // Blood drops when critical
+  if (hpRatio < 0.3) {
+    if (maybe(dt * (1 - hpRatio) * 3)) {
+      hpHorror.bloodDrops.push({
+        x: Math.random(),
+        y: 0,
+        size: rng(2, 6),
+        alpha: rng(0.3, 0.7),
+        speed: rng(0.02, 0.06),
+      });
+    }
+  }
+  // Update blood drops
+  hpHorror.bloodDrops = hpHorror.bloodDrops.filter(d => {
+    d.y += d.speed * dt * 60;
+    d.alpha -= dt * 0.1;
+    return d.alpha > 0 && d.y < 1.2;
+  });
+
+  // Chromatic aberration timer
+  if (hpRatio < 0.3) {
+    hpHorror.chromaticTimer = Math.min(1, hpHorror.chromaticTimer + dt * 2);
+  } else {
+    hpHorror.chromaticTimer = Math.max(0, hpHorror.chromaticTimer - dt * 3);
+  }
+}
+
+// === HP-REACTIVE VISUAL RENDERING ===
+
+export function renderHPHorror(ctx: CanvasRenderingContext2D, hpRatio: number, time: number, vp: Viewport) {
+  const fx = -vp.gox;
+  const fy = -vp.goy;
+  const fw = vp.rw;
+  const fh = vp.rh;
+
+  // 1. HP-reactive vignette — darkens and reddens as HP drops
+  if (hpRatio < 0.7) {
+    const intensity = (0.7 - hpRatio) / 0.7; // 0 at 70%, 1 at 0%
+    const redShift = Math.min(1, intensity * 1.5);
+    const r = Math.floor(80 + redShift * 120);
+    const g = Math.floor(10 * (1 - redShift));
+    const b = Math.floor(10 * (1 - redShift));
+    const baseAlpha = intensity * 0.5;
+    
+    const vignette = ctx.createRadialGradient(
+      fw / 2 + fx, fh / 2 + fy, fw * 0.15,
+      fw / 2 + fx, fh / 2 + fy, fw * 0.55
+    );
+    vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vignette.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, ${baseAlpha * 0.3})`);
+    vignette.addColorStop(1, `rgba(${r}, ${g}, ${b}, ${baseAlpha})`);
+    ctx.fillStyle = vignette;
+    ctx.fillRect(fx, fy, fw, fh);
+  }
+
+  // 2. Blood overlay — edge stains when HP < 50%
+  if (hpRatio < 0.5) {
+    const bloodIntensity = (0.5 - hpRatio) / 0.5;
+    
+    // Corner blood stains
+    const corners = [
+      { x: fx, y: fy },
+      { x: fx + fw, y: fy },
+      { x: fx, y: fy + fh },
+      { x: fx + fw, y: fy + fh },
+    ];
+    for (let i = 0; i < corners.length; i++) {
+      const c = corners[i];
+      const radius = 60 + bloodIntensity * 80;
+      const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, radius);
+      const alpha = bloodIntensity * 0.25 + Math.sin(time * 2 + i) * 0.05;
+      grad.addColorStop(0, `rgba(120, 0, 0, ${alpha})`);
+      grad.addColorStop(0.5, `rgba(80, 0, 0, ${alpha * 0.4})`);
+      grad.addColorStop(1, 'rgba(60, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(c.x - radius, c.y - radius, radius * 2, radius * 2);
+    }
+
+    // Blood drips from top when critical
+    for (const drop of hpHorror.bloodDrops) {
+      const dx = fx + drop.x * fw;
+      const dy = fy + drop.y * fh;
+      ctx.fillStyle = `rgba(120, 10, 0, ${drop.alpha})`;
+      ctx.beginPath();
+      ctx.ellipse(dx, dy, drop.size * 0.4, drop.size, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // 3. Heartbeat pulse flash — rhythmic red flash at HP < 30%
+  if (hpRatio < 0.3) {
+    const bpm = 60 + (1 - hpRatio) * 120;
+    const beatPhase = (time * bpm / 60) % 1;
+    const beatFlash = beatPhase < 0.1 ? Math.sin(beatPhase / 0.1 * Math.PI) : 0;
+    if (beatFlash > 0) {
+      ctx.fillStyle = `rgba(150, 0, 0, ${beatFlash * 0.12 * (1 - hpRatio) * 3})`;
+      ctx.fillRect(fx, fy, fw, fh);
+    }
+  }
+
+  // 4. Ambient darkness pulses — random brief darkening
+  if (hpHorror.darkPulseTimer < 0.3) {
+    const pulseAlpha = (0.3 - hpHorror.darkPulseTimer) / 0.3 * 0.15;
+    ctx.fillStyle = `rgba(0, 0, 0, ${pulseAlpha * Math.sin(hpHorror.darkPulseTimer * 20)})`;
+    ctx.fillRect(fx, fy, fw, fh);
+  }
+
+  // 5. Chromatic aberration at low HP
+  if (hpHorror.chromaticTimer > 0.01) {
+    const offset = hpHorror.chromaticTimer * 3 * Math.sin(time * 15);
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = `rgba(255, 0, 0, ${0.02 * hpHorror.chromaticTimer})`;
+    ctx.fillRect(fx + offset, fy, fw, fh);
+    ctx.fillStyle = `rgba(0, 0, 255, ${0.02 * hpHorror.chromaticTimer})`;
+    ctx.fillRect(fx - offset, fy, fw, fh);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // 6. Enhanced shadow figures at low HP — taller, with aura
+  if (hpRatio < 0.4) {
+    const shadowChance = (0.4 - hpRatio) * 0.003;
+    if (maybe(shadowChance)) {
+      const sx = Math.random() * C.dims.gw;
+      const sy = Math.random() * C.dims.gh;
+      // Tall shadow figure
+      ctx.fillStyle = `rgba(5, 0, 10, 0.5)`;
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, 10, 24, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Dark aura
+      const aura = ctx.createRadialGradient(sx, sy, 0, sx, sy, 30);
+      aura.addColorStop(0, 'rgba(0, 0, 0, 0.15)');
+      aura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = aura;
+      ctx.fillRect(sx - 30, sy - 30, 60, 60);
+      // Bright red eyes
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+      ctx.fillRect(sx - 4, sy - 14, 2.5, 2.5);
+      ctx.fillRect(sx + 2, sy - 14, 2.5, 2.5);
+      // Eye glow
+      const eg = ctx.createRadialGradient(sx, sy - 14, 0, sx, sy - 14, 10);
+      eg.addColorStop(0, 'rgba(255, 0, 0, 0.1)');
+      eg.addColorStop(1, 'rgba(255, 0, 0, 0)');
+      ctx.fillStyle = eg;
+      ctx.fillRect(sx - 10, sy - 24, 20, 20);
+    }
+  }
+
+  // 7. Multiple eyes in darkness when HP very low
+  if (hpRatio < 0.25) {
+    const eyeCount = Math.floor((0.25 - hpRatio) * 20);
+    for (let i = 0; i < eyeCount; i++) {
+      // Use deterministic positions based on time so they don't flicker every frame
+      const seed = Math.sin(i * 127.1 + Math.floor(time * 0.5) * 311.7);
+      const seed2 = Math.cos(i * 269.5 + Math.floor(time * 0.5) * 183.3);
+      const ex = (seed * 0.5 + 0.5) * C.dims.gw;
+      const ey = (seed2 * 0.5 + 0.5) * C.dims.gh;
+      const blink = Math.sin(time * 3 + i * 1.7) > -0.3;
+      if (blink) {
+        const eyeAlpha = 0.2 + Math.sin(time * 2 + i) * 0.1;
+        ctx.fillStyle = `rgba(255, 30, 0, ${eyeAlpha})`;
+        ctx.fillRect(ex - 3, ey, 2, 1.5);
+        ctx.fillRect(ex + 2, ey, 2, 1.5);
+      }
+    }
+  }
+}
+
+// === BREATHING LIGHT RADIUS ===
+// Returns a multiplier for the light radius based on HP
+export function getHPLightPulse(hpRatio: number, time: number): number {
+  if (hpRatio > 0.5) return 1;
+  // Light "breathes" — pulses subtly, more intensely at low HP
+  const intensity = (0.5 - hpRatio) / 0.5; // 0 to 1
+  const breathRate = 1.5 + intensity * 2; // faster breathing at lower HP
+  const breathAmp = 0.05 + intensity * 0.15; // wider pulse at lower HP
+  return 1 - breathAmp + Math.sin(time * breathRate) * breathAmp;
+}
+
 // ============ BOSS INTRO SYSTEM ============
 
 import { BOSS_DATA } from './bosses';
