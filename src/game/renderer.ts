@@ -478,8 +478,8 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
   const visible = p.invincibleTime <= 0 || Math.floor(p.invincibleTime * 20) % 2 === 0;
   if (!visible) return;
 
-  const x = Math.floor(p.x);
-  const y = Math.floor(p.y);
+  const x = p.x;
+  const y = p.y;
   const isMoving = p.trail.length > 0 || p.isDashing;
   const breathe = Math.sin(time * 2.5) * 0.5;
   const bobY = isMoving ? Math.sin(time * 10) * 1.2 : breathe * 0.3;
@@ -602,6 +602,46 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
     ctx.stroke();
   }
 
+  // === HANDHELD WEAPON (AAA Longsword with Ethereal Integration) ===
+  const isMeleeAttacking = p.meleeAttacking;
+
+  if (!isMeleeAttacking) {
+    ctx.save();
+
+    // Position comfortably in hand, or on back if truly idle for long
+    const isRestingOnBack = p.idleTime > 12; // Increased threshold
+
+    if (isRestingOnBack) {
+      // Position on back, slightly angled
+      ctx.translate(2, -2);
+      ctx.rotate(-Math.PI * 0.75 + Math.sin(time * 2) * 0.05);
+      drawLongsword(ctx, 20, 0, time); // Scaled down (24 -> 20)
+    } else {
+      // --- Ethereal Energy Hand (Side-Snapped Integration) ---
+      // Force hand to a specific side (left or right) to prevent "middle" alignment
+      const sideX = p.facing.x >= 0 ? 1 : -1;
+      const handX = sideX * 10;
+      const handY = -1 + (isMoving ? Math.sin(time * 12) * 1.5 : 0);
+
+      // Hand aura pulse
+      const pulse = 0.9 + Math.sin(time * 6) * 0.1;
+      // Connect back to character center (0,0 because we are already translated to character core)
+      drawEtherealHand(ctx, handX, handY, pulse, time, 0, 0);
+
+      // Position sword in the ethereal hand
+      ctx.translate(handX, handY);
+
+      // Angle based on movement
+      const restAngle = p.facing.x >= 0 ? Math.PI * 0.25 : Math.PI * 0.75;
+      const moveAngle = p.facing.x >= 0 ? Math.PI * 0.45 : Math.PI * 0.55;
+      ctx.rotate(isMoving ? moveAngle : restAngle);
+
+      drawLongsword(ctx, 20, 0, time); // Scaled down further (24 -> 20)
+    }
+
+    ctx.restore();
+  }
+
   // === HEAD (hood shape — Hollow Knight-like) ===
   const headShiftX = idleLookX;
   const headShiftY = -idleHoodShift;
@@ -705,44 +745,263 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
 
   ctx.restore();
 
-  // === MELEE SWING (outside translate) ===
+  // === MELEE SWING (Professional Swordplay) ===
   if (p.meleeAttacking) {
     const range = C.MELEE_RANGE * p.areaMultiplier;
-    const swingProgress = 1 - (p.meleeTimer / 0.15);
+
+    // 3-Stage Animation Logic
+    // Total duration is C.MELEE_COOLDOWN (0.25s)
+    // T goes from 1.0 (start) to 0.0 (end)
+    const t = 1 - (p.meleeTimer / C.MELEE_COOLDOWN);
+
+    let swingProgress = 0;
+    let bladeScale = 1.0;
+    let handOffset = 0;
+
+    // Phase 1: Anticipation (0% - 20%)
+    if (t < 0.2) {
+      const pt = t / 0.2;
+      swingProgress = -pt * 0.15; // Slight pullback
+      handOffset = pt * 2;
+    }
+    // Phase 2: Strike (20% - 60%)
+    else if (t < 0.6) {
+      const pt = (t - 0.2) / 0.4;
+      // Explosive Cubic-Out for the strike
+      swingProgress = -0.15 + (1.3 * (1 - Math.pow(1 - pt, 3)));
+      bladeScale = 1.1 + Math.sin(pt * Math.PI) * 0.1; // Slight stretch for speed
+    }
+    // Phase 3: Recovery (60% - 100%)
+    else {
+      const pt = (t - 0.6) / 0.4;
+      swingProgress = 1.15 + pt * 0.1; // Slow follow-through
+      bladeScale = 1.0;
+    }
+
     const startAngle = p.meleeAngle - C.MELEE_ARC / 2;
     const currentAngle = startAngle + C.MELEE_ARC * swingProgress;
 
-    // Slash arc glow
-    const slashAlpha = 0.6 * (1 - swingProgress);
-    ctx.strokeStyle = `rgba(150, 210, 255, ${slashAlpha})`;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(x, y, range, startAngle, currentAngle);
-    ctx.stroke();
+    // --- AAA Motion Blur Trail ---
+    if (t > 0.15 && t < 0.9) {
+      const trailAlpha = Math.sin((t - 0.15) / 0.75 * Math.PI) * 0.5;
 
-    // Inner bright line
-    ctx.strokeStyle = `rgba(220, 240, 255, ${slashAlpha * 0.8})`;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(x, y, range - 2, startAngle, currentAngle);
-    ctx.stroke();
+      // Multi-layered trail for volume
+      for (let i = 0; i < 3; i++) {
+        const layerRange = range + (i * 2);
+        const grad = ctx.createRadialGradient(x, y, range * 0.4, x, y, layerRange);
+        const alpha = trailAlpha / (i + 1);
+        grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        grad.addColorStop(0.7, `rgba(200, 230, 255, ${alpha * 0.5})`);
+        grad.addColorStop(0.9, `rgba(255, 255, 255, ${alpha})`);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
-    // Slash fill
-    ctx.fillStyle = `rgba(85, 153, 255, ${0.25 * (1 - swingProgress)})`;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.arc(x, y, range, startAngle, currentAngle);
-    ctx.closePath();
-    ctx.fill();
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.arc(x, y, layerRange, startAngle, currentAngle);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
 
-    // Tip spark
-    const tipX = x + Math.cos(currentAngle) * range;
-    const tipY = y + Math.sin(currentAngle) * range;
-    ctx.fillStyle = '#ffffff';
+    // --- The Sword Rendering ---
+    ctx.save();
+
+    // Increased base offset during attack to stay outside the body
+    const baseAttackRadius = 13;
+    const sideX = Math.cos(p.meleeAngle) >= 0 ? 1 : -1;
+
+    // Position of the Hand during attack - Side Snapped
+    const handX = x + sideX * (baseAttackRadius + handOffset);
+    const handY = y + Math.sin(currentAngle) * handOffset;
+
+    // Draw Ethereal Hand during strike (connecting back to player center x,y)
+    const pulse = 1.1 + Math.sin(time * 10) * 0.2;
+    drawEtherealHand(ctx, handX, handY, pulse, time, x, y);
+
+    ctx.translate(handX, handY);
+    ctx.rotate(currentAngle);
+    ctx.scale(bladeScale * 0.8, 1 / (bladeScale * 0.8)); // Scaled down 20% total (0.8 multiplier)
+
+    drawLongsword(ctx, range, 1, time);
+
+    ctx.restore();
+  }
+}
+
+/** Draws a mystical ethereal hand */
+function drawEtherealHand(ctx: CanvasRenderingContext2D, handX: number, handY: number, scale: number, time: number, coreX: number, coreY: number) {
+  ctx.save();
+  ctx.translate(handX, handY);
+
+  // Energy connection thread back to the character core
+  ctx.strokeStyle = 'rgba(150, 230, 255, 0.2)';
+  ctx.setLineDash([2, 2]); // Dotted energy feel
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  // Relative coordinates back to core
+  ctx.moveTo(coreX - handX, coreY - handY);
+  ctx.lineTo(0, 0); // Hand center
+  ctx.stroke();
+  ctx.setLineDash([]); // Reset
+
+  // Outer soft glow
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 8 * scale);
+  g.addColorStop(0, 'rgba(100, 200, 255, 0.4)');
+  g.addColorStop(0.5, 'rgba(50, 150, 255, 0.2)');
+  g.addColorStop(1, 'rgba(0, 100, 255, 0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(0, 0, 8 * scale, 0, Math.PI * 2);
+  ctx.fill();
+
+  // "Finger" particles (procedural energy wisps)
+  ctx.fillStyle = 'rgba(150, 230, 255, 0.6)';
+  for (let i = 0; i < 3; i++) {
+    const angle = (time * 5) + (i * Math.PI * 2 / 3);
+    const rx = Math.cos(angle) * 3 * scale;
+    const ry = Math.sin(angle) * 3 * scale;
     ctx.beginPath();
-    ctx.arc(tipX, tipY, 2, 0, Math.PI * 2);
+    ctx.arc(rx, ry, 1.5 * scale, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  // Core
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(0, 0, 2 * scale, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/** Draws a professional-grade AAA longsword */
+function drawLongsword(ctx: CanvasRenderingContext2D, length: number, isAttacking: number, time: number) {
+  // Increase proportions for a larger, more impactful weapon
+  const hiltLen = 10;
+  const guardW = 14;
+  const bladeLen = length - hiltLen;
+
+  // 1. Hilt (Thick leather wrapped with gold wire)
+  ctx.fillStyle = '#1a0f08';
+  ctx.fillRect(-hiltLen, -1.8, hiltLen, 3.6);
+
+  // Leather wraps detail
+  ctx.strokeStyle = '#3d2b1f';
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < 5; i++) {
+    const ox = -hiltLen + 1 + i * 1.8;
+    ctx.beginPath();
+    ctx.moveTo(ox, -1.8);
+    ctx.lineTo(ox + 0.8, 1.8);
+    ctx.stroke();
+  }
+
+  // 2. Heavy Weighted Pommel
+  const pommelGrad = ctx.createRadialGradient(-hiltLen, 0, 0, -hiltLen, 0, 3);
+  pommelGrad.addColorStop(0, '#ffcc33');
+  pommelGrad.addColorStop(1, '#aa8833');
+  ctx.fillStyle = pommelGrad;
+  ctx.beginPath();
+  ctx.arc(-hiltLen, 0, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pommel shine
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.beginPath();
+  ctx.arc(-hiltLen - 1, -1, 1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3. Ornate Crossguard (Ornate Silver / Chrome)
+  const silverGrad = ctx.createLinearGradient(0, -guardW / 2, 0, guardW / 2);
+  silverGrad.addColorStop(0, '#555555');
+  silverGrad.addColorStop(0.2, '#aaaaaa');
+  silverGrad.addColorStop(0.5, '#ffffff'); // Center shine
+  silverGrad.addColorStop(0.8, '#aaaaaa');
+  silverGrad.addColorStop(1, '#444444');
+  ctx.fillStyle = silverGrad;
+
+  // Complex flared guard shape
+  ctx.beginPath();
+  ctx.moveTo(0, -guardW / 2);
+  ctx.bezierCurveTo(-4, -guardW / 4, -4, guardW / 4, 0, guardW / 2);
+  ctx.lineTo(3, guardW / 3);
+  ctx.lineTo(3, -guardW / 3);
+  ctx.closePath();
+  ctx.fill();
+
+  // Guard engravings
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+
+  // 4. Central Magical Gem
+  const gemPulse = 0.8 + Math.sin(time * 5) * 0.2;
+  const gemGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 2.5);
+  gemGrad.addColorStop(0, '#ffffff');
+  gemGrad.addColorStop(0.3, '#33ccff');
+  gemGrad.addColorStop(1, '#0044ff');
+  ctx.fillStyle = gemGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, 2 * gemPulse, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Gem glow
+  ctx.shadowBlur = 8 * gemPulse;
+  ctx.shadowColor = '#3399ff';
+
+  // 5. Elite Blade (Polished Mirror-Finish Steel)
+  const bladeWidth = 2.8;
+  const bladeGrad = ctx.createLinearGradient(0, -bladeWidth, 0, bladeWidth);
+  bladeGrad.addColorStop(0, '#444444');
+  bladeGrad.addColorStop(0.3, '#bbbbbb');
+  bladeGrad.addColorStop(0.48, '#ffffff'); // Razor sharp edge highlight
+  bladeGrad.addColorStop(0.52, '#ffffff');
+  bladeGrad.addColorStop(0.7, '#999999');
+  bladeGrad.addColorStop(1, '#333333');
+
+  ctx.fillStyle = bladeGrad;
+  ctx.beginPath();
+  ctx.moveTo(3, -bladeWidth);
+  ctx.lineTo(bladeLen - 8, -bladeWidth * 0.8);
+  ctx.lineTo(bladeLen, 0); // Precision Point
+  ctx.lineTo(bladeLen - 8, bladeWidth * 0.8);
+  ctx.lineTo(3, bladeWidth);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.shadowBlur = 0; // Reset shadow for rest of blade
+
+  // 6. Deep Fuller (Central Groove)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+  ctx.fillRect(6, -0.6, bladeLen - 18, 1.2);
+
+  // 7. Dynamic Blade Shimmer (Glint)
+  const shineSpeed = isAttacking ? 20 : 4;
+  const shinePos = (Math.sin(time * shineSpeed) * 0.5 + 0.5) * (bladeLen - 10) + 10;
+
+  const g = ctx.createRadialGradient(shinePos, 0, 0, shinePos, 0, 12);
+  g.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+  g.addColorStop(0.2, 'rgba(200, 230, 255, 0.4)');
+  g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+  // Glint shape
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(shinePos - 15, 0);
+  ctx.lineTo(shinePos, -4);
+  ctx.lineTo(shinePos + 15, 0);
+  ctx.lineTo(shinePos, 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // 8. Blade Rim Light (Energy glow)
+  ctx.strokeStyle = `rgba(150, 220, 255, ${0.1 + Math.sin(time * 2) * 0.05})`;
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
 }
 
 export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: number) {
@@ -764,6 +1023,13 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
   // Apply wraith alpha
   if (e.type === 'wraith') {
     ctx.globalAlpha = e.phaseAlpha;
+  }
+
+  // Hit jitter / bulge
+  if (e.flashTime > 0) {
+    const jitter = Math.sin(time * 60) * 2;
+    ctx.translate(jitter, (Math.random() - 0.5) * 2);
+    ctx.scale(1.1, 1.1); // Bulge on hit
   }
 
   // Shadow

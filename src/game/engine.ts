@@ -78,6 +78,14 @@ export class GameEngine {
   cruelRepIsMelee = false;
   cruelRepTarget = { x: 0, y: 0 };
   _pendingBossAmuletId: string | null = null;
+  hitStopTimer = 0;
+  _hitTriggeredThisSwing = false;
+  bossIntroPlayed = false;
+  bossWasSpawned = false;
+  pendingNextFloor = false;
+  victoryActive = false;
+  slowMoFactor = 1;
+  lastFrameTime = 0;
 
   constructor(displayCanvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     this.displayCanvas = displayCanvas;
@@ -364,24 +372,30 @@ export class GameEngine {
     this.lastTime = now;
 
     if (!this.paused || this.vendorDialogueActive) {
-      // Apply slow-mo
-      let effectiveDt = dt;
-      if (this.slowMoTimer > 0) {
-        this.slowMoTimer -= dt;
-        effectiveDt = dt * this.slowMoFactor;
-        if (this.slowMoTimer <= 0) {
-          this.slowMoTimer = 0;
-          this.slowMoFactor = 1;
-        }
-      }
-
-      if (this.vendorDialogueActive) {
-        this.updateVendorDialogue(dt);
-        if (this.input.isMouseJustPressed(0) || this.input.isMouseJustPressed(2) || this.input.wantsDash()) {
-          this.advanceVendorDialogue();
-        }
+      // Apply hit-stop (pause world on impact)
+      if (this.hitStopTimer > 0) {
+        this.hitStopTimer -= dt;
+        // Skip update during hit-stop
       } else {
-        this.update(effectiveDt);
+        // Apply slow-mo
+        let effectiveDt = dt;
+        if (this.slowMoTimer > 0) {
+          this.slowMoTimer -= dt;
+          effectiveDt = dt * this.slowMoFactor;
+          if (this.slowMoTimer <= 0) {
+            this.slowMoTimer = 0;
+            this.slowMoFactor = 1;
+          }
+        }
+
+        if (this.vendorDialogueActive) {
+          this.updateVendorDialogue(dt);
+          if (this.input.isMouseJustPressed(0) || this.input.isMouseJustPressed(2) || this.input.wantsDash()) {
+            this.advanceVendorDialogue();
+          }
+        } else {
+          this.update(effectiveDt);
+        }
       }
     }
     this.render();
@@ -389,18 +403,13 @@ export class GameEngine {
     this.animFrameId = requestAnimationFrame(this.loop);
   };
 
-  private pendingNextFloor = false;
-  private bossWasSpawned = false;
-  private bossIntroPlayed = false;
   private bossKillTimer = 0;
   private bossKillFloor = 1;
   private slowMoTimer = 0;
-  private slowMoFactor = 1;
 
   // Victory countdown state
   private victoryCountdown = 0;
   private victoryCountdownMax = 5;
-  private victoryActive = false;
 
   private spawnRoomEnemies() {
     const room = getCurrentRoom(this.dungeon);
@@ -578,15 +587,15 @@ export class GameEngine {
       const mouse = this.input.getMousePos();
       if (tryMelee(this.player, mouse.x, mouse.y)) {
         this.lastAttackWasMelee = true;
-        this.doMeleeHit();
-        SFX.meleeSwing();
-        // Cruel Repetition — 30% chance to auto-repeat
-        if (isAmuletEquipped(this.amuletInventory, 'cruel_repetition') && Math.random() < 0.3) {
-          this.cruelRepTimer = 0.15;
-          this.cruelRepIsMelee = true;
-          this.cruelRepTarget = { ...mouse };
-        }
+        this._hitTriggeredThisSwing = false; // Reset for new swing
       }
+    }
+
+    // Trigger melee impact on the "active" frame (0.2s remaining of 0.25s)
+    if (this.player.meleeAttacking && this.player.meleeTimer <= 0.2 && !this._hitTriggeredThisSwing) {
+      this._hitTriggeredThisSwing = true;
+      this.doMeleeHit();
+      SFX.meleeSwing();
     }
 
     // Combat - ranged
@@ -614,8 +623,7 @@ export class GameEngine {
         if (this.cruelRepIsMelee) {
           this.player.meleeCooldown = 0; // force allow
           if (tryMelee(this.player, this.cruelRepTarget.x, this.cruelRepTarget.y)) {
-            this.doMeleeHit();
-            SFX.meleeSwing();
+            this._hitTriggeredThisSwing = false; // Reset for repeatable swing
             spawnDamageText(this.particles, this.player.x, this.player.y - 16, '🔁', '#aa88ff');
           }
         } else {
@@ -1143,8 +1151,8 @@ export class GameEngine {
 
     if (hitAny) {
       SFX.meleeHit();
-      this.addEffect('shake', 6, 0.15);
-      this.addEffect('flash', 0.4, 0.06, 'rgb(200, 220, 255)');
+      this.hitStopTimer = 0.08; // Impact pause
+      this.addEffect('shake', 10, 0.15); // Stronger shake
       // Melee hit reduces dash cooldown
       this.player.dashCooldown = Math.max(0, this.player.dashCooldown - 0.25);
     } else {

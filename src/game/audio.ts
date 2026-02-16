@@ -99,16 +99,29 @@ export const SFX = {
   },
 
   meleeSwing() {
-    playFreqSweep(400, 80, 0.14, 'sawtooth', 0.12);
-    playNoise(0.1, 0.09, 2500);
-    playTone(60, 0.08, 'sine', 0.06);
+    // Sharp high-freq whoosh (the cut)
+    playFreqSweep(1500, 600, 0.14, 'sawtooth', 0.12);
+    // Medium-freq air displacement
+    playFreqSweep(600, 200, 0.12, 'sine', 0.1);
+    // Low-end "weight" thump
+    playFreqSweep(180, 50, 0.1, 'sine', 0.15);
+    // Metallic resonant ring (subtle)
+    playTone(800, 0.05, 'sine', 0.04);
+    playNoise(0.08, 0.15, 4500);
   },
 
   meleeHit() {
-    playTone(100, 0.15, 'square', 0.18);
-    playNoise(0.1, 0.15, 5000);
-    playTone(50, 0.2, 'sine', 0.12);
-    playFreqSweep(200, 40, 0.12, 'sawtooth', 0.08);
+    // Heavy "Sledgehammer" impact body
+    playFreqSweep(120, 40, 0.2, 'square', 0.3);
+    playTone(60, 0.25, 'sine', 0.25);
+    // Bone-crunching/Metal-clashing mid layer
+    playFreqSweep(2000, 400, 0.1, 'sawtooth', 0.18);
+    // High-end impact "snap"
+    playNoise(0.05, 0.3, 8000);
+    // Shrapnel/Debris rumble
+    playNoise(0.15, 0.25, 2000);
+    // Deep sub-bass impact
+    playFreqSweep(70, 10, 0.22, 'sine', 0.15);
   },
 
   rangedShoot() {

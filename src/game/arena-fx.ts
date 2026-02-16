@@ -75,7 +75,7 @@ export function initArenaFX() {
   combatMarks = [];
   torchSmoke = [];
   initialized = true;
-  
+
   // Pre-populate ground fog
   for (let i = 0; i < MAX_FOG; i++) {
     groundFog.push({
@@ -97,7 +97,7 @@ export function resetArenaFX() {
 
 export function updateArenaFX(dt: number, time: number, playerX: number, playerY: number, torchPositions: { x: number; y: number }[]) {
   if (!initialized) initArenaFX();
-  
+
   // --- Dust motes ---
   if (dustMotes.length < MAX_DUST && Math.random() < 0.15) {
     dustMotes.push({
@@ -112,7 +112,7 @@ export function updateArenaFX(dt: number, time: number, playerX: number, playerY
     });
     dustMotes[dustMotes.length - 1].maxLife = dustMotes[dustMotes.length - 1].life;
   }
-  
+
   for (let i = dustMotes.length - 1; i >= 0; i--) {
     const d = dustMotes[i];
     d.x += d.vx * dt;
@@ -123,7 +123,7 @@ export function updateArenaFX(dt: number, time: number, playerX: number, playerY
       dustMotes.splice(i, 1);
     }
   }
-  
+
   // --- Embers from torches ---
   if (embers.length < MAX_EMBERS && torchPositions.length > 0 && Math.random() < 0.2) {
     const torch = torchPositions[Math.floor(Math.random() * torchPositions.length)];
@@ -140,7 +140,7 @@ export function updateArenaFX(dt: number, time: number, playerX: number, playerY
     });
     embers[embers.length - 1].maxLife = embers[embers.length - 1].life;
   }
-  
+
   for (let i = embers.length - 1; i >= 0; i--) {
     const e = embers[i];
     e.x += e.vx * dt;
@@ -153,14 +153,14 @@ export function updateArenaFX(dt: number, time: number, playerX: number, playerY
       embers.splice(i, 1);
     }
   }
-  
+
   // --- Ground fog drift ---
   for (const f of groundFog) {
     f.x += f.drift * dt;
     if (f.x < -f.radius) f.x = C.dims.gw + f.radius;
     if (f.x > C.dims.gw + f.radius) f.x = -f.radius;
   }
-  
+
   // --- Torch smoke ---
   if (torchSmoke.length < MAX_SMOKE && torchPositions.length > 0 && Math.random() < 0.12) {
     const torch = torchPositions[Math.floor(Math.random() * torchPositions.length)];
@@ -174,7 +174,7 @@ export function updateArenaFX(dt: number, time: number, playerX: number, playerY
       life: rng(1.5, 3),
     });
   }
-  
+
   for (let i = torchSmoke.length - 1; i >= 0; i--) {
     const s = torchSmoke[i];
     s.x += s.vx * dt;
@@ -186,7 +186,7 @@ export function updateArenaFX(dt: number, time: number, playerX: number, playerY
       torchSmoke.splice(i, 1);
     }
   }
-  
+
   // --- Combat marks (blood marks are permanent, no fading) ---
   // Only remove non-blood marks that expire
   for (let i = combatMarks.length - 1; i >= 0; i--) {
@@ -201,8 +201,19 @@ export function updateArenaFX(dt: number, time: number, playerX: number, playerY
 
 // ============ COMBAT MARK SPAWNERS ============
 
-export function spawnSlashMark(_x: number, _y: number, _angle: number) {
-  // Removed — no slash marks on floor
+export function spawnSlashMark(x: number, y: number, angle: number) {
+  if (combatMarks.length >= MAX_MARKS) combatMarks.shift();
+  combatMarks.push({
+    x, y,
+    angle,
+    length: rng(8, 16),
+    type: 'slash',
+    alpha: 0.35,
+    life: 99999, // Permanent scar
+    maxLife: 99999,
+    color: 'rgba(20, 18, 25, 0.4)',
+    size: rng(1, 2),
+  });
 }
 
 export function spawnBloodMark(x: number, y: number) {
@@ -230,7 +241,7 @@ export function spawnImpactMark(_x: number, _y: number) {
 export function renderArenaFloorFX(ctx: CanvasRenderingContext2D, time: number) {
   // --- Enhanced floor decorations ---
   renderFloorDecorations(ctx, time);
-  
+
   // --- Combat marks on floor (only blood) ---
   for (const m of combatMarks) {
     if (m.type === 'blood') {
@@ -249,7 +260,7 @@ export function renderArenaFloorFX(ctx: CanvasRenderingContext2D, time: number) 
       }
     }
   }
-  
+
   // --- Ground fog ---
   for (const f of groundFog) {
     const pulse = Math.sin(time * 0.8 + f.phase) * 0.3 + 0.7;
@@ -276,7 +287,7 @@ export function renderArenaOverlayFX(ctx: CanvasRenderingContext2D, time: number
     ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2);
     ctx.fill();
   }
-  
+
   // --- Embers ---
   for (const e of embers) {
     const fadeOut = Math.min(1, e.life / 0.5);
@@ -296,7 +307,7 @@ export function renderArenaOverlayFX(ctx: CanvasRenderingContext2D, time: number
     ctx.fillStyle = glow;
     ctx.fillRect(e.x - e.size * 3, e.y - e.size * 3, e.size * 6, e.size * 6);
   }
-  
+
   // --- Torch smoke ---
   for (const s of torchSmoke) {
     ctx.fillStyle = `rgba(30, 25, 40, ${s.alpha})`;
@@ -313,7 +324,7 @@ function renderFloorDecorations(ctx: CanvasRenderingContext2D, time: number) {
   const gh = C.dims.gh;
   const cx = gw / 2;
   const cy = gh / 2;
-  
+
   // --- Central rune circle (subtle, mysterious) ---
   const runeAlpha = 0.035 + Math.sin(time * 0.5) * 0.008;
   ctx.strokeStyle = `rgba(100, 70, 160, ${runeAlpha})`;
@@ -350,7 +361,7 @@ function renderFloorDecorations(ctx: CanvasRenderingContext2D, time: number) {
   ctx.moveTo(cx + diag, cy - diag);
   ctx.lineTo(cx - diag, cy + diag);
   ctx.stroke();
-  
+
   // --- Large floor cracks (organic, spanning multiple tiles) ---
   ctx.strokeStyle = 'rgba(20, 18, 30, 0.25)';
   ctx.lineWidth = 0.8;
@@ -370,7 +381,7 @@ function renderFloorDecorations(ctx: CanvasRenderingContext2D, time: number) {
   ctx.moveTo(gw * 0.55, gh * 0.8);
   ctx.quadraticCurveTo(gw * 0.6, gh * 0.78, gw * 0.68, gh * 0.82);
   ctx.stroke();
-  
+
   // --- Moisture patches (darker, subtle wet spots) ---
   const moistureSpots = [
     { x: gw * 0.12, y: gh * 0.7, r: 12 },
@@ -386,7 +397,7 @@ function renderFloorDecorations(ctx: CanvasRenderingContext2D, time: number) {
     ctx.fillStyle = grad;
     ctx.fillRect(m.x - m.r, m.y - m.r, m.r * 2, m.r * 2);
   }
-  
+
   // --- Moss/lichen patches along walls ---
   const wallMoss = [
     { x: C.TILE_SIZE * 3, y: C.TILE_SIZE + 2, w: 15, h: 4 },
@@ -403,7 +414,7 @@ function renderFloorDecorations(ctx: CanvasRenderingContext2D, time: number) {
     ctx.fillStyle = 'rgba(30, 55, 30, 0.07)';
     ctx.fillRect(m.x + 2, m.y, m.w * 0.5, m.h * 0.6);
   }
-  
+
   // --- Scattered stone chips (away from center) ---
   const chips = [
     { x: gw * 0.1, y: gh * 0.3, s: 2 },

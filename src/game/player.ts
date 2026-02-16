@@ -80,7 +80,13 @@ export function updatePlayer(p: PlayerState, moveDir: Vec2, dt: number) {
   }
 
   const dashSpeed = p.dashEnhanced ? C.PLAYER_DASH_SPEED * 1.5 : C.PLAYER_DASH_SPEED;
-  const speed = p.isDashing ? dashSpeed : p.speed * p.moveSpeedMult;
+  let speed = p.isDashing ? dashSpeed : p.speed * p.moveSpeedMult;
+
+  // Add weight/commitment to melee attacks: slow down during anticipation and swing
+  if (p.meleeAttacking && p.meleeTimer > 0.1) {
+    speed *= 0.5;
+  }
+
   p.x += moveDir.x * speed * dt;
   p.y += moveDir.y * speed * dt;
 
@@ -107,10 +113,11 @@ export function tryDash(p: PlayerState): boolean {
 
 export function tryMelee(p: PlayerState, mouseX: number, mouseY: number): boolean {
   if (p.meleeCooldown > 0) return false;
+  // Melee sequence: 0.05s anticipation -> 0.1s swing -> 0.1s recovery
   p.meleeCooldown = C.MELEE_COOLDOWN / p.attackSpeedMult;
   p.meleeAttacking = true;
   p.meleeAngle = Math.atan2(mouseY - p.y, mouseX - p.x);
-  p.meleeTimer = 0.15;
+  p.meleeTimer = 0.25;
   return true;
 }
 
