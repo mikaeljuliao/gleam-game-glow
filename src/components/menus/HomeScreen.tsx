@@ -59,10 +59,10 @@ const HomeScreen = ({ onStart, onNavigate, onOpenDevMenu, hasSave }: HomeScreenP
                 </MenuButton>
 
                 <MenuButton
-                    onClick={() => onNavigate('credits')}
+                    onClick={() => onNavigate('guide')}
                     variant="secondary"
                 >
-                    CRÉDITOS
+                    GUIA
                 </MenuButton>
             </div>
 

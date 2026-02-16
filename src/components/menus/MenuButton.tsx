@@ -10,7 +10,7 @@ const MenuButton = ({ children, variant = 'primary', icon, className, ...props }
     const baseStyles = "relative w-full py-4 px-6 text-left group overflow-hidden transition-all duration-300 ease-out border backdrop-blur-sm";
 
     const variants = {
-        primary: "bg-black/40 hover:bg-purple-900/30 border-white/10 hover:border-purple-500/50 text-gray-300 hover:text-white hover:pl-8",
+        primary: "bg-black/40 hover:bg-gray-800/40 border-white/10 hover:border-white/20 text-gray-300 hover:text-white hover:pl-8",
         secondary: "bg-black/20 hover:bg-gray-800/40 border-white/5 hover:border-white/20 text-gray-400 hover:text-gray-200 hover:pl-8",
         danger: "bg-red-950/10 hover:bg-red-900/20 border-red-900/20 hover:border-red-500/30 text-red-400/80 hover:text-red-300 hover:pl-8"
     };
@@ -27,7 +27,7 @@ const MenuButton = ({ children, variant = 'primary', icon, className, ...props }
                 style={{
                     background: variant === 'danger'
                         ? 'linear-gradient(90deg, transparent, rgba(200,50,50,0.1), transparent)'
-                        : 'linear-gradient(90deg, transparent, rgba(120,80,200,0.1), transparent)'
+                        : 'linear-gradient(90deg, transparent, rgba(180,180,200,0.08), transparent)'
                 }}
             />
 
