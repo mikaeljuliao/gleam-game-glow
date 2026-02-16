@@ -80,6 +80,12 @@ const MobileHUD = ({ engineRef, onOpenInventory, onOpenMap }: MobileHUDProps) =>
     engineRef.current?.trySanctuaryHeal();
   }, [engineRef]);
 
+  const handleVendorInteract = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    engineRef.current?.tryVendorInteract();
+  }, [engineRef]);
+
   if (!isMobile) return null;
 
   const btnSize = isLandscape ? 56 : 58;
@@ -142,6 +148,18 @@ const MobileHUD = ({ engineRef, onOpenInventory, onOpenMap }: MobileHUDProps) =>
           onTouchStart={handleMap}
         >
           🗺️
+        </button>
+        <button
+          style={btnStyle('rgba(80, 200, 150, 0.35)', 'rgba(100, 220, 170, 0.5)', '#88ffcc', smallBtn)}
+          onTouchStart={handleSanctuary}
+        >
+          💚
+        </button>
+        <button
+          style={btnStyle('rgba(200, 180, 80, 0.35)', 'rgba(220, 200, 100, 0.5)', '#eedd88', smallBtn)}
+          onTouchStart={handleVendorInteract}
+        >
+          🧙
         </button>
       </div>
 

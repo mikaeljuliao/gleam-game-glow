@@ -213,6 +213,13 @@ const Index = () => {
           engine.trySanctuaryHeal();
         }
       }
+      // [F] to interact with vendor
+      if (key === 'f' && gameState === 'playing') {
+        const engine = engineRef.current;
+        if (engine) {
+          engine.tryVendorInteract();
+        }
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);

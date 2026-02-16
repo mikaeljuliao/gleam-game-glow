@@ -906,6 +906,9 @@ export class GameEngine {
       spawnFog(this.particles, this.player.x, this.player.y);
     }
 
+    // Vendor interact cooldown tick
+    if (this.vendorInteractCooldown > 0) this.vendorInteractCooldown -= dt;
+
     // Special room interactions (old single-trap system)
     this.handleSpecialRoomInteraction(room);
 
@@ -1151,17 +1154,14 @@ export class GameEngine {
       setTimeout(() => this.addEffect('flash', 0.8, 0.3, 'rgb(255, 200, 100)'), 200);
       setTimeout(() => this.addEffect('flash', 0.6, 0.2, 'rgb(255, 100, 50)'), 400);
       SFX.bossKill(this.bossKillFloor);
-      // Drop amulet with dramatic reveal
+      // Drop amulet — level-up handled by bossKillSequence, NOT here
       const amuletId = getRandomBossAmuletDrop(this.amuletInventory);
       if (amuletId) {
         this.callbacks.onAmuletDrop(amuletId);
         spawnDamageText(this.particles, e.x, e.y - 20, '🔮 AMULETO!', '#cc88ff');
-        // Show amulet reveal, then level-up after it completes
         this._pendingBossAmuletId = amuletId;
-      } else {
-        // No amulet to show, go straight to level-up
-        this.handleBossLevelUp();
       }
+      // Boss XP is granted but do NOT trigger level-up here (bossKillSequence handles it)
     } else {
       spawnExplosion(this.particles, e.x, e.y, 10);
       SFX.enemyDeath();
@@ -1195,7 +1195,8 @@ export class GameEngine {
     this.player.xpGlowTimer = 1.0;
     const xpGain = Math.floor(xpAmount * this.player.xpMultiplier);
     const leveledUp = addXP(this.player, xpGain);
-    if (leveledUp) this.handleLevelUp();
+    // Boss level-up is handled by bossKillSequence — skip XP-based level-up for bosses
+    if (leveledUp && e.type !== 'boss') this.handleLevelUp();
   }
 
   private handleLevelUp(guaranteeLegendary = false) {
@@ -1255,7 +1256,6 @@ export class GameEngine {
         this.projectiles = [];
         this.stats.roomsExplored++;
         SFX.roomEnter();
-        this.spawnRoomEnemies();
         this.spawnRoomEnemies();
         // Auto-save on room transition
         saveGame(this.player, this.dungeon, this.stats);
@@ -1563,21 +1563,29 @@ export class GameEngine {
       room.trapTriggered = true;
     }
 
-    // Vendor room interaction — dialogue first, then shop
-    // Also includes SANCTUARY: interact to heal for souls
-    if (room.type === 'vendor' && !this.shopOpen && !this.vendorDialogueActive) {
-      if (this.vendorInteractCooldown > 0) {
-        this.vendorInteractCooldown -= 0.016;
-      } else if (dist < 30) {
-        this.startVendorDialogue();
-      }
+    // Vendor cooldown ticked in update() loop
+  }
+
+  // Public method to interact with the vendor — triggered by key press
+  tryVendorInteract() {
+    if (this.vendorDialogueActive || this.shopOpen) return;
+    const room = getCurrentRoom(this.dungeon);
+    if (room.type !== 'vendor') return;
+    if (!this.inVendorRoom) return;
+    if (this.vendorInteractCooldown > 0) return;
+    const p = this.player;
+    const cx = C.dims.gw / 2;
+    const cy = C.dims.gh / 2;
+    const dist = Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
+    if (dist < 40) {
+      this.startVendorDialogue();
     }
   }
 
   // Public method for sanctuary heal — triggered by [T] key
   trySanctuaryHeal() {
-    // Guard: don't heal during dialogue, shop, or paused states
-    if (this.vendorDialogueActive || this.shopOpen || this.paused) return;
+    // Guard: don't heal during dialogue or shop
+    if (this.vendorDialogueActive || this.shopOpen) return;
     const room = getCurrentRoom(this.dungeon);
     if (room.type !== 'vendor') return;
     if (!this.inVendorRoom) return;
