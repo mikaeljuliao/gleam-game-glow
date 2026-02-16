@@ -1,17 +1,190 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getBrightness, setBrightness } from '@/game/brightness';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { getBrightness, setBrightness, applyBrightnessToCanvas } from '@/game/brightness';
 
 interface BrightnessSettingsProps {
   open: boolean;
   onClose: () => void;
 }
 
+/** Render a simulated dungeon scene on a canvas for brightness preview */
+function renderDungeonPreview(ctx: CanvasRenderingContext2D, w: number, h: number, time: number) {
+  // Dark dungeon floor
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(0, 0, w, h);
+
+  const ts = 20;
+  const cols = Math.ceil(w / ts);
+  const rows = Math.ceil(h / ts);
+
+  // Floor tiles
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = c * ts;
+      const y = r * ts;
+      const hash = ((r * 7 + c * 13) & 0xFF);
+      const isEdge = r === 0 || r === rows - 1 || c === 0 || c === cols - 1;
+
+      if (isEdge) {
+        // Walls
+        const dark = 0.7 + (hash % 10) * 0.03;
+        ctx.fillStyle = `rgb(${Math.floor(25 * dark)}, ${Math.floor(22 * dark)}, ${Math.floor(35 * dark)})`;
+        ctx.fillRect(x, y, ts, ts);
+        ctx.fillStyle = 'rgba(35, 30, 50, 0.4)';
+        ctx.fillRect(x, y, ts, 1);
+        if (hash % 7 === 0) {
+          ctx.fillStyle = 'rgba(15, 12, 25, 0.5)';
+          ctx.fillRect(x + 3, y + 5, 4, 1);
+        }
+      } else {
+        // Floor
+        ctx.fillStyle = (r + c) % 2 === 0 ? '#12121e' : '#10101a';
+        ctx.fillRect(x, y, ts, ts);
+        if (hash % 17 === 0) {
+          ctx.fillStyle = 'rgba(25, 25, 35, 0.3)';
+          ctx.fillRect(x + 3, y + 3, 2, 1);
+        }
+        if (hash % 23 === 0) {
+          ctx.fillStyle = 'rgba(80, 20, 20, 0.08)';
+          ctx.fillRect(x + 2, y + 5, 4, 4);
+        }
+        // Faint rune
+        if (hash % 53 === 0) {
+          ctx.fillStyle = 'rgba(80, 60, 120, 0.05)';
+          ctx.beginPath();
+          ctx.arc(x + ts / 2, y + ts / 2, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+  }
+
+  // Obstacles (pillars)
+  const pillars = [
+    { x: w * 0.25, y: h * 0.35, w: 16, h: 18 },
+    { x: w * 0.7, y: h * 0.55, w: 16, h: 18 },
+    { x: w * 0.45, y: h * 0.7, w: 14, h: 16 },
+  ];
+  for (const p of pillars) {
+    // Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.fillRect(p.x + 3, p.y + 3, p.w + 2, p.h + 2);
+    // Body
+    ctx.fillStyle = '#1e1c2a';
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    // Top
+    ctx.fillStyle = '#2a2838';
+    ctx.fillRect(p.x, p.y, p.w, 2);
+    // Mortar
+    ctx.fillStyle = 'rgba(15, 12, 25, 0.3)';
+    for (let by = p.y + 5; by < p.y + p.h - 2; by += 5) {
+      ctx.fillRect(p.x, by, p.w, 1);
+    }
+  }
+
+  // Torches with warm glow
+  const torches = [
+    { x: w * 0.15, y: ts + 2 },
+    { x: w * 0.5, y: ts + 2 },
+    { x: w * 0.85, y: ts + 2 },
+    { x: ts + 2, y: h * 0.5 },
+    { x: w - ts - 2, y: h * 0.5 },
+  ];
+  const flicker = Math.sin(time * 8) * 0.12 + 0.88;
+  for (const t of torches) {
+    // Floor light pool
+    const pool = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 35);
+    pool.addColorStop(0, `rgba(255, 130, 40, ${0.05 * flicker})`);
+    pool.addColorStop(0.5, `rgba(255, 100, 20, ${0.02 * flicker})`);
+    pool.addColorStop(1, 'rgba(255, 80, 10, 0)');
+    ctx.fillStyle = pool;
+    ctx.fillRect(t.x - 35, t.y - 35, 70, 70);
+    // Torch glow
+    const g = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 14);
+    g.addColorStop(0, `rgba(255, 160, 60, ${0.15 * flicker})`);
+    g.addColorStop(1, 'rgba(255, 100, 30, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(t.x - 14, t.y - 14, 28, 28);
+    // Bracket
+    ctx.fillStyle = '#3a3030';
+    ctx.fillRect(t.x - 1, t.y, 2, 4);
+    // Flame
+    ctx.fillStyle = `rgba(255, 140, 30, ${0.7 * flicker})`;
+    ctx.beginPath();
+    ctx.ellipse(t.x, t.y - 2, 1.5, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(255, 240, 120, ${0.8 * flicker})`;
+    ctx.beginPath();
+    ctx.ellipse(t.x, t.y - 2, 0.8, 1.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Central lighting (player area simulation)
+  const cx = w / 2;
+  const cy = h / 2;
+  const lightR = Math.min(w, h) * 0.45;
+
+  // Darkness vignette (simulates dungeon lighting)
+  const darkness = ctx.createRadialGradient(cx, cy, lightR * 0.3, cx, cy, lightR);
+  darkness.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  darkness.addColorStop(0.6, 'rgba(0, 0, 0, 0.3)');
+  darkness.addColorStop(1, 'rgba(0, 0, 0, 0.7)');
+  ctx.fillStyle = darkness;
+  ctx.fillRect(0, 0, w, h);
+
+  // Simulated player (small glow in center)
+  const playerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 20);
+  playerGlow.addColorStop(0, 'rgba(180, 160, 220, 0.08)');
+  playerGlow.addColorStop(1, 'rgba(180, 160, 220, 0)');
+  ctx.fillStyle = playerGlow;
+  ctx.fillRect(cx - 20, cy - 20, 40, 40);
+  ctx.fillStyle = '#8877aa';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Apply gamma correction
+  applyBrightnessToCanvas(ctx);
+}
+
 const BrightnessSettings = ({ open, onClose }: BrightnessSettingsProps) => {
   const [value, setValue] = useState(getBrightness());
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animRef = useRef<number>(0);
 
   useEffect(() => {
     if (open) setValue(getBrightness());
   }, [open]);
+
+  // Animate preview canvas
+  useEffect(() => {
+    if (!open) return;
+    let running = true;
+    const draw = () => {
+      if (!running) return;
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const dpr = window.devicePixelRatio || 1;
+          const rect = canvas.getBoundingClientRect();
+          const w = Math.round(rect.width * dpr);
+          const h = Math.round(rect.height * dpr);
+          if (canvas.width !== w || canvas.height !== h) {
+            canvas.width = w;
+            canvas.height = h;
+          }
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          renderDungeonPreview(ctx, rect.width, rect.height, performance.now() / 1000);
+        }
+      }
+      animRef.current = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => {
+      running = false;
+      cancelAnimationFrame(animRef.current);
+    };
+  }, [open, value]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const v = parseFloat(e.target.value);
@@ -25,11 +198,6 @@ const BrightnessSettings = ({ open, onClose }: BrightnessSettingsProps) => {
   }, []);
 
   if (!open) return null;
-
-  // Calculate symbol visibility based on brightness
-  // At default (0), bright symbol should be clearly visible, dark one barely visible
-  const brightAlpha = Math.max(0.1, 0.85 + value * 0.3);
-  const darkAlpha = Math.max(0.02, 0.08 + value * 0.15);
 
   return (
     <div
@@ -53,55 +221,18 @@ const BrightnessSettings = ({ open, onClose }: BrightnessSettingsProps) => {
             AJUSTE DE BRILHO
           </h2>
           <p className="text-center mt-2" style={{ color: '#555566', fontFamily: 'monospace', fontSize: '11px' }}>
-            Ajuste o slider até que o símbolo da esquerda<br />
-            esteja <span style={{ color: '#888899' }}>claramente visível</span> e o da direita<br />
-            esteja <span style={{ color: '#888899' }}>quase invisível</span>.
+            Ajuste até enxergar detalhes nas áreas escuras<br />
+            sem perder a atmosfera do jogo.
           </p>
         </div>
 
-        {/* Reference symbols area */}
-        <div className="px-6 py-8">
-          <div
-            className="rounded-lg flex items-center justify-around py-10 px-4"
-            style={{ background: '#050508' }}
-          >
-            {/* Bright symbol — should be clearly visible */}
-            <div className="text-center">
-              <div
-                className="text-5xl select-none"
-                style={{
-                  opacity: brightAlpha,
-                  filter: `brightness(${1 + value})`,
-                  transition: 'opacity 0.1s, filter 0.1s',
-                }}
-              >
-                ☀️
-              </div>
-              <p className="mt-3" style={{ color: '#555566', fontFamily: 'monospace', fontSize: '9px', letterSpacing: '0.1em' }}>
-                VISÍVEL
-              </p>
-            </div>
-
-            {/* Divider */}
-            <div style={{ width: '1px', height: '60px', background: '#1a1a2a' }} />
-
-            {/* Dark symbol — should be barely visible */}
-            <div className="text-center">
-              <div
-                className="text-5xl select-none"
-                style={{
-                  opacity: darkAlpha,
-                  filter: `brightness(${0.3 + value * 0.5})`,
-                  transition: 'opacity 0.1s, filter 0.1s',
-                }}
-              >
-                🌑
-              </div>
-              <p className="mt-3" style={{ color: '#555566', fontFamily: 'monospace', fontSize: '9px', letterSpacing: '0.1em' }}>
-                QUASE INVISÍVEL
-              </p>
-            </div>
-          </div>
+        {/* Live dungeon preview */}
+        <div className="px-6 py-4">
+          <canvas
+            ref={canvasRef}
+            className="w-full rounded-lg"
+            style={{ height: '180px', background: '#050508' }}
+          />
         </div>
 
         {/* Slider */}

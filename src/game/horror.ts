@@ -57,159 +57,12 @@ function playDistantWind() {
   ambienceTimers.push(setTimeout(playDistantWind, rng(8000, 25000)));
 }
 
-// ── Layer 2: Random ambient creak/crack (very rare) ──────
+// ── Layers 2-3: Ambient creaks & whispers — REMOVED (audio pollution)
 
-function playAmbientCreak() {
-  if (!ambienceActive) return;
-  const ctx = getBgCtx();
-  const type = Math.floor(rng(0, 3));
-  if (type === 0) {
-    // Creak
-    const dur = rng(0.05, 0.15);
-    const noise = createNoise(ctx, dur);
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(rng(800, 2000), ctx.currentTime);
-    filter.Q.setValueAtTime(rng(5, 15), ctx.currentTime);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(rng(0.02, 0.06), ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(ctx.destination);
-    noise.start();
-  } else if (type === 1) {
-    // Drip
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(rng(1200, 3000), ctx.currentTime);
-    gain.gain.setValueAtTime(rng(0.01, 0.03), ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.08);
-  } else {
-    // Low scrape
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    const dur = rng(0.1, 0.3);
-    osc.frequency.setValueAtTime(rng(60, 150), ctx.currentTime);
-    osc.frequency.linearRampToValueAtTime(rng(30, 80), ctx.currentTime + dur);
-    gain.gain.setValueAtTime(rng(0.01, 0.03), ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + dur);
-  }
-  ambienceTimers.push(setTimeout(playAmbientCreak, rng(12000, 45000)));
-}
+// ── Layer 3: Ambient whispers — REMOVED (audio pollution)
 
-// ── Layer 3: Near-inaudible whispers (no words, just feeling) ──
-
-function playAmbientWhisper() {
-  if (!ambienceActive) return;
-  const ctx = getBgCtx();
-  const duration = rng(0.8, 2.5);
-  const noise = createNoise(ctx, duration);
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'bandpass';
-  filter.frequency.setValueAtTime(rng(300, 800), ctx.currentTime);
-  filter.Q.setValueAtTime(rng(3, 8), ctx.currentTime);
-  const gain = ctx.createGain();
-  const vol = rng(0.006, 0.018);
-  gain.gain.setValueAtTime(0, ctx.currentTime);
-  const syllables = Math.floor(rng(2, 5));
-  const syllableDur = duration / syllables;
-  for (let i = 0; i < syllables; i++) {
-    const t = ctx.currentTime + i * syllableDur;
-    gain.gain.linearRampToValueAtTime(vol * rng(0.3, 1), t + syllableDur * 0.2);
-    gain.gain.linearRampToValueAtTime(vol * 0.05, t + syllableDur * 0.8);
-  }
-  gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
-  const panner = ctx.createStereoPanner();
-  panner.pan.setValueAtTime(rng(-0.8, 0.8), ctx.currentTime);
-  noise.connect(filter);
-  filter.connect(gain);
-  gain.connect(panner);
-  panner.connect(ctx.destination);
-  noise.start();
-  ambienceTimers.push(setTimeout(playAmbientWhisper, rng(20000, 60000)));
-}
-
-// ── Layer 4: Breathing (sometimes close, sometimes far) ──
-
-function playBreathing() {
-  if (!ambienceActive) return;
-  const ctx = getBgCtx();
-  const isClose = maybe(0.3);
-  const baseVol = isClose ? rng(0.02, 0.04) : rng(0.005, 0.015);
-  const breathCount = Math.floor(rng(2, 5));
-  const breathDur = rng(0.6, 1.2);
-  for (let i = 0; i < breathCount; i++) {
-    const delay = i * breathDur * 1.4;
-    const startTime = ctx.currentTime + delay;
-    const noise = createNoise(ctx, breathDur);
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(isClose ? rng(200, 500) : rng(100, 300), startTime);
-    filter.Q.setValueAtTime(rng(1, 4), startTime);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, startTime);
-    gain.gain.linearRampToValueAtTime(baseVol, startTime + breathDur * 0.3);
-    gain.gain.linearRampToValueAtTime(baseVol * 0.6, startTime + breathDur * 0.5);
-    gain.gain.linearRampToValueAtTime(baseVol * 0.8, startTime + breathDur * 0.7);
-    gain.gain.linearRampToValueAtTime(0, startTime + breathDur);
-    const panner = ctx.createStereoPanner();
-    panner.pan.setValueAtTime(isClose ? rng(-0.3, 0.3) : rng(-1, 1), startTime);
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(panner);
-    panner.connect(ctx.destination);
-    noise.start(startTime);
-    noise.stop(startTime + breathDur);
-  }
-  ambienceTimers.push(setTimeout(playBreathing, rng(25000, 70000)));
-}
-
-// ── Layer 5: Deep heartbeat (VERY rare) ──────────────────
-
-function playDeepHeartbeat() {
-  if (!ambienceActive) return;
-  const ctx = getBgCtx();
-  const beats = Math.floor(rng(3, 8));
-  const interval = rng(0.7, 1.2);
-  const vol = rng(0.03, 0.06);
-  for (let i = 0; i < beats; i++) {
-    const t = ctx.currentTime + i * interval;
-    // Lub
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(rng(35, 50), t);
-    gain1.gain.setValueAtTime(vol, t);
-    gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(t);
-    osc1.stop(t + 0.15);
-    // Dub
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(rng(50, 70), t + 0.12);
-    gain2.gain.setValueAtTime(vol * 0.7, t + 0.12);
-    gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(t + 0.12);
-    osc2.stop(t + 0.25);
-  }
-  ambienceTimers.push(setTimeout(playDeepHeartbeat, rng(40000, 120000)));
-}
+// ── Layer 4: Breathing — REMOVED (audio pollution)
+// ── Layer 5: Deep heartbeat — REMOVED (audio pollution)
 
 // ── Combat Tension System ────────────────────────────────
 // Dynamic audio layers that intensify during combat
@@ -432,12 +285,8 @@ export function startBackgroundMusic() {
   if (ambienceActive) return;
   ambienceActive = true;
   combatIntensity = 0;
-  // Stagger initial starts — never all at once
+  // Only distant wind remains — all other ambient layers removed
   ambienceTimers.push(setTimeout(playDistantWind, rng(3000, 8000)));
-  ambienceTimers.push(setTimeout(playAmbientCreak, rng(10000, 20000)));
-  ambienceTimers.push(setTimeout(playAmbientWhisper, rng(15000, 35000)));
-  ambienceTimers.push(setTimeout(playBreathing, rng(20000, 40000)));
-  ambienceTimers.push(setTimeout(playDeepHeartbeat, rng(30000, 60000)));
 }
 
 export function stopBackgroundMusic() {
@@ -455,86 +304,7 @@ export function stopBackgroundMusic() {
 // ============ HORROR SOUND EFFECTS ============
 
 export const HorrorSFX = {
-  whisper() {
-    const ctx = getBgCtx();
-    // Breathy noise filtered to sound like whisper
-    const bufferSize = ctx.sampleRate * 1.5;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.sin(i / bufferSize * Math.PI);
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buffer;
-    const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.setValueAtTime(2000 + Math.random() * 1000, ctx.currentTime);
-    bp.Q.setValueAtTime(5, ctx.currentTime);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0, ctx.currentTime);
-    g.gain.linearRampToValueAtTime(0.04, ctx.currentTime + 0.3);
-    g.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
-    src.connect(bp);
-    bp.connect(g);
-    g.connect(ctx.destination);
-    src.start();
-  },
-
-  heartbeat() {
-    const ctx = getBgCtx();
-    // Two thumps
-    for (let i = 0; i < 2; i++) {
-      setTimeout(() => {
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(50, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.15);
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0.12, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-        osc.connect(g);
-        g.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.2);
-      }, i * 250);
-    }
-  },
-
-  distantScream() {
-    const ctx = getBgCtx();
-    const osc = ctx.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(600, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.8);
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(800, ctx.currentTime);
-    filter.Q.setValueAtTime(3, ctx.currentTime);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0, ctx.currentTime);
-    g.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 0.1);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1);
-    osc.connect(filter);
-    filter.connect(g);
-    g.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 1);
-  },
-
-  metalCreak() {
-    const ctx = getBgCtx();
-    const osc = ctx.createOscillator();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(80 + Math.random() * 40, ctx.currentTime);
-    osc.frequency.linearRampToValueAtTime(120 + Math.random() * 60, ctx.currentTime + 0.5);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.03, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-    osc.connect(g);
-    g.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.5);
-  },
+  // whisper, heartbeat, distantScream, metalCreak — REMOVED (audio pollution)
 
   chestOpen() {
     const ctx = getBgCtx();
@@ -1071,97 +841,7 @@ function playHPHeartbeat(hpRatio: number) {
   }
 }
 
-function playGhostFootstep() {
-  if (!ambienceActive) return;
-  const ctx = getBgCtx();
-  const panner = ctx.createStereoPanner();
-  panner.pan.setValueAtTime(rng(-0.9, 0.9), ctx.currentTime);
-  
-  // Soft footstep behind the player
-  const noise = createNoise(ctx, 0.06);
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'bandpass';
-  filter.frequency.setValueAtTime(rng(300, 800), ctx.currentTime);
-  filter.Q.setValueAtTime(3, ctx.currentTime);
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(rng(0.02, 0.04), ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
-  noise.connect(filter);
-  filter.connect(gain);
-  gain.connect(panner);
-  panner.connect(ctx.destination);
-  noise.start();
-}
-
-function playWallScratch() {
-  if (!ambienceActive) return;
-  const ctx = getBgCtx();
-  const dur = rng(0.3, 0.8);
-  const osc = ctx.createOscillator();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(rng(1500, 3000), ctx.currentTime);
-  osc.frequency.linearRampToValueAtTime(rng(800, 1500), ctx.currentTime + dur);
-  
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'bandpass';
-  filter.frequency.setValueAtTime(2000, ctx.currentTime);
-  filter.Q.setValueAtTime(6, ctx.currentTime);
-  
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(rng(0.015, 0.03), ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-  
-  const panner = ctx.createStereoPanner();
-  panner.pan.setValueAtTime(rng(-1, 1), ctx.currentTime);
-  
-  osc.connect(filter);
-  filter.connect(gain);
-  gain.connect(panner);
-  panner.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + dur);
-}
-
-function playDeepGrowl() {
-  if (!ambienceActive) return;
-  const ctx = getBgCtx();
-  const dur = rng(0.6, 1.2);
-  
-  // Deep resonant growl
-  const osc = ctx.createOscillator();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(rng(30, 50), ctx.currentTime);
-  osc.frequency.linearRampToValueAtTime(rng(20, 35), ctx.currentTime + dur);
-  
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(100, ctx.currentTime);
-  
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(rng(0.06, 0.1), ctx.currentTime + dur * 0.3);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-  
-  // Sub-rumble
-  const noise = createNoise(ctx, dur);
-  const noiseFilter = ctx.createBiquadFilter();
-  noiseFilter.type = 'lowpass';
-  noiseFilter.frequency.setValueAtTime(60, ctx.currentTime);
-  const noiseGain = ctx.createGain();
-  noiseGain.gain.setValueAtTime(0.03, ctx.currentTime);
-  noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-  
-  osc.connect(filter);
-  filter.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + dur);
-  
-  noise.connect(noiseFilter);
-  noiseFilter.connect(noiseGain);
-  noiseGain.connect(ctx.destination);
-  noise.start();
-}
+// playGhostFootstep, playWallScratch, playDeepGrowl — REMOVED (audio pollution)
 
 // === HP-REACTIVE UPDATE (called every frame) ===
 
@@ -1179,25 +859,7 @@ export function updateHPHorror(hpRatio: number, dt: number, floor: number) {
     hpHorror.heartbeatTimer = 0;
   }
 
-  // Ghost footsteps — REMOVED (audio pollution)
-
-  // Wall scratching — HP < 20%, much rarer and quieter
-  if (hpRatio < 0.2) {
-    hpHorror.scratchTimer -= dt;
-    if (hpHorror.scratchTimer <= 0) {
-      hpHorror.scratchTimer = rng(12, 30); // much rarer (was 4-10)
-      if (maybe(0.3)) playWallScratch(); // only 30% chance
-    }
-  }
-
-  // Deep growl — HP < 15%, extremely rare
-  if (hpRatio < 0.15) {
-    hpHorror.growlTimer -= dt;
-    if (hpHorror.growlTimer <= 0) {
-      hpHorror.growlTimer = rng(30, 70); // much rarer (was 15-40)
-      if (maybe(0.3)) playDeepGrowl();
-    }
-  }
+  // Ghost footsteps, wall scratching, deep growl — ALL REMOVED (audio pollution)
 
   // Random darkness pulses
   hpHorror.darkPulseTimer -= dt;
