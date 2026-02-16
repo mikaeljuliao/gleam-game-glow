@@ -6,9 +6,10 @@ import BrightnessSettings from '../BrightnessSettings'; // Reusing existing comp
 
 interface SettingsScreenProps {
     onBack: () => void;
+    onOpenDevMenu?: () => void;
 }
 
-const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
+const SettingsScreen = ({ onBack, onOpenDevMenu }: SettingsScreenProps) => {
     const [volume, setVolume] = useState(getMasterVolume());
     const [showBrightnessModal, setShowBrightnessModal] = useState(false);
 
@@ -79,6 +80,26 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
                             className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded transition-all text-sm font-mono text-yellow-100"
                         >
                             AJUSTAR
+                        </button>
+                    </div>
+                </section>
+
+                {/* Developer Tools (Discrete) */}
+                <section className="bg-black/20 p-6 rounded-lg border border-red-900/10">
+                    <h3 className="text-xs font-mono text-gray-600 mb-4 tracking-widest uppercase">
+                        ⚙️ Ferramentas de Desenvolvedor
+                    </h3>
+
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="text-gray-500 font-medium text-sm">Acesso Interno</div>
+                            <div className="text-gray-700 text-[10px] mt-1 font-mono uppercase">Early Access 콘텐츠 디버그용</div>
+                        </div>
+                        <button
+                            onClick={onOpenDevMenu}
+                            className="px-3 py-1.5 bg-red-950/10 hover:bg-red-950/20 border border-red-900/20 rounded transition-all text-[10px] font-mono text-gray-600 hover:text-red-400"
+                        >
+                            MODO DEV
                         </button>
                     </div>
                 </section>

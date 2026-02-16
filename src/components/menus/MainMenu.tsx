@@ -23,7 +23,7 @@ const MainMenu = ({ onStart, onOpenDevMenu, hasSave }: MainMenuProps) => {
             case 'rank':
                 return <RankScreen onBack={() => setCurrentScreen('home')} />;
             case 'settings':
-                return <SettingsScreen onBack={() => setCurrentScreen('home')} />;
+                return <SettingsScreen onBack={() => setCurrentScreen('home')} onOpenDevMenu={onOpenDevMenu} />;
             case 'guide':
                 return <GuideScreen onBack={() => setCurrentScreen('home')} />;
             default:
