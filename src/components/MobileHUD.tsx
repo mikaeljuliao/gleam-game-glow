@@ -155,12 +155,6 @@ const MobileHUD = ({ engineRef, onOpenInventory, onOpenMap }: MobileHUDProps) =>
         >
           💚
         </button>
-        <button
-          style={btnStyle('rgba(200, 180, 80, 0.35)', 'rgba(220, 200, 100, 0.5)', '#eedd88', smallBtn)}
-          onTouchStart={handleVendorInteract}
-        >
-          🧙
-        </button>
       </div>
 
       {/* Hint text */}

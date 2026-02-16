@@ -1158,7 +1158,6 @@ export class GameEngine {
       const amuletId = getRandomBossAmuletDrop(this.amuletInventory);
       if (amuletId) {
         addAmulet(this.amuletInventory, amuletId);
-        spawnDamageText(this.particles, e.x, e.y - 20, '🔮 AMULETO!', '#cc88ff');
         this._pendingBossAmuletId = amuletId;
       }
       // Boss XP is granted but do NOT trigger level-up here (bossKillSequence handles it)
@@ -1590,11 +1589,12 @@ export class GameEngine {
     const room = getCurrentRoom(this.dungeon);
     if (room.type !== 'vendor' || !this.inVendorRoom) return;
     const p = this.player;
-    const shrineX = C.dims.gw * 0.5;
-    const shrineY = C.dims.gh * 0.5;
+    // Sanctuary is rendered at 18% of game width, 50% height (left side of vendor room)
+    const shrineX = Math.floor(C.dims.gw * 0.18);
+    const shrineY = Math.floor(C.dims.gh * 0.5);
     const shrineDist = Math.sqrt((p.x - shrineX) ** 2 + (p.y - shrineY) ** 2);
-    if (shrineDist > 70) {
-      spawnDamageText(this.particles, p.x, p.y - 10, 'Muito longe', '#888888');
+    if (shrineDist > 40) {
+      spawnDamageText(this.particles, p.x, p.y - 10, 'Aproxime-se do Santuário', '#888888');
       return;
     }
     if (this.shrineCooldown) {
@@ -1617,14 +1617,16 @@ export class GameEngine {
     const healAmount = Math.floor(p.maxHp * 0.25);
     p.hp = Math.min(p.maxHp, p.hp + healAmount);
 
-    // Healing particles: souls flowing OUT from player (cost), then green heal IN
+    // Healing particles: souls flowing OUT from player toward shrine, then green heal IN
+    const healShrineX = shrineX;
+    const healShrineY = shrineY;
     for (let i = 0; i < 6; i++) {
       const angle = Math.random() * Math.PI * 2;
       this.particles.push({
         x: p.x + Math.cos(angle) * 5,
         y: p.y + Math.sin(angle) * 5,
-        vx: (shrineX - p.x) * (0.8 + Math.random() * 0.4),
-        vy: (shrineY - p.y) * (0.8 + Math.random() * 0.4),
+        vx: (healShrineX - p.x) * (0.8 + Math.random() * 0.4),
+        vy: (healShrineY - p.y) * (0.8 + Math.random() * 0.4),
         life: 0.5 + Math.random() * 0.3,
         maxLife: 0.8,
         size: 2 + Math.random() * 1.5,
@@ -1653,7 +1655,7 @@ export class GameEngine {
 
     spawnDamageText(this.particles, p.x, p.y - 10, `+${healAmount} HP`, C.COLORS.healText);
     spawnDamageText(this.particles, p.x, p.y - 25, `-${healCost} Almas`, '#6688cc');
-    spawnExplosion(this.particles, shrineX, shrineY, 10);
+    spawnExplosion(this.particles, healShrineX, healShrineY, 10);
     this.addEffect('flash', 0.6, 0.2, 'rgb(80, 200, 150)');
     SFX.sanctuaryHeal();
     HorrorSFX.shrineActivate();
