@@ -8,7 +8,7 @@ import { createParticles, updateParticles, spawnBlood, spawnDamageText, spawnXPP
 import { getRandomUpgrades, checkSynergies, getOwnedTags, SYNERGIES } from './upgrades';
 import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins } from './renderer';
 import { SFX, initAudio } from './audio';
-import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive } from './horror';
+import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive, updateHPHorror, renderHPHorror, getHPLightPulse } from './horror';
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
 import { checkTrapCollision, activateTrap, updateTrapEffects, resetTrapEffects, getLightsOutTimer, getPanicTimer, getDoorsLockedTimer, hasEffect } from './traps';
 import { AmuletInventory, createAmuletInventory, getRandomBossAmuletDrop, isAmuletEquipped, WarRhythmState, createWarRhythmState, getSoulCollectorBonus, getSoulCollectorSpeedBonus, AMULET_DEFS, addAmulet } from './amulets';
@@ -879,18 +879,38 @@ export class GameEngine {
     }
     updateCombatTension(this.enemies.length, closestDist, dt);
 
+    // HP-reactive horror system
+    const hpRatio = this.player.hp / this.player.maxHp;
+    updateHPHorror(hpRatio, dt, this.dungeon.floor);
+
     // Horror events — much sparser for psychological tension
     this.horrorTimer -= dt;
+    this.horrorTimer -= dt;
+    // Horror events become more frequent at low HP
+    const horrorInterval = hpRatio < 0.3 ? (3 + Math.random() * 8) : (10 + Math.random() * 20);
     if (this.horrorTimer <= 0) {
-      this.horrorTimer = 10 + Math.random() * 20; // long gaps between events
+      this.horrorTimer = horrorInterval;
       const evt = createHorrorEvent();
       if (evt) {
         this.horrorEvents.push(evt);
-        // Only occasionally play SFX — silence is scarier
-        if (evt.type === 'whisper' && Math.random() < 0.4) HorrorSFX.whisper();
-        else if (evt.type === 'heartbeat' && Math.random() < 0.3) HorrorSFX.heartbeat();
-        else if (evt.type === 'scream' && Math.random() < 0.15) HorrorSFX.distantScream();
-        else if (evt.type === 'flicker' && Math.random() < 0.3) HorrorSFX.metalCreak();
+        // More likely to play SFX at low HP
+        const sfxBoost = hpRatio < 0.3 ? 2 : 1;
+        if (evt.type === 'whisper' && Math.random() < 0.4 * sfxBoost) HorrorSFX.whisper();
+        else if (evt.type === 'heartbeat' && Math.random() < 0.3 * sfxBoost) HorrorSFX.heartbeat();
+        else if (evt.type === 'scream' && Math.random() < 0.15 * sfxBoost) {
+          HorrorSFX.distantScream();
+          // Chromatic distortion on scream at low HP
+          if (hpRatio < 0.4) {
+            this.addEffect('flash', 0.3, 0.1, 'rgb(100, 0, 150)');
+          }
+        }
+        else if (evt.type === 'flicker') {
+          // Aggressive flickering at low HP
+          if (hpRatio < 0.3) {
+            this.addEffect('flash', 0.5, 0.08, 'rgb(0, 0, 0)');
+          }
+          if (Math.random() < 0.3 * sfxBoost) HorrorSFX.metalCreak();
+        }
       }
     }
     // Update horror events
@@ -1896,12 +1916,17 @@ export class GameEngine {
     }
     renderParticles(ctx, this.particles);
 
-    // Lighting
+    // Lighting with breathing light effect
     let lightRadius = C.LIGHT_RADIUS;
     if (this.inVendorRoom) lightRadius = C.VENDOR_LIGHT_RADIUS;
     if (hasEffect('blindness')) lightRadius = 40;
     if (getLightsOutTimer() > 0) lightRadius = 15;
+    const hpRatio = this.player.hp / this.player.maxHp;
+    lightRadius *= getHPLightPulse(hpRatio, this.gameTime);
     renderLighting(ctx, this.player.x, this.player.y, lightRadius, vp, this.inVendorRoom);
+
+    // HP-reactive horror overlays (vignette, blood, heartbeat flash, shadows)
+    renderHPHorror(ctx, hpRatio, this.gameTime, vp);
 
     // Horror events overlay
     renderHorrorEvents(ctx, this.horrorEvents, this.gameTime, vp);
