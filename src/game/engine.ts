@@ -12,6 +12,7 @@ import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
 import { checkTrapCollision, activateTrap, updateTrapEffects, resetTrapEffects, getLightsOutTimer, getPanicTimer, getDoorsLockedTimer, hasEffect } from './traps';
 import { AmuletInventory, createAmuletInventory, getRandomBossAmuletDrop, isAmuletEquipped, WarRhythmState, createWarRhythmState, getSoulCollectorBonus, getSoulCollectorSpeedBonus, AMULET_DEFS, addAmulet } from './amulets';
+import { initArenaFX, resetArenaFX, updateArenaFX, renderArenaFloorFX, renderArenaOverlayFX, spawnSlashMark, spawnBloodMark, spawnImpactMark, getTorchPositions } from './arena-fx';
 import * as C from './constants';
 
 export class GameEngine {
@@ -104,6 +105,7 @@ export class GameEngine {
     this.spawnRoomEnemies();
     initAudio();
     startBackgroundMusic();
+    initArenaFX();
   }
 
   loadFromSave(): boolean {
@@ -853,6 +855,9 @@ export class GameEngine {
 
     // Particles
     this.particles = updateParticles(this.particles, dt);
+    
+    // Arena ambient FX
+    updateArenaFX(dt, this.gameTime, this.player.x, this.player.y, getTorchPositions());
 
     // Ambient effects
     this.dustTimer -= dt;
@@ -1123,6 +1128,8 @@ export class GameEngine {
       spawnBlood(this.particles, e.x, e.y, 8);
       spawnSpark(this.particles, e.x, e.y, C.COLORS.playerLight, 8);
       spawnSpark(this.particles, e.x, e.y, '#ffffff', 4);
+      spawnSlashMark(e.x, e.y, this.player.meleeAngle);
+      spawnImpactMark(e.x, e.y);
       hitAny = true;
 
       if (dead) {
@@ -1156,6 +1163,7 @@ export class GameEngine {
     spawnSoulCollectParticle(this.particles, e.x, e.y, this.player.x, this.player.y, soulAmount);
     spawnDamageText(this.particles, e.x, e.y + 10, `+${soulAmount}`, '#66aaff');
     SFX.soulCollect();
+    spawnBloodMark(e.x, e.y);
     
     if (e.type === 'boss') {
       // BOSS KILL IMPACT — massive explosion + slow-mo
@@ -1279,6 +1287,7 @@ export class GameEngine {
         this.projectiles = [];
         this.stats.roomsExplored++;
         SFX.roomEnter();
+        resetArenaFX();
         this.spawnRoomEnemies();
         // Auto-save on room transition
         saveGame(this.player, this.dungeon, this.stats);
@@ -1858,6 +1867,7 @@ export class GameEngine {
     // Render dungeon atmosphere in viewport margins (fills black bars with stone textures)
     renderViewportMargins(ctx, this.gameTime, vp);
     renderFloor(ctx, this.gameTime);
+    renderArenaFloorFX(ctx, this.gameTime);
     if (room.hiddenTraps) {
       renderHiddenTraps(ctx, room.hiddenTraps, this.gameTime);
     }
@@ -1915,6 +1925,7 @@ export class GameEngine {
       ctx.restore();
     }
     renderParticles(ctx, this.particles);
+    renderArenaOverlayFX(ctx, this.gameTime);
 
     // Lighting with breathing light effect
     let lightRadius = C.LIGHT_RADIUS;
