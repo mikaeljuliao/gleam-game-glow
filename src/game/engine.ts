@@ -1565,9 +1565,14 @@ export class GameEngine {
     }
 
     // Auto vendor dialogue on proximity (original behavior)
+    // Only trigger if player is closer to vendor than to sanctuary shrine
     if (room.type === 'vendor' && this.inVendorRoom && !this.vendorDialogueActive && !this.shopOpen && this.vendorInteractCooldown <= 0) {
       const vdist = Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
-      if (vdist < 40) {
+      const shrineX = Math.floor(C.dims.gw * 0.18);
+      const shrineY = Math.floor(C.dims.gh * 0.5);
+      const shrineDist = Math.sqrt((p.x - shrineX) ** 2 + (p.y - shrineY) ** 2);
+      // Only auto-trigger vendor if player is closer to vendor than shrine
+      if (vdist < 40 && vdist < shrineDist) {
         this.startVendorDialogue();
       }
     }
@@ -1584,10 +1589,15 @@ export class GameEngine {
 
   // Public method for sanctuary heal — triggered by [T] key
   trySanctuaryHeal() {
-    // Guard: don't heal during dialogue or shop
-    if (this.vendorDialogueActive || this.shopOpen) return;
+    // Guard: don't heal during shop (but allow during vendor dialogue — close dialogue first)
+    if (this.shopOpen) return;
     const room = getCurrentRoom(this.dungeon);
     if (room.type !== 'vendor' || !this.inVendorRoom) return;
+    // If vendor dialogue is active, close it so sanctuary can proceed
+    if (this.vendorDialogueActive) {
+      this.vendorDialogueActive = false;
+      this.resume();
+    }
     const p = this.player;
     // Sanctuary is rendered at 18% of game width, 50% height (left side of vendor room)
     const shrineX = Math.floor(C.dims.gw * 0.18);

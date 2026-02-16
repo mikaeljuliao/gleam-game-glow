@@ -131,8 +131,10 @@ const Index = () => {
   const handleAmuletRevealComplete = useCallback(() => {
     setRevealAmuletId(null);
     setGameState('playing');
-    // After reveal completes, trigger boss level-up with guaranteed legendary
+    // Sync amulet inventory from engine → React state (critical: this is the only sync point for boss drops)
     if (engineRef.current) {
+      const inv = engineRef.current.amuletInventory;
+      setAmuletInv({ ...inv, owned: inv.owned.map(a => ({ ...a })) });
       (engineRef.current as any).handleBossLevelUp();
     }
   }, []);
