@@ -1839,8 +1839,8 @@ export class GameEngine {
 
     const room = getCurrentRoom(this.dungeon);
     // Render dungeon atmosphere in viewport margins (fills black bars with stone textures)
-    renderViewportMargins(ctx, this.gameTime, vp);
-    renderFloor(ctx, this.gameTime);
+    renderViewportMargins(ctx, this.gameTime, vp, this.dungeon.floor);
+    renderFloor(ctx, this.gameTime, this.dungeon.floor);
     renderArenaFloorFX(ctx, this.gameTime);
     if (room.hiddenTraps) {
       renderHiddenTraps(ctx, room.hiddenTraps, this.gameTime);

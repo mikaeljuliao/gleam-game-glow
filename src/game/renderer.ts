@@ -2,6 +2,7 @@ import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, Dungeon
 import { HiddenTrap } from './traps';
 import * as C from './constants';
 import { getBrightness } from './brightness';
+import { getBiome, Biome } from './biomes';
 
 /** Draw text with letter-spacing by rendering each character individually */
 function drawSpacedText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, spacing: number, stroke = false) {
@@ -36,9 +37,10 @@ function drawHudText(ctx: CanvasRenderingContext2D, text: string, x: number, y: 
 
 // Render dungeon atmosphere in the viewport margins (beyond the 640x400 game area)
 // This fills the "black bars" with stone wall textures so the arena feels immersive
-export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: number, vp: Viewport) {
+export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: number, vp: Viewport, floor = 1) {
   const { gox, goy, rw, rh } = vp;
   const ts = C.TILE_SIZE;
+  const biome = getBiome(floor);
 
   const startCol = Math.floor(-gox / ts) - 1;
   const endCol = Math.ceil((rw - gox) / ts) + 1;
@@ -53,40 +55,33 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
       const y = row * ts;
       const hash = ((row * 7 + col * 13) & 0xFF);
 
-      // Warmer, more visible stone walls — not too dark, not too bright
-      const darkness = 0.75 + (hash % 10) * 0.025;
-      const r = Math.floor(22 * darkness);
-      const g = Math.floor(20 * darkness);
-      const b = Math.floor(30 * darkness);
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      // Warmer, more visible stone walls — based on biome color
+      const shade = 0.8 + (hash % 10) * 0.03;
+      ctx.fillStyle = biome.wall;
+      ctx.globalAlpha = shade;
       ctx.fillRect(x, y, ts, ts);
+      ctx.globalAlpha = 1.0;
 
       // Stone brick mortar lines
+      ctx.fillStyle = biome.wallDetail;
       if ((row + col) % 2 === 0) {
-        ctx.fillStyle = 'rgba(35, 30, 50, 0.5)';
         ctx.fillRect(x, y, ts, 1);
         ctx.fillRect(x, y, 1, ts);
       }
       // Alternate brick pattern
       if ((row + col) % 2 === 1) {
-        ctx.fillStyle = 'rgba(25, 22, 38, 0.3)';
         ctx.fillRect(x + ts / 2, y, 1, ts);
       }
 
       // Cracks & details
       if (hash % 11 === 0) {
-        ctx.fillStyle = 'rgba(10, 8, 18, 0.5)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         ctx.fillRect(x + 3, y + 5, 5, 1);
-        ctx.fillRect(x + 5, y + 5, 1, 3);
-      }
-      if (hash % 13 === 0) {
-        ctx.fillStyle = 'rgba(10, 8, 18, 0.4)';
-        ctx.fillRect(x + 9, y + 3, 1, 6);
       }
 
-      // Moss patches
+      // Biome-specific details (Moss/Ash/etc)
       if (hash % 23 === 0) {
-        ctx.fillStyle = 'rgba(25, 50, 25, 0.2)';
+        ctx.fillStyle = biome.detail;
         ctx.fillRect(x + 1, y + ts - 4, 7, 3);
       }
 
@@ -96,111 +91,114 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
       const nearEdge = (distToArenaCol === 1 || distToArenaRow === 1);
 
       if (nearEdge && (col % 6 === 0 || row % 5 === 0)) {
-        // Pillar stone — slightly brighter
-        ctx.fillStyle = 'rgba(40, 35, 55, 0.7)';
+        ctx.fillStyle = biome.wallTop;
         ctx.fillRect(x + 2, y, ts - 4, ts);
-        ctx.fillStyle = 'rgba(55, 48, 70, 0.5)';
-        ctx.fillRect(x + 3, y, 2, ts);
-        // Pillar cap highlight
-        ctx.fillStyle = 'rgba(70, 60, 90, 0.4)';
-        ctx.fillRect(x + 1, y, ts - 2, 2);
+        ctx.fillStyle = biome.wallDetail;
+        ctx.fillRect(x + 3, y, 1, ts);
       }
     }
   }
 
-  // Soft fog/mist along margins — atmospheric glow
-  const fogAlpha = 0.04 + Math.sin(time * 0.5) * 0.015;
-  // Top fog
-  const topFog = ctx.createLinearGradient(0, -goy, 0, 0);
-  topFog.addColorStop(0, `rgba(30, 25, 50, ${fogAlpha})`);
-  topFog.addColorStop(1, 'rgba(30, 25, 50, 0)');
-  ctx.fillStyle = topFog;
-  ctx.fillRect(-gox, -goy, rw, goy + 20);
-  // Bottom fog
-  const botFog = ctx.createLinearGradient(0, C.dims.gh, 0, C.dims.gh + (rh - goy - C.dims.gh));
-  botFog.addColorStop(0, 'rgba(30, 25, 50, 0)');
-  botFog.addColorStop(1, `rgba(30, 25, 50, ${fogAlpha})`);
-  ctx.fillStyle = botFog;
-  ctx.fillRect(-gox, C.dims.gh - 10, rw, rh - goy - C.dims.gh + 20);
-  // Left fog
-  const leftFog = ctx.createLinearGradient(-gox, 0, 0, 0);
-  leftFog.addColorStop(0, `rgba(30, 25, 50, ${fogAlpha})`);
-  leftFog.addColorStop(1, 'rgba(30, 25, 50, 0)');
-  ctx.fillStyle = leftFog;
-  ctx.fillRect(-gox, -goy, gox + 20, rh);
-  // Right fog
-  const rightFog = ctx.createLinearGradient(C.dims.gw, 0, C.dims.gw + (rw - gox - C.dims.gw), 0);
-  rightFog.addColorStop(0, 'rgba(30, 25, 50, 0)');
-  rightFog.addColorStop(1, `rgba(30, 25, 50, ${fogAlpha})`);
-  ctx.fillStyle = rightFog;
-  ctx.fillRect(C.dims.gw - 10, -goy, rw - gox - C.dims.gw + 20, rh);
+  // Soft fog/mist along margins — atmospheric glow matching biome accent
+  const fogAlpha = 0.03 + Math.sin(time * 0.5) * 0.01;
+  const fogColor = biome.accentGlow.replace('0.15', fogAlpha.toString()).replace('0.2', fogAlpha.toString());
+
+  // Outer fade
+  const grad = ctx.createRadialGradient(C.dims.gw / 2, C.dims.gh / 2, 200, C.dims.gw / 2, C.dims.gh / 2, 600);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, fogColor);
+  ctx.fillStyle = grad;
+  ctx.fillRect(-gox, -goy, rw, rh);
 }
 import { roomKey, getCurrentRoom } from './dungeon';
 
-export function renderFloor(ctx: CanvasRenderingContext2D, time: number) {
+export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor = 1) {
+  const biome = getBiome(floor);
+  const ts = C.TILE_SIZE;
+
+  // Render floor slabs (Large bricks/tiles)
+  // We use a larger grid for slabs (e.g. 40x40 or 3x2 tiles)
   for (let row = 0; row < C.dims.rr; row++) {
     for (let col = 0; col < C.dims.rc; col++) {
-      const x = col * C.TILE_SIZE;
-      const y = row * C.TILE_SIZE;
+      const x = col * ts;
+      const y = row * ts;
       const isEdge = row === 0 || row === C.dims.rr - 1 || col === 0 || col === C.dims.rc - 1;
+
       if (isEdge) {
-        ctx.fillStyle = C.COLORS.wall;
-        ctx.fillRect(x, y, C.TILE_SIZE, C.TILE_SIZE);
-        ctx.fillStyle = C.COLORS.wallTop;
-        ctx.fillRect(x, y, C.TILE_SIZE, 3);
-        ctx.fillStyle = C.COLORS.wallEdge;
-        ctx.fillRect(x, y + C.TILE_SIZE - 1, C.TILE_SIZE, 1);
-        if ((row + col) % 3 === 0) {
-          ctx.fillStyle = 'rgba(40, 40, 70, 0.5)';
-          ctx.fillRect(x + 4, y + 5, 2, 2);
+        // Architectural Walls with Depth
+        const isBottom = row === C.dims.rr - 1;
+        const isTop = row === 0;
+
+        ctx.fillStyle = biome.wall;
+        ctx.fillRect(x, y, ts, ts);
+
+        // Heavy Top Face (Architectural perspective)
+        if (isTop) {
+          ctx.fillStyle = biome.wallTop;
+          ctx.fillRect(x, y, ts, 12);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+          ctx.fillRect(x, y, ts, 1); // Edge highlight
+        } else {
+          ctx.fillStyle = biome.wallTop;
+          ctx.fillRect(x, y, ts, 3);
         }
-        if ((row + col) % 5 === 0) {
-          ctx.fillStyle = 'rgba(20, 20, 35, 0.5)';
-          ctx.fillRect(x + 10, y + 8, 3, 1);
+
+        // Brick mortar lines on side walls
+        ctx.fillStyle = biome.wallDetail;
+        if ((row + col) % 3 === 0) {
+          ctx.fillRect(x + 4, y + 14, ts - 8, 1);
+        }
+
+        // Baseboard / Floor Trim
+        if (!isTop) {
+          ctx.fillStyle = biome.seam;
+          ctx.fillRect(x, y + ts - 2, ts, 2);
         }
       } else {
-        ctx.fillStyle = (row + col) % 2 === 0 ? C.COLORS.floor1 : C.COLORS.floor2;
-        ctx.fillRect(x, y, C.TILE_SIZE, C.TILE_SIZE);
-        // Floor cracks and blood splatters
-        if ((row * 7 + col * 13) % 17 === 0) {
-          ctx.fillStyle = 'rgba(25, 25, 35, 0.3)';
-          ctx.fillRect(x + 3, y + 3, 2, 1);
+        // Material Slabs logic
+        // Group tiles into 3x2 or 2x2 slabs using floor/hash
+        const slabCol = Math.floor(col / 3);
+        const slabRow = Math.floor(row / 2);
+        const slabID = (slabCol * 13 + slabRow * 7) % 100;
+
+        ctx.fillStyle = slabID % 2 === 0 ? biome.floor : biome.floorAlt;
+        ctx.fillRect(x, y, ts, ts);
+
+        // Slab Seams & Bevels
+        const inSlabCol = col % 3;
+        const inSlabRow = row % 2;
+
+        ctx.fillStyle = biome.seam;
+        // Draw seams at slab edges
+        if (inSlabCol === 0) ctx.fillRect(x, y, 1, ts);
+        if (inSlabRow === 0) ctx.fillRect(x, y, ts, 1);
+
+        // Material Variation / Procedural Noise
+        const noise = (row * 31 + col * 17) % 10;
+        if (noise === 0) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+          ctx.fillRect(x + 2, y + 2, ts - 4, ts - 4);
         }
-        if ((row * 11 + col * 3) % 23 === 0) {
-          ctx.fillStyle = 'rgba(80, 20, 20, 0.1)';
-          ctx.fillRect(x + 2, y + 5, 5, 5);
+
+        // Wear and Tear (cracks, details)
+        if (slabID % 17 === 0 && inSlabCol === 1 && inSlabRow === 1) {
+          ctx.fillStyle = biome.seam;
+          ctx.globalAlpha = 0.4;
+          ctx.fillRect(x + 5, y + 8, 8, 1);
+          ctx.fillRect(x + 9, y + 5, 1, 6);
+          ctx.globalAlpha = 1.0;
         }
-        // Occasional bones
-        if ((row * 17 + col * 11) % 37 === 0) {
-          ctx.fillStyle = 'rgba(180, 170, 150, 0.12)';
-          ctx.fillRect(x + 6, y + 8, 6, 2);
-          ctx.fillRect(x + 8, y + 6, 2, 6);
-        }
-        // Subtle stone debris
-        if ((row * 3 + col * 19) % 41 === 0) {
-          ctx.fillStyle = 'rgba(60, 55, 70, 0.15)';
-          ctx.fillRect(x + 10, y + 10, 3, 2);
-          ctx.fillRect(x + 11, y + 9, 1, 4);
-        }
-        // Faint rune markings
-        if ((row * 23 + col * 7) % 53 === 0) {
-          ctx.fillStyle = 'rgba(80, 60, 120, 0.06)';
-          ctx.beginPath();
-          ctx.arc(x + C.TILE_SIZE / 2, y + C.TILE_SIZE / 2, 4, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillRect(x + C.TILE_SIZE / 2 - 1, y + C.TILE_SIZE / 2 - 5, 2, 10);
-        }
-        // Tiny pebbles
-        if ((row * 13 + col * 17) % 31 === 0) {
-          ctx.fillStyle = 'rgba(45, 40, 55, 0.2)';
-          ctx.fillRect(x + 4, y + 12, 2, 1);
-          ctx.fillRect(x + 12, y + 3, 1, 2);
+
+        // Biome detail (Moss/Rust/Ash)
+        if (slabID % 23 === 0) {
+          ctx.fillStyle = biome.detail;
+          ctx.fillRect(x + 2, y + ts - 5, ts - 4, 3);
         }
       }
     }
   }
 
-  // Wall torches - dynamically placed along room edges
+  // Wall torches - rendered with biome-specific colors
   const torchPositions: { x: number; y: number }[] = [];
   for (let col = 4; col < C.dims.rc; col += 8) {
     torchPositions.push({ x: col * C.TILE_SIZE, y: C.TILE_SIZE });
@@ -210,51 +208,43 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number) {
     torchPositions.push({ x: C.TILE_SIZE, y: row * C.TILE_SIZE });
     torchPositions.push({ x: C.dims.gw - C.TILE_SIZE, y: row * C.TILE_SIZE });
   }
+
   const flicker = Math.sin(time * 8) * 0.15 + 0.85;
   const flicker2 = Math.sin(time * 11 + 1.3) * 0.1 + 0.9;
+
   for (let ti = 0; ti < torchPositions.length; ti++) {
     const t = torchPositions[ti];
     const localFlicker = ti % 2 === 0 ? flicker : flicker2;
 
-    // Warm light pool on floor around torch
-    const floorGlow = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 40);
-    floorGlow.addColorStop(0, `rgba(255, 130, 40, ${0.06 * localFlicker})`);
-    floorGlow.addColorStop(0.5, `rgba(255, 100, 20, ${0.025 * localFlicker})`);
-    floorGlow.addColorStop(1, 'rgba(255, 80, 10, 0)');
+    // Biome-specific light pool
+    const floorGlow = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 60);
+    floorGlow.addColorStop(0, biome.accentGlow.replace('0.15', (0.12 * localFlicker).toString()));
+    floorGlow.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = floorGlow;
-    ctx.fillRect(t.x - 40, t.y - 40, 80, 80);
+    ctx.fillRect(t.x - 60, t.y - 60, 120, 120);
 
-    // Torch light glow (closer, brighter)
-    const g = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 20);
-    g.addColorStop(0, `rgba(255, 160, 60, ${0.2 * localFlicker})`);
-    g.addColorStop(0.5, `rgba(255, 120, 40, ${0.08 * localFlicker})`);
-    g.addColorStop(1, 'rgba(255, 100, 30, 0)');
+    // Torch light core
+    const g = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 15);
+    g.addColorStop(0, biome.accent);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.4 * localFlicker;
     ctx.fillStyle = g;
-    ctx.fillRect(t.x - 20, t.y - 20, 40, 40);
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
 
-    // Torch bracket (metal)
-    ctx.fillStyle = '#3a3030';
-    ctx.fillRect(t.x - 1.5, t.y - 1, 3, 5);
-    // Torch body (wood)
-    ctx.fillStyle = '#553311';
-    ctx.fillRect(t.x - 1, t.y - 4, 3, 5);
+    // Torch handle
+    ctx.fillStyle = biome.wallDetail;
+    ctx.fillRect(t.x - 1, t.y, 2, 8);
 
-    // Flame layers (more detailed)
-    // Outer flame
+    // Flame
     const fSway = Math.sin(time * 12 + ti * 2) * 1;
-    ctx.fillStyle = `rgba(255, ${100 + Math.floor(localFlicker * 40)}, 20, ${0.6 * localFlicker})`;
+    ctx.fillStyle = biome.accent;
     ctx.beginPath();
-    ctx.moveTo(t.x - 2 + fSway * 0.5, t.y - 4);
-    ctx.quadraticCurveTo(t.x + fSway, t.y - 9, t.x + fSway * 0.3, t.y - 4);
+    ctx.moveTo(t.x - 2 + fSway * 0.5, t.y - 2);
+    ctx.quadraticCurveTo(t.x + fSway, t.y - 8, t.x + fSway * 0.3, t.y - 2);
     ctx.fill();
-    // Inner bright core
-    ctx.fillStyle = `rgba(255, 240, 120, ${0.7 * localFlicker})`;
-    ctx.beginPath();
-    ctx.ellipse(t.x + fSway * 0.3, t.y - 6, 1, 1.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Tip spark
-    ctx.fillStyle = `rgba(255, 255, 200, ${0.4 * localFlicker * Math.abs(Math.sin(time * 15 + ti))})`;
-    ctx.fillRect(t.x + fSway * 0.5 - 0.5, t.y - 8, 1, 1);
   }
 }
 
@@ -1630,6 +1620,13 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   // --- Floor indicator (top-right) ---
   const floorW = Math.round(84 * ms);
   const floorH = Math.round(18 * ms);
+  const biome = getBiome(dungeon.floor);
+
+  // Biome name (small, above floor)
+  ctx.font = `600 ${Math.round(7 * ms)}px ${C.HUD_FONT}`;
+  ctx.textAlign = 'right';
+  drawHudText(ctx, biome.name.toUpperCase(), visRight - 6, hpY - 2, biome.accent);
+
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
   ctx.fillRect(visRight - floorW - 6, hpY, floorW, floorH);
   ctx.strokeStyle = '#aa8833';
