@@ -210,21 +210,50 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number) {
     torchPositions.push({ x: C.dims.gw - C.TILE_SIZE, y: row * C.TILE_SIZE });
   }
   const flicker = Math.sin(time * 8) * 0.15 + 0.85;
-  for (const t of torchPositions) {
-    // Torch light glow
-    const g = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 25);
-    g.addColorStop(0, `rgba(255, 150, 50, ${0.15 * flicker})`);
+  const flicker2 = Math.sin(time * 11 + 1.3) * 0.1 + 0.9;
+  for (let ti = 0; ti < torchPositions.length; ti++) {
+    const t = torchPositions[ti];
+    const localFlicker = ti % 2 === 0 ? flicker : flicker2;
+    
+    // Warm light pool on floor around torch
+    const floorGlow = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 40);
+    floorGlow.addColorStop(0, `rgba(255, 130, 40, ${0.06 * localFlicker})`);
+    floorGlow.addColorStop(0.5, `rgba(255, 100, 20, ${0.025 * localFlicker})`);
+    floorGlow.addColorStop(1, 'rgba(255, 80, 10, 0)');
+    ctx.fillStyle = floorGlow;
+    ctx.fillRect(t.x - 40, t.y - 40, 80, 80);
+    
+    // Torch light glow (closer, brighter)
+    const g = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 20);
+    g.addColorStop(0, `rgba(255, 160, 60, ${0.2 * localFlicker})`);
+    g.addColorStop(0.5, `rgba(255, 120, 40, ${0.08 * localFlicker})`);
     g.addColorStop(1, 'rgba(255, 100, 30, 0)');
     ctx.fillStyle = g;
-    ctx.fillRect(t.x - 25, t.y - 25, 50, 50);
-    // Torch body
+    ctx.fillRect(t.x - 20, t.y - 20, 40, 40);
+    
+    // Torch bracket (metal)
+    ctx.fillStyle = '#3a3030';
+    ctx.fillRect(t.x - 1.5, t.y - 1, 3, 5);
+    // Torch body (wood)
     ctx.fillStyle = '#553311';
-    ctx.fillRect(t.x - 1, t.y - 3, 3, 6);
-    // Flame
-    ctx.fillStyle = `rgba(255, ${140 + Math.floor(flicker * 40)}, 30, ${0.8 * flicker})`;
-    ctx.fillRect(t.x - 1, t.y - 5, 3, 3);
-    ctx.fillStyle = `rgba(255, 255, 100, ${0.5 * flicker})`;
-    ctx.fillRect(t.x, t.y - 6, 1, 2);
+    ctx.fillRect(t.x - 1, t.y - 4, 3, 5);
+    
+    // Flame layers (more detailed)
+    // Outer flame
+    const fSway = Math.sin(time * 12 + ti * 2) * 1;
+    ctx.fillStyle = `rgba(255, ${100 + Math.floor(localFlicker * 40)}, 20, ${0.6 * localFlicker})`;
+    ctx.beginPath();
+    ctx.moveTo(t.x - 2 + fSway * 0.5, t.y - 4);
+    ctx.quadraticCurveTo(t.x + fSway, t.y - 9, t.x + fSway * 0.3, t.y - 4);
+    ctx.fill();
+    // Inner bright core
+    ctx.fillStyle = `rgba(255, 240, 120, ${0.7 * localFlicker})`;
+    ctx.beginPath();
+    ctx.ellipse(t.x + fSway * 0.3, t.y - 6, 1, 1.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Tip spark
+    ctx.fillStyle = `rgba(255, 255, 200, ${0.4 * localFlicker * Math.abs(Math.sin(time * 15 + ti))})`;
+    ctx.fillRect(t.x + fSway * 0.5 - 0.5, t.y - 8, 1, 1);
   }
 }
 
