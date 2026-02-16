@@ -1154,10 +1154,10 @@ export class GameEngine {
       setTimeout(() => this.addEffect('flash', 0.8, 0.3, 'rgb(255, 200, 100)'), 200);
       setTimeout(() => this.addEffect('flash', 0.6, 0.2, 'rgb(255, 100, 50)'), 400);
       SFX.bossKill(this.bossKillFloor);
-      // Drop amulet — level-up handled by bossKillSequence, NOT here
+      // Drop amulet — add to inventory directly, reveal handled by bossKillSequence
       const amuletId = getRandomBossAmuletDrop(this.amuletInventory);
       if (amuletId) {
-        this.callbacks.onAmuletDrop(amuletId);
+        addAmulet(this.amuletInventory, amuletId);
         spawnDamageText(this.particles, e.x, e.y - 20, '🔮 AMULETO!', '#cc88ff');
         this._pendingBossAmuletId = amuletId;
       }
@@ -1217,10 +1217,14 @@ export class GameEngine {
     this.player.level++;
     this.player.xp = 0;
     this.player.xpToNext = Math.floor(C.XP_BASE * Math.pow(C.XP_MULTIPLIER, this.player.level - 1));
-    // Delay to let boss kill effects play out
-    setTimeout(() => {
-      this.handleLevelUp(true); // guarantee at least 1 legendary
-    }, 1500);
+    // Show level-up immediately (amulet reveal already provided the pause)
+    this.handleLevelUp(true); // guarantee at least 1 legendary
+  }
+
+  // Start victory countdown — called after boss level-up upgrade is selected
+  startVictoryCountdown() {
+    this.victoryActive = true;
+    this.victoryCountdown = this.victoryCountdownMax;
   }
 
   private checkDoorTransition(room: DungeonRoom) {
@@ -1436,23 +1440,21 @@ export class GameEngine {
     this.addEffect('shake', 12, 0.6);
     spawnExplosion(this.particles, C.dims.gw / 2, C.dims.gh / 2, 30);
 
-    // If there's a pending amulet reveal, show it then level-up
+    // Sequential flow: amulet reveal → level-up → victory countdown
+    // Victory countdown starts AFTER level-up completes
     if (this._pendingBossAmuletId) {
       const amuletId = this._pendingBossAmuletId;
       this._pendingBossAmuletId = null;
-      // Brief delay then show reveal overlay
+      // Brief delay then show reveal overlay (only ONE presentation)
       setTimeout(() => {
         this.pause();
         this.callbacks.onAmuletReveal(amuletId);
+        // handleBossLevelUp is called by onAmuletRevealComplete in Index.tsx
       }, 600);
     } else {
       // No amulet — just do level-up after brief delay
       this.handleBossLevelUp();
     }
-
-    // Start victory countdown — 5 seconds of calm before next floor
-    this.victoryActive = true;
-    this.victoryCountdown = this.victoryCountdownMax;
   }
   
   private updateVictoryCountdown(dt: number) {
@@ -1563,23 +1565,22 @@ export class GameEngine {
       room.trapTriggered = true;
     }
 
-    // Vendor cooldown ticked in update() loop
+    // Auto vendor dialogue on proximity (original behavior)
+    if (room.type === 'vendor' && this.inVendorRoom && !this.vendorDialogueActive && !this.shopOpen && this.vendorInteractCooldown <= 0) {
+      const vdist = Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
+      if (vdist < 40) {
+        this.startVendorDialogue();
+      }
+    }
   }
 
-  // Public method to interact with the vendor — triggered by key press
+  // Legacy public method — kept for mobile button compat
   tryVendorInteract() {
     if (this.vendorDialogueActive || this.shopOpen) return;
     const room = getCurrentRoom(this.dungeon);
-    if (room.type !== 'vendor') return;
-    if (!this.inVendorRoom) return;
+    if (room.type !== 'vendor' || !this.inVendorRoom) return;
     if (this.vendorInteractCooldown > 0) return;
-    const p = this.player;
-    const cx = C.dims.gw / 2;
-    const cy = C.dims.gh / 2;
-    const dist = Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
-    if (dist < 40) {
-      this.startVendorDialogue();
-    }
+    this.startVendorDialogue();
   }
 
   // Public method for sanctuary heal — triggered by [T] key
@@ -1587,24 +1588,36 @@ export class GameEngine {
     // Guard: don't heal during dialogue or shop
     if (this.vendorDialogueActive || this.shopOpen) return;
     const room = getCurrentRoom(this.dungeon);
-    if (room.type !== 'vendor') return;
-    if (!this.inVendorRoom) return;
+    if (room.type !== 'vendor' || !this.inVendorRoom) return;
     const p = this.player;
-    // Sanctuary is near vendor center — wider detection radius
     const shrineX = C.dims.gw * 0.5;
     const shrineY = C.dims.gh * 0.5;
     const shrineDist = Math.sqrt((p.x - shrineX) ** 2 + (p.y - shrineY) ** 2);
-    if (shrineDist > 60) return;
-    if (this.shrineCooldown) return;
+    if (shrineDist > 70) {
+      spawnDamageText(this.particles, p.x, p.y - 10, 'Muito longe', '#888888');
+      return;
+    }
+    if (this.shrineCooldown) {
+      spawnDamageText(this.particles, p.x, p.y - 10, 'Aguarde...', '#888888');
+      return;
+    }
+    if (p.hp >= p.maxHp) {
+      spawnDamageText(this.particles, p.x, p.y - 10, 'Vida cheia', '#88cc88');
+      SFX.uiClose();
+      return;
+    }
     const healCost = 50 + this.dungeon.floor * 10;
-    if (p.souls < healCost || p.hp >= p.maxHp) return;
+    if (p.souls < healCost) {
+      spawnDamageText(this.particles, p.x, p.y - 10, `Precisa ${healCost} almas`, '#cc6666');
+      SFX.uiClose();
+      return;
+    }
 
     p.souls -= healCost;
     const healAmount = Math.floor(p.maxHp * 0.25);
     p.hp = Math.min(p.maxHp, p.hp + healAmount);
 
     // Healing particles: souls flowing OUT from player (cost), then green heal IN
-    // Blue soul particles fly from player toward shrine (cost visualization)
     for (let i = 0; i < 6; i++) {
       const angle = Math.random() * Math.PI * 2;
       this.particles.push({
