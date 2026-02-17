@@ -4,7 +4,12 @@ import { createPlayer, updatePlayer, tryDash, tryMelee, canRangedAttack, doRange
 import { createEnemy, updateEnemy, damageEnemy, scaleEnemyForFloor, getXPForEnemy, createBossForFloor, consumeBossAction, setBossFloor } from './enemies';
 import { createPlayerProjectile, updateProjectile } from './projectiles';
 import { generateDungeon, getCurrentRoom, moveToRoom } from './dungeon';
-import { createParticles, updateParticles, spawnBlood, spawnDamageText, spawnXPParticle, spawnExplosion, spawnSpark, spawnDust, spawnTrail, spawnEmbers, spawnGhostParticle, spawnBomberExplosion, spawnSoulCollectParticle } from './particles';
+import {
+  createParticles, updateParticles, spawnBlood, spawnDamageText, spawnXPParticle,
+  spawnExplosion, spawnSpark, spawnDust, spawnTrail, spawnEmbers,
+  spawnGhostParticle, spawnBomberExplosion, spawnSoulCollectParticle,
+  spawnImpactGlint, spawnBladeShard
+} from './particles';
 import { getRandomUpgrades, checkSynergies, getOwnedTags, SYNERGIES } from './upgrades';
 import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins } from './renderer';
 import { SFX, initAudio } from './audio';
@@ -1393,8 +1398,7 @@ export class GameEngine {
     const range = C.MELEE_RANGE * this.player.areaMultiplier;
     const angle = this.player.meleeAngle;
     const isFinisher = this.player.activeComboStep === 4;
-    const shakeInt = isFinisher ? 14 : (this.player.activeComboStep === 3 ? 8 : 5);
-    this.addEffect('shake', shakeInt, 0.15);
+    // Shake removed for sword
     let hitAny = false;
     const meleeDeadSet = new Set<EnemyState>();
 
@@ -1430,20 +1434,25 @@ export class GameEngine {
         spawnDamageText(this.particles, e.x, e.y - 8, 'CRIT!', '#ffff00');
         SFX.criticalHit();
       }
-      // Stronger knockback for melee
       const nx = dist > 0 ? dx / dist : 0;
       const ny = dist > 0 ? dy / dist : 0;
-      const dead = damageEnemy(e, dmg, nx * 8, ny * 8);
+      // Light knockback for slice feel
+      const dead = damageEnemy(e, dmg, nx * 4, ny * 4);
       this.stats.damageDealt += dmg;
       spawnDamageText(this.particles, e.x, e.y, `${dmg}`);
-      spawnBlood(this.particles, e.x, e.y, 8);
-      spawnSpark(this.particles, e.x, e.y, C.COLORS.playerLight, isFinisher ? 16 : 8);
-      spawnSpark(this.particles, e.x, e.y, '#88ccff', isFinisher ? 8 : 4);
+
+      // Elegant slice particles (vibrant energy sparks)
+      spawnBlood(this.particles, e.x, e.y, 4);
+      // Bright white/blue energy sparks for contact feedback
+      spawnSpark(this.particles, e.x, e.y, '#ffffff', 6);
+      spawnSpark(this.particles, e.x, e.y, '#66ccff', 12);
+      spawnSpark(this.particles, e.x, e.y, '#99eeff', 8);
+      // Subtle extra polish: fast metallic shards
+      spawnBladeShard(this.particles, e.x, e.y, 5);
+
+      // Permanent but subtle scratch on the environment
       spawnSlashMark(e.x, e.y, this.player.meleeAngle);
-      if (isFinisher) {
-        spawnExplosion(this.particles, e.x, e.y, 15); // Extra impact
-      }
-      spawnImpactMark(e.x, e.y);
+
       hitAny = true;
 
       if (dead) {
@@ -1459,9 +1468,9 @@ export class GameEngine {
     if (hitAny) {
       SFX.meleeHit();
       const isFinisher = this.player.activeComboStep === 4;
-      this.hitStopTimer = isFinisher ? 0.15 : 0.08; // Impact pause
-      this.addEffect('shake', isFinisher ? 15 : 10, 0.15); // Stronger shake
-      // Melee hit reduces dash cooldown
+      // Ultra-snappy hit-stop for katana feel (0.04s is just right)
+      this.hitStopTimer = isFinisher ? 0.06 : 0.04;
+      // Screen shake REMOVED for sword slice
       this.player.dashCooldown = Math.max(0, this.player.dashCooldown - 0.25);
     } else {
       SFX.meleeWhiff();
@@ -1505,7 +1514,11 @@ export class GameEngine {
       }
       // Boss XP is granted but do NOT trigger level-up here (bossKillSequence handles it)
     } else {
-      spawnExplosion(this.particles, e.x, e.y, 10);
+      if (byMelee) {
+        spawnSpark(this.particles, e.x, e.y, '#ffffff', 8);
+      } else {
+        spawnExplosion(this.particles, e.x, e.y, 10);
+      }
       SFX.enemyDeath();
     }
 

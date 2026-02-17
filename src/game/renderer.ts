@@ -900,12 +900,12 @@ function drawAttackPose1(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   const angleStart = p.meleeAngle - C.MELEE_ARC / 2;
   const angleEnd = p.meleeAngle + C.MELEE_ARC / 2;
 
-  // Snap Swing Easing
+  // Snap Swing Easing (Faster snap: 0.1s windup)
   let swingT = 0;
-  if (t > 0.2 && t < 0.7) {
-    const st = (t - 0.2) / 0.5;
-    swingT = 1 - Math.pow(1 - st, 3);
-  } else if (t >= 0.7) swingT = 1;
+  if (t > 0.1 && t < 0.6) {
+    const st = (t - 0.1) / 0.5;
+    swingT = 1 - Math.pow(1 - st, 4); // Sharper curve
+  } else if (t >= 0.6) swingT = 1;
 
   const currentAngle = angleStart + (angleEnd - angleStart) * swingT;
 
@@ -959,10 +959,10 @@ function drawAttackPose2(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   const angleEnd = p.meleeAngle - C.MELEE_ARC / 2;   // Go to start
 
   let swingT = 0;
-  if (t > 0.2 && t < 0.7) {
-    const st = (t - 0.2) / 0.5;
-    swingT = 1 - Math.pow(1 - st, 3);
-  } else if (t >= 0.7) swingT = 1;
+  if (t > 0.1 && t < 0.6) {
+    const st = (t - 0.1) / 0.5;
+    swingT = 1 - Math.pow(1 - st, 4);
+  } else if (t >= 0.6) swingT = 1;
 
   const currentAngle = angleStart + (angleEnd - angleStart) * swingT;
 
@@ -991,18 +991,17 @@ function drawAttackPose3(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   let jumpY = 0;
   let lunge = 0;
 
-  // Jump phase
-  if (t < 0.4) {
-    // Windup/Jump
-    jumpY = -8 * Math.sin((t / 0.4) * Math.PI);
-    lunge = -2;
-  } else if (t < 0.6) {
-    // Slam Impact
+  // Jump phase (Faster: 0.2s windup)
+  if (t < 0.2) {
+    jumpY = -4 * (t / 0.2);
+    lunge = -1;
+  } else if (t < 0.5) {
+    // Quick Downward Slash
     jumpY = 2;
-    lunge = 10;
+    lunge = 8;
   } else {
-    // Recovery
-    lunge = 10 * (1 - (t - 0.6) / 0.4);
+    // Fast Recovery
+    lunge = 8 * (1 - (t - 0.5) / 0.5);
   }
 
   const bx = x + facing * lunge;
@@ -1012,24 +1011,20 @@ function drawAttackPose3(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   ctx.translate(bx, by);
 
   // Draw Character Body (Original Art)
-  // Look down/ahead during smash
-  drawOriginalCharacterBody(ctx, p, time, facing * 0.5, 0, 0);
+  drawOriginalCharacterBody(ctx, p, time, facing * 0.3, 0, 0);
 
   ctx.restore();
 
-  // Weapon: Overhead Arc
-  // Start high (-PI/2 relative), end low
-  const baseAngle = Math.atan2(p.facing.y, p.facing.x); // Should be mouse angle ideally, but simple for now
-  const angleStart = p.meleeAngle - 0.5;
-  const angleEnd = p.meleeAngle + 0.5;
+  // Weapon: Overhead Arc (Snappier)
+  const angleStart = p.meleeAngle - 0.4;
+  const angleEnd = p.meleeAngle + 0.4;
 
   let swingT = 0;
-  if (t > 0.4 && t < 0.7) {
-    const st = (t - 0.4) / 0.3;
-    swingT = st * st; // Accelerate
-  } else if (t >= 0.7) swingT = 1;
+  if (t > 0.2 && t < 0.5) {
+    const st = (t - 0.2) / 0.3;
+    swingT = st * st * st; // Fast acceleration
+  } else if (t >= 0.5) swingT = 1;
 
-  // Manual override for overhead look: strictly vertical chop logic could be better but reusing arc
   const currentAngle = angleStart + (angleEnd - angleStart) * swingT;
 
   const hx = bx + Math.cos(currentAngle) * 10;
@@ -1038,11 +1033,11 @@ function drawAttackPose3(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   ctx.save();
   ctx.translate(hx, hy);
   ctx.rotate(currentAngle);
-  drawLongsword(ctx, C.MELEE_RANGE * 1.3, 1, time);
+  drawLongsword(ctx, C.MELEE_RANGE * 1.1, 1, time);
   ctx.restore();
 
   // VFX
-  if (t > 0.4 && t < 0.7) drawSlashTrail(ctx, bx, by, C.MELEE_RANGE * 1.3, angleStart, currentAngle, 'gold');
+  if (t > 0.2 && t < 0.6) drawSlashTrail(ctx, bx, by, C.MELEE_RANGE * 1.1, angleStart, currentAngle, 'azure');
 }
 
 /** 
@@ -1079,34 +1074,86 @@ function drawAttackPose4(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   ctx.rotate(swordAngle + Math.PI / 2); // Tangent
   drawLongsword(ctx, C.MELEE_RANGE * 1.5, 1, time);
 
-  // VFX - Circular Ring
-  if (t > 0.1 && t < 0.9) {
-    ctx.strokeStyle = `rgba(255, 50, 50, 0.5)`;
-    ctx.lineWidth = 20 * (Math.sin(t * Math.PI));
+  // VFX - Clean azure spin circle
+  if (t > 0.05 && t < 0.95) {
+    ctx.strokeStyle = `rgba(150, 230, 255, 0.4)`;
+    ctx.lineWidth = 12 * (Math.sin(t * Math.PI));
     ctx.beginPath();
-    ctx.arc(0, 0, C.MELEE_RANGE * 1.2, 0, Math.PI * 2);
+    ctx.arc(0, 0, C.MELEE_RANGE * 1.3, 0, Math.PI * 2);
     ctx.stroke();
   }
 
   ctx.restore();
 }
 
-// Helper for VFX Trail
 function drawSlashTrail(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, start: number, end: number, color: 'azure' | 'gold' | 'crimson') {
-  const grad = ctx.createRadialGradient(x, y, r * 0.5, x, y, r);
-  if (color === 'azure') {
-    grad.addColorStop(0, 'rgba(100,200,255,0)');
-    grad.addColorStop(1, 'rgba(200,255,255,0.6)');
-  } else if (color === 'gold') {
-    grad.addColorStop(0, 'rgba(255,200,0,0)');
-    grad.addColorStop(1, 'rgba(255,255,200,0.8)');
+  ctx.save();
+
+  let mainColor = 'rgba(100, 200, 255, 0.12)'; // Default azure
+  let sharpColor = 'rgba(255, 255, 255, 0.8)';
+  let glowColor = 'rgba(100, 200, 255, 0)';
+
+  if (color === 'gold') {
+    mainColor = 'rgba(255, 200, 0, 0.12)';
+    sharpColor = 'rgba(255, 255, 200, 0.8)';
+    glowColor = 'rgba(255, 200, 0, 0)';
+  } else if (color === 'crimson') {
+    mainColor = 'rgba(255, 50, 50, 0.12)';
+    sharpColor = 'rgba(255, 200, 200, 0.8)';
+    glowColor = 'rgba(255, 50, 50, 0)';
   }
 
-  ctx.fillStyle = grad;
+  // Layer 1: Focused Blade Edge (The sharp part)
+  const bladeGrad = ctx.createRadialGradient(x, y, r * 0.95, x, y, r);
+  bladeGrad.addColorStop(0, 'rgba(200, 240, 255, 0)');
+  bladeGrad.addColorStop(0.5, sharpColor); // Sharp white core
+  bladeGrad.addColorStop(1, glowColor);
+
+  ctx.fillStyle = bladeGrad;
   ctx.beginPath();
   ctx.moveTo(x, y);
-  ctx.arc(x, y, r, start, end, start > end); // smart arc direction
+  ctx.arc(x, y, r, start, end, start > end);
   ctx.fill();
+
+  // Layer 2: Ethereal Energy Tail (Subtle dissipation)
+  const auraGrad = ctx.createRadialGradient(x, y, r * 0.7, x, y, r * 1.05);
+  auraGrad.addColorStop(0, 'rgba(100, 180, 255, 0)');
+  auraGrad.addColorStop(0.5, mainColor);
+  auraGrad.addColorStop(1, 'rgba(100, 180, 255, 0)');
+
+  ctx.fillStyle = auraGrad;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, r * 1.05, start, end, start > end);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Draws a sharp white glint/spark at contact point */
+function drawImpactGlint(ctx: CanvasRenderingContext2D, x: number, y: number, alpha: number, size = 12) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = alpha;
+
+  const g = ctx.createRadialGradient(x, y, 0, x, y, size);
+  g.addColorStop(0, 'rgba(255, 255, 255, 1)');
+  g.addColorStop(0.4, 'rgba(255, 255, 255, 0.4)');
+  g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, size, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Horizontal/Vertical sharp crosses
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x - size, y); ctx.lineTo(x + size, y);
+  ctx.moveTo(x, y - size); ctx.lineTo(x, y + size);
+  ctx.stroke();
+
+  ctx.restore();
 }
 
 

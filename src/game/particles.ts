@@ -65,10 +65,10 @@ export function spawnSoulCollectParticle(particles: Particle[], fromX: number, f
     const spread = (Math.random() - 0.5) * 80;
     const perpX = -dy / dist;
     const perpY = dx / dist;
-    
+
     const hue = 210 + Math.random() * 30; // blue range
     const lightness = 55 + Math.random() * 25;
-    
+
     particles.push({
       x: fromX + (Math.random() - 0.5) * 8,
       y: fromY + (Math.random() - 0.5) * 8,
@@ -148,6 +148,36 @@ export function spawnSpark(particles: Particle[], x: number, y: number, color: s
       type: 'spark',
     });
   }
+}
+
+// Sharp metallic shards from blade contact
+export function spawnBladeShard(particles: Particle[], x: number, y: number, count = 4) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 80 + Math.random() * 120;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0.1 + Math.random() * 0.15,
+      maxLife: 0.25,
+      size: 0.8 + Math.random() * 0.5,
+      color: '#ffffff',
+      type: 'spark',
+    });
+  }
+}
+
+// Static flash at impact point
+export function spawnImpactGlint(particles: Particle[], x: number, y: number) {
+  particles.push({
+    x, y, vx: 0, vy: 0,
+    life: 0.1, maxLife: 0.1,
+    size: 15,
+    color: '#ffffff',
+    type: 'shockwave', // Use shockwave type for the radial expand/fade logic
+    radius: 2,
+  });
 }
 
 export function spawnTrail(particles: Particle[], x: number, y: number, color: string) {

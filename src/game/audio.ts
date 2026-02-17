@@ -38,7 +38,9 @@ function playTone(freq: number, duration: number, type: OscillatorType = 'square
   const gain = ctx.createGain();
   osc.type = type;
   osc.frequency.setValueAtTime(freq, ctx.currentTime);
-  gain.gain.setValueAtTime(volume, ctx.currentTime);
+  // Zero-click fade in
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.002);
   if (decay) {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
   }
@@ -48,7 +50,7 @@ function playTone(freq: number, duration: number, type: OscillatorType = 'square
   osc.stop(ctx.currentTime + duration);
 }
 
-function playNoise(duration: number, volume = 0.1, filterFreq = 3000) {
+function playNoise(duration: number, volume = 0.1, filterFreq = 3000, filterType: BiquadFilterType = 'lowpass') {
   const ctx = getCtx();
   const bufferSize = ctx.sampleRate * duration;
   const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -59,10 +61,12 @@ function playNoise(duration: number, volume = 0.1, filterFreq = 3000) {
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
+  filter.type = filterType;
   filter.frequency.setValueAtTime(filterFreq, ctx.currentTime);
   const gain = ctx.createGain();
-  gain.gain.setValueAtTime(volume, ctx.currentTime);
+  // Zero-click fade in
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.002);
   gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
   source.connect(filter);
   filter.connect(gain);
@@ -77,7 +81,9 @@ function playFreqSweep(startFreq: number, endFreq: number, duration: number, typ
   osc.type = type;
   osc.frequency.setValueAtTime(startFreq, ctx.currentTime);
   osc.frequency.exponentialRampToValueAtTime(endFreq, ctx.currentTime + duration);
-  gain.gain.setValueAtTime(volume, ctx.currentTime);
+  // Zero-click fade in
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.002);
   gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
   osc.connect(gain);
   gain.connect(masterGainNode!); // Connect to master gain
@@ -99,29 +105,23 @@ export const SFX = {
   },
 
   meleeSwing() {
-    // Sharp high-freq whoosh (the cut)
-    playFreqSweep(1500, 600, 0.14, 'sawtooth', 0.12);
-    // Medium-freq air displacement
-    playFreqSweep(600, 200, 0.12, 'sine', 0.1);
-    // Low-end "weight" thump
-    playFreqSweep(180, 50, 0.1, 'sine', 0.15);
-    // Metallic resonant ring (subtle)
-    playTone(800, 0.05, 'sine', 0.04);
-    playNoise(0.08, 0.15, 4500);
+    // REALISTIC STEEL SWING - Mid-range whoosh + subtle resonance
+    // 1. Natural air displacement (Mid-low noise)
+    playNoise(0.12, 0.07, 1800, 'lowpass');
+    // 2. Metallic "blade edge" resonance (Subtle sawtooth sweep)
+    playFreqSweep(900, 750, 0.1, 'sawtooth', 0.03);
   },
 
   meleeHit() {
-    // Heavy "Sledgehammer" impact body
-    playFreqSweep(120, 40, 0.2, 'square', 0.3);
-    playTone(60, 0.25, 'sine', 0.25);
-    // Bone-crunching/Metal-clashing mid layer
-    playFreqSweep(2000, 400, 0.1, 'sawtooth', 0.18);
-    // High-end impact "snap"
-    playNoise(0.05, 0.3, 8000);
-    // Shrapnel/Debris rumble
-    playNoise(0.15, 0.25, 2000);
-    // Deep sub-bass impact
-    playFreqSweep(70, 10, 0.22, 'sine', 0.15);
+    // REALISTIC CUT - Dry, organic, and direct
+    // 1. Metallic "Bite" - Short contact transient
+    playFreqSweep(1500, 1200, 0.03, 'sawtooth', 0.08);
+
+    // 2. The "Cut" - Mid-range noise (flesh/fabric friction)
+    playNoise(0.06, 0.08, 2800, 'lowpass');
+
+    // 3. Organic "Chop" - Very short low-mid pulse for connection
+    playTone(450, 0.04, 'sine', 0.06);
   },
 
   rangedShoot() {
@@ -130,14 +130,15 @@ export const SFX = {
   },
 
   enemyHit() {
-    playTone(200 + Math.random() * 100, 0.08, 'square', 0.07);
-    playNoise(0.04, 0.05, 3000);
+    // Subtle realistic feedback (Short cut texture)
+    playNoise(0.04, 0.04, 2500, 'lowpass');
+    playFreqSweep(1200, 1000, 0.02, 'sine', 0.04);
   },
 
   enemyDeath() {
-    playFreqSweep(400, 80, 0.25, 'sawtooth', 0.1);
-    playNoise(0.15, 0.08, 2000);
-    playTone(60, 0.3, 'sine', 0.06);
+    // Ethereal Dissipation — High-pass airy whisper
+    playNoise(0.2, 0.04, 2500, 'highpass');
+    playFreqSweep(1200, 2500, 0.25, 'sine', 0.03); // Shimmering rising tail
   },
 
   playerHit() {
@@ -455,18 +456,17 @@ export const SFX = {
     noise.start(t);
   },
 
-  // Critical hit — sharp metallic impact + high pitch accent
+  // Critical hit — Deep, heavy realistic slash
   criticalHit() {
-    playTone(1400, 0.06, 'square', 0.1);
-    playNoise(0.06, 0.1, 6000);
-    playTone(2000, 0.04, 'sine', 0.08);
-    setTimeout(() => playTone(1800, 0.08, 'sine', 0.05), 40);
+    playFreqSweep(1200, 800, 0.08, 'sawtooth', 0.12); // Heavier edge bite
+    playNoise(0.1, 0.1, 3000, 'lowpass'); // Longer cut texture
+    playTone(350, 0.06, 'sine', 0.08); // Deeper organic connection
   },
 
   // Melee miss / swing whiff — lighter than meleeSwing
   meleeWhiff() {
     playFreqSweep(300, 100, 0.08, 'sine', 0.04);
-    playNoise(0.05, 0.03, 3000);
+    playNoise(0.05, 0.03, 4000, 'highpass');
   },
 
   // Room enter — subtle atmospheric shift
