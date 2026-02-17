@@ -74,6 +74,13 @@ export interface PlayerState {
   discipleX: number;
   discipleY: number;
   discipleAngle: number;
+  // Potion System
+  potions: number;
+  maxPotions: number;
+  // Buff Timers (Seconds)
+  strengthBuffTimer: number;
+  defenseBuffTimer: number;
+  speedBuffTimer: number;
 }
 
 export type EnemyType = 'chaser' | 'shooter' | 'tank' | 'boss' | 'wraith' | 'bomber' | 'swarm' | 'necromancer' | 'stalker' | 'phantom' | 'flash_hunter' | 'distortion' | 'flicker_fiend' | 'warper' | 'accelerator';
@@ -172,8 +179,9 @@ export interface DungeonRoom {
   trapType?: TrapType;
   // Hidden traps (new system)
   hiddenTraps?: import('./traps').HiddenTrap[];
-  // Vendor shop inventory (persisted per room)
-  shopItems?: ShopItem[];
+  // Vendor shop inventories (persisted per room)
+  merchantShopItems?: ShopItem[];
+  alchemistShopItems?: ShopItem[];
 }
 
 export interface HorrorEvent {
@@ -242,6 +250,9 @@ export interface ShopItem {
   cost: number;
   sold: boolean;
   amuletId?: string; // if this is an amulet shop item
+  isPotion?: boolean; // New flag for potion refills
+  purchasesThisFloor?: number;
+  maxPurchasesPerFloor?: number;
 }
 
 export interface GameCallbacks {
@@ -249,7 +260,7 @@ export interface GameCallbacks {
   onGameOver: (stats: GameStats) => void;
   onSynergyActivated: (synergy: Synergy) => void;
   onFloorChange: (floor: number) => void;
-  onShopOpen: (items: ShopItem[], souls: number) => void;
+  onShopOpen: (items: ShopItem[], souls: number, shopType: 'normal' | 'potion') => void;
   onShopClose: () => void;
   onAmuletDrop: (amuletId: string) => void;
   onInventoryOpen: () => void;

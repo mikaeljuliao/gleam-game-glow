@@ -13,10 +13,9 @@ const UPGRADE_POOL: Omit<Upgrade, 'apply'>[] = [
   { id: 'proj2', name: 'Triplo Tiro', description: '+2 projéteis', rarity: 'epic', icon: '✨', synergyTags: ['ranged', 'projectile'] },
   { id: 'area1', name: 'Alcance Amplo', description: 'Área de efeito +30%', rarity: 'common', icon: '🌀', synergyTags: ['area'] },
   { id: 'fire1', name: 'Toque Flamejante', description: 'Projéteis ganham fogo (+5 dano)', rarity: 'rare', icon: '🔥', synergyTags: ['fire', 'ranged'] },
-  { id: 'life1', name: 'Roubo de Vida', description: 'Recupera 2 HP por inimigo', rarity: 'rare', icon: '🩸', synergyTags: ['health', 'lifesteal'] },
   { id: 'pierce1', name: 'Perfurante', description: 'Projéteis atravessam inimigos', rarity: 'epic', icon: '🏹', synergyTags: ['ranged', 'pierce'] },
   { id: 'explode1', name: 'Explosão', description: 'Projéteis explodem no impacto', rarity: 'epic', icon: '💥', synergyTags: ['ranged', 'explosion'] },
-  { id: 'regen1', name: 'Regeneração', description: 'Recupera 1 HP a cada 5s', rarity: 'common', icon: '🌿', synergyTags: ['health', 'regen'] },
+  // REMOVED: regen1 and life1 (Healing overhaul - survival is now potion-based)
   // === NEW COMMON ===
   { id: 'armor1', name: 'Pele de Ferro', description: 'Reduz dano recebido em 15%', rarity: 'common', icon: '🛡️', synergyTags: ['defense'] },
   { id: 'xpboost1', name: 'Sabedoria Sombria', description: 'XP ganho +25%', rarity: 'common', icon: '📖', synergyTags: ['xp'] },
@@ -48,10 +47,10 @@ function getApplyFunction(id: string): (p: PlayerState) => void {
     proj2: (p) => { p.projectileCount += 2; },
     area1: (p) => { p.areaMultiplier *= 1.3; },
     fire1: (p) => { p.projectileDamage += 5; },
-    life1: (p) => { p.lifesteal += 2; },
+    life1: (p) => { /* removed */ },
     pierce1: (p) => { p.piercing = true; },
     explode1: (p) => { p.explosive = true; },
-    regen1: (p) => { /* handled in engine update */ },
+    regen1: (p) => { /* removed */ },
     // New common
     armor1: (p) => { p.armor *= 0.85; },
     xpboost1: (p) => { p.xpMultiplier *= 1.25; },
@@ -69,7 +68,7 @@ function getApplyFunction(id: string): (p: PlayerState) => void {
     storm1: (p) => { p.projectileCount += 4; p.piercing = true; p.explosive = true; },
     disciple1: (p) => { p.hasDisciple = true; },
   };
-  return fns[id] || (() => {});
+  return fns[id] || (() => { });
 }
 
 export function getRandomUpgrades(count: number, ownedIds: string[], guaranteeLegendary = false): Upgrade[] {
@@ -125,14 +124,7 @@ export const SYNERGIES: Synergy[] = [
     applied: false,
     apply: (p) => { p.moveSpeedMult *= 1.2; },
   },
-  {
-    id: 'health_lifesteal',
-    name: 'Vampirismo',
-    description: 'Roubo de vida dobrado',
-    requiredTags: ['health', 'lifesteal'],
-    applied: false,
-    apply: (p) => { p.lifesteal *= 2; },
-  },
+  // REMOVED: health_lifesteal synergy
   {
     id: 'ranged_pierce',
     name: 'Perfuração Total',

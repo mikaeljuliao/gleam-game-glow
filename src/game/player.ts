@@ -61,6 +61,11 @@ export function createPlayer(): PlayerState {
     discipleX: 0,
     discipleY: 0,
     discipleAngle: 0,
+    potions: 0,
+    maxPotions: 3,
+    strengthBuffTimer: 0,
+    defenseBuffTimer: 0,
+    speedBuffTimer: 0,
   };
 }
 
@@ -79,8 +84,9 @@ export function updatePlayer(p: PlayerState, moveDir: Vec2, dt: number) {
     if (p.dashTimer <= 0) p.isDashing = false;
   }
 
+  const buffSpeed = p.speedBuffTimer > 0 ? 1.4 : 1.0;
   const dashSpeed = p.dashEnhanced ? C.PLAYER_DASH_SPEED * 1.5 : C.PLAYER_DASH_SPEED;
-  let speed = p.isDashing ? dashSpeed : p.speed * p.moveSpeedMult;
+  let speed = p.isDashing ? dashSpeed : p.speed * p.moveSpeedMult * buffSpeed;
 
   // Add weight/commitment to melee attacks: slow down during anticipation and swing
   if (p.meleeAttacking && p.meleeTimer > 0.1) {
@@ -142,7 +148,12 @@ export function addXP(p: PlayerState, amount: number): boolean {
 
 export function damagePlayer(p: PlayerState, amount: number): boolean {
   if (p.invincibleTime > 0) return false;
-  p.hp = Math.max(0, p.hp - amount);
+
+  // Apply armor and defense buff
+  const buffArmorMult = p.defenseBuffTimer > 0 ? 0.7 : 1.0;
+  const finalDamage = amount * p.armor * buffArmorMult;
+
+  p.hp = Math.max(0, p.hp - finalDamage);
   p.invincibleTime = 0.5;
   return p.hp <= 0;
 }

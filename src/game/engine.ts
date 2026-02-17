@@ -11,10 +11,12 @@ import { SFX, initAudio } from './audio';
 import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive, updateHPHorror, renderHPHorror, getHPLightPulse } from './horror';
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
 import { checkTrapCollision, activateTrap, updateTrapEffects, resetTrapEffects, getLightsOutTimer, getPanicTimer, getDoorsLockedTimer, hasEffect } from './traps';
-import { AmuletInventory, createAmuletInventory, getRandomBossAmuletDrop, isAmuletEquipped, WarRhythmState, createWarRhythmState, getSoulCollectorBonus, getSoulCollectorSpeedBonus, AMULET_DEFS, addAmulet } from './amulets';
+import { AmuletInventory, createAmuletInventory, getRandomBossAmuletDrop, isAmuletEquipped, WarRhythmState, createWarRhythmState, getSoulCollectorBonus, getSoulCollectorSpeedBonus, AMULET_DEFS, addAmulet, addConsumable, getEquippedConsumable } from './amulets';
 import { initArenaFX, resetArenaFX, updateArenaFX, renderArenaFloorFX, renderArenaOverlayFX, spawnSlashMark, spawnBloodMark, spawnImpactMark, getTorchPositions } from './arena-fx';
 import { applyBrightness } from './brightness';
 import * as C from './constants';
+import { MerchantNPC } from './npc/Merchant';
+import { AlchemistNPC } from './npc/Alchemist';
 
 export class GameEngine {
   player: PlayerState;
@@ -62,7 +64,10 @@ export class GameEngine {
   inVendorRoom = false;
   shrineCooldown = false;
   shopOpen = false;
-  shopItems: ShopItem[] = [];
+  private shopItems: ShopItem[] = [];
+  private shopType: 'normal' | 'potion' = 'normal';
+  private currentNPC: 'merchant' | 'alchemist' | null = null;
+  private potionCooldown = 0; // Prevent spam
   vendorInteractCooldown = 0;
   vendorFirstMeet = true;
   vendorDialogueActive = false;
@@ -84,6 +89,7 @@ export class GameEngine {
   bossWasSpawned = false;
   pendingNextFloor = false;
   victoryActive = false;
+  sanctuaryPortal: { x: number, y: number } | null = null;
   slowMoFactor = 1;
   lastFrameTime = 0;
 
@@ -112,6 +118,10 @@ export class GameEngine {
     this.particles = createParticles();
     this.stats = { enemiesDefeated: 0, roomsExplored: 1, floor: 1, level: 1, timePlayed: 0, damageDealt: 0, damageTaken: 0, upgradesCollected: 0, synergiesActivated: 0 };
     this.spawnRoomEnemies();
+    // Add starting potion to inventory
+    addConsumable(this.amuletInventory, 'potion_refill', 1);
+    if (this.amuletInventory.consumables[0]) this.amuletInventory.consumables[0].equipped = true;
+    this.player.potions = 1;
     initAudio();
     startBackgroundMusic();
     initArenaFX();
@@ -222,8 +232,8 @@ export class GameEngine {
     this.pause();
     // Use persisted shop items from room, or generate if first visit
     const room = getCurrentRoom(this.dungeon);
-    if (room.shopItems && room.shopItems.length > 0) {
-      this.shopItems = room.shopItems;
+    if (room.merchantShopItems && room.merchantShopItems.length > 0) {
+      this.shopItems = room.merchantShopItems;
     } else {
       const items = getRandomUpgrades(4, this.player.upgrades);
       this.shopItems = items.map(u => ({
@@ -253,9 +263,133 @@ export class GameEngine {
         }
       }
       // Persist to room
-      room.shopItems = this.shopItems;
+      room.merchantShopItems = this.shopItems;
     }
-    this.callbacks.onShopOpen(this.shopItems, this.player.souls);
+    this.callbacks.onShopOpen(this.shopItems, this.player.souls, 'normal');
+  }
+
+  openPotionShop() {
+    if (this.shopOpen) return;
+    this.shopOpen = true;
+    this.pause();
+
+    const room = getCurrentRoom(this.dungeon);
+    if (room.alchemistShopItems && room.alchemistShopItems.length > 0) {
+      this.shopItems = room.alchemistShopItems;
+    } else {
+      this.shopItems = [];
+
+      // Health Potion (Basic)
+      this.shopItems.push({
+        upgrade: {
+          id: 'potion_refill',
+          name: 'Elixir de Vida',
+          description: 'Restaura 35% da sua vida máxima.',
+          rarity: 'common',
+          icon: '🧪',
+          synergyTags: [],
+          apply: () => { },
+        },
+        cost: 50,
+        sold: false,
+        isPotion: true,
+        purchasesThisFloor: 0,
+        maxPurchasesPerFloor: 4
+      });
+
+      // Greater Health Potion
+      this.shopItems.push({
+        upgrade: {
+          id: 'potion_greater_heal',
+          name: 'Elixir Superior',
+          description: 'Restaura 65% da sua vida máxima.',
+          rarity: 'rare',
+          icon: '🍶',
+          synergyTags: [],
+          apply: () => { },
+        },
+        cost: 150,
+        sold: false,
+        isPotion: true,
+        purchasesThisFloor: 0,
+        maxPurchasesPerFloor: 4
+      });
+
+      // Strength Potion
+      this.shopItems.push({
+        upgrade: {
+          id: 'potion_strength',
+          name: 'Elixir de Fúria',
+          description: '+50% de DANO por 30 segundos.',
+          rarity: 'rare',
+          icon: '🔴',
+          synergyTags: [],
+          apply: () => { },
+        },
+        cost: 120,
+        sold: false,
+        isPotion: true,
+        purchasesThisFloor: 0,
+        maxPurchasesPerFloor: 4
+      });
+
+      // Defense Potion
+      this.shopItems.push({
+        upgrade: {
+          id: 'potion_defense',
+          name: 'Elixir de Ferro',
+          description: '+30% de RESISTÊNCIA por 30 segundos.',
+          rarity: 'rare',
+          icon: '🔵',
+          synergyTags: [],
+          apply: () => { },
+        },
+        cost: 120,
+        sold: false,
+        isPotion: true,
+        purchasesThisFloor: 0,
+        maxPurchasesPerFloor: 4
+      });
+
+      // Speed Potion
+      this.shopItems.push({
+        upgrade: {
+          id: 'potion_speed',
+          name: 'Elixir de Rapidez',
+          description: '+40% de VELOCIDADE por 30 segundos.',
+          rarity: 'rare',
+          icon: '🟡',
+          synergyTags: [],
+          apply: () => { },
+        },
+        cost: 100,
+        sold: false,
+        isPotion: true,
+        purchasesThisFloor: 0,
+        maxPurchasesPerFloor: 4
+      });
+
+      // Potion Capacity Upgrade
+      this.shopItems.push({
+        upgrade: {
+          id: 'potion_capacity',
+          name: 'Frasco Maior',
+          description: 'Aumenta o limite de poções em +1.',
+          rarity: 'epic',
+          icon: '🏺',
+          synergyTags: [],
+          apply: (p) => {
+            p.maxPotions++;
+          },
+        },
+        cost: 300,
+        sold: false,
+      });
+
+      room.alchemistShopItems = this.shopItems;
+    }
+
+    this.callbacks.onShopOpen(this.shopItems, this.player.souls, 'potion');
   }
 
   closeShop() {
@@ -264,35 +398,24 @@ export class GameEngine {
     this.resume();
   }
 
-  // Vendor dialogue system
-  private startVendorDialogue() {
+  // Dialogue system entry point
+  public startDialogue(lines: string[]) {
     this.vendorDialogueActive = true;
+    this.vendorDialogueLines = lines;
     this.vendorDialogueIndex = 0;
     this.vendorDialogueCharIndex = 0;
     this.vendorDialogueTimer = 0;
     this.pause();
+  }
 
-    if (this.vendorFirstMeet) {
-      this.vendorFirstMeet = false;
-      this.vendorDialogueLines = [
-        'Então é você…',
-        'O viajante que está fazendo o andar tremer.',
-        'Poucos chegam até mim ainda vivos.',
-        'A maioria vira lembrança… ou alimento para as criaturas daqui.',
-        'Este lugar corrói coragem, esperança… e ossos.',
-        'Eu sou conhecido como O Mercador.',
-        'Negocio oportunidades para aqueles teimosos o bastante para continuar subindo.',
-        'E se pretende ir mais longe…',
-        'vai precisar do que eu tenho.',
-      ];
-    } else {
-      const shortLines = [
-        ['Ainda vivo. Impressionante.', 'Selecionei algumas coisas que você possa gostar.', 'Veja o que eu tenho.'],
-        ['Você voltou.', 'Gosto de clientes que sobrevivem.', 'Dê uma olhada.'],
-        ['Você continua me surpreendendo.', 'Poucos passam tantas vezes por esta porta.', 'Vamos negociar.'],
-      ];
-      this.vendorDialogueLines = shortLines[Math.floor(Math.random() * shortLines.length)];
-    }
+  private startVendorDialogue() {
+    this.currentNPC = 'merchant';
+    MerchantNPC.onInteract(this);
+  }
+
+  private startAlchemistDialogue() {
+    this.currentNPC = 'alchemist';
+    AlchemistNPC.onInteract(this);
   }
 
   private updateVendorDialogue(dt: number) {
@@ -313,7 +436,6 @@ export class GameEngine {
     if (!this.vendorDialogueActive) return;
     const line = this.vendorDialogueLines[this.vendorDialogueIndex];
     if (this.vendorDialogueCharIndex < line.length) {
-      // Skip to end of current line
       this.vendorDialogueCharIndex = line.length;
       return;
     }
@@ -321,16 +443,63 @@ export class GameEngine {
     this.vendorDialogueCharIndex = 0;
     this.vendorDialogueTimer = 0;
     if (this.vendorDialogueIndex >= this.vendorDialogueLines.length) {
-      // Dialogue done → open shop
       this.vendorDialogueActive = false;
       this.resume();
-      this.openShop();
+      if (this.currentNPC === 'merchant') {
+        this.openShop();
+      } else if (this.currentNPC === 'alchemist') {
+        this.openPotionShop();
+      }
+      this.currentNPC = null;
     }
   }
 
   buyShopItem(index: number): boolean {
     const item = this.shopItems[index];
     if (!item || item.sold || this.player.souls < item.cost) return false;
+
+    // Check purchase limits
+    if (item.purchasesThisFloor !== undefined && item.maxPurchasesPerFloor !== undefined) {
+      if (item.purchasesThisFloor >= item.maxPurchasesPerFloor) {
+        SFX.uiError();
+        console.log(`[SHOP] Purchase failed: Limit reached (${item.maxPurchasesPerFloor})`);
+        return false;
+      }
+    }
+
+    // Potion/Consumable purchase
+    if (item.isPotion) {
+      // Validate capacity
+      if (item.upgrade.id === 'potion_refill' && this.player.potions >= this.player.maxPotions) {
+        SFX.uiError();
+        console.log(`[SHOP] Purchase failed: Already at max capacity (${this.player.maxPotions})`);
+        return false;
+      }
+
+      console.log(`[SHOP] Consumable purchased: ${item.upgrade.id}. Cost: ${item.cost}`);
+      this.player.souls -= item.cost;
+
+      // Increment purchase counter
+      if (item.purchasesThisFloor !== undefined) {
+        item.purchasesThisFloor++;
+        if (item.purchasesThisFloor >= (item.maxPurchasesPerFloor || 4)) {
+          item.sold = true;
+        }
+      } else {
+        item.sold = true;
+      }
+
+      addConsumable(this.amuletInventory, item.upgrade.id, 1);
+
+      // Sync legacy potion counter for HUD display (only if it's the standard potion)
+      if (item.upgrade.id === 'potion_refill') {
+        this.player.potions = this.amuletInventory.consumables.find(c => c.id === 'potion_refill')?.quantity || 0;
+      }
+
+      SFX.shopBuy();
+      return true;
+    }
+
     this.player.souls -= item.cost;
     item.sold = true;
 
@@ -365,6 +534,9 @@ export class GameEngine {
     return range[0] + Math.floor(Math.random() * (range[1] - range[0] + 1));
   }
 
+  // Alchemist legacy start method removed, now handled via Merchant/Alchemist specific calls from checkSpecialRoomInteraction
+
+
   private loop = () => {
     if (!this.running) return;
     const now = performance.now();
@@ -395,6 +567,21 @@ export class GameEngine {
           }
         } else {
           this.update(effectiveDt);
+
+          // Alchemist Interaction
+          if (this.inVendorRoom && !this.shopOpen && !this.vendorDialogueActive) {
+            // Check if near Alchemist position (defined in render or logical pos?)
+            // For now, assume Alchemist is at x=200, y=200 in vendor room (just an example pos)
+            // Actually, let's use a key press or simple distance check if we had an entity.
+            // Since we just render him, let's check distance to center-left area.
+            const alchX = C.dims.gw / 2 - 80;
+            const alchY = C.dims.gh / 2;
+            const dist = Math.sqrt((this.player.x - alchX) ** 2 + (this.player.y - alchY) ** 2);
+
+            if (dist < 40 && this.input.isDown('e') && this.vendorInteractCooldown <= 0) {
+              this.startAlchemistDialogue();
+            }
+          }
         }
       }
     }
@@ -454,6 +641,88 @@ export class GameEngine {
   }
 
   private update(dt: number) {
+    if (this.hitStopTimer > 0) return;
+
+    // Consumable Use (Q key)
+    const eqConsumable = getEquippedConsumable(this.amuletInventory);
+    if (this.input.isDown('q') && this.potionCooldown <= 0) {
+      if (eqConsumable && eqConsumable.quantity > 0) {
+        let potionUsed = false;
+
+        // --- Standard Health Potion ---
+        if (eqConsumable.id === 'potion_refill') {
+          if (this.player.hp < this.player.maxHp) {
+            const heal = Math.floor(Math.max(40, this.player.maxHp * 0.35));
+            this.player.hp = Math.min(this.player.maxHp, this.player.hp + heal);
+            spawnDamageText(this.particles, this.player.x, this.player.y - 15, `+${heal}`, C.COLORS.healText);
+            SFX.potionDrink();
+            this.addEffect('flash', 1, 0.3, 'rgba(100, 255, 150, 0.4)');
+            spawnSpark(this.particles, this.player.x, this.player.y, '#55ff88', 8);
+            potionUsed = true;
+          }
+        }
+        // --- Greater Health Potion ---
+        else if (eqConsumable.id === 'potion_greater_heal') {
+          if (this.player.hp < this.player.maxHp) {
+            const heal = Math.floor(Math.max(60, this.player.maxHp * 0.65));
+            this.player.hp = Math.min(this.player.maxHp, this.player.hp + heal);
+            spawnDamageText(this.particles, this.player.x, this.player.y - 15, `+${heal} (SUPER)`, C.COLORS.healText);
+            SFX.potionDrink();
+            this.addEffect('flash', 1, 0.3, 'rgba(150, 255, 200, 0.5)');
+            spawnSpark(this.particles, this.player.x, this.player.y, '#55ff88', 12);
+            potionUsed = true;
+          }
+        }
+        // --- Strength Potion ---
+        else if (eqConsumable.id === 'potion_strength') {
+          this.player.strengthBuffTimer = 30;
+          spawnDamageText(this.particles, this.player.x, this.player.y - 15, 'DANO AUMENTADO!', '#ff4444');
+          SFX.potionDrink();
+          this.addEffect('flash', 1, 0.3, 'rgba(255, 100, 100, 0.4)');
+          potionUsed = true;
+        }
+        // --- Defense Potion ---
+        else if (eqConsumable.id === 'potion_defense') {
+          this.player.defenseBuffTimer = 30;
+          spawnDamageText(this.particles, this.player.x, this.player.y - 15, 'BORDA DE FERRO!', '#4444ff');
+          SFX.potionDrink();
+          this.addEffect('flash', 1, 0.3, 'rgba(100, 100, 255, 0.4)');
+          potionUsed = true;
+        }
+        // --- Speed Potion ---
+        else if (eqConsumable.id === 'potion_speed') {
+          this.player.speedBuffTimer = 30;
+          spawnDamageText(this.particles, this.player.x, this.player.y - 15, 'VELOCIDADE!', '#ffff44');
+          SFX.potionDrink();
+          this.addEffect('flash', 1, 0.3, 'rgba(255, 255, 100, 0.4)');
+          potionUsed = true;
+        }
+
+        if (potionUsed) {
+          this.potionCooldown = 1.0;
+          eqConsumable.quantity--;
+          if (eqConsumable.quantity <= 0) {
+            console.log(`[INVENTORY] Consumable ${eqConsumable.id} depleted. Removing from slot.`);
+            this.amuletInventory.consumables = this.amuletInventory.consumables.filter(c => c.id !== eqConsumable.id);
+          }
+          // Sync legacy counter
+          this.player.potions = this.amuletInventory.consumables.find(c => c.id === 'potion_refill')?.quantity || 0;
+          console.log(`[INPUT] Consumable ${eqConsumable.id} used. Remaining: ${eqConsumable.quantity}`);
+        }
+      } else {
+        this.potionCooldown = 0.5;
+        SFX.uiError();
+        spawnDamageText(this.particles, this.player.x, this.player.y - 15, 'SEM ITEM EQUIPADO', '#aaaaaa');
+      }
+    } else {
+      if (this.potionCooldown > 0) this.potionCooldown -= dt;
+    }
+
+    // Tick Buff Timers
+    if (this.player.strengthBuffTimer > 0) this.player.strengthBuffTimer -= dt;
+    if (this.player.defenseBuffTimer > 0) this.player.defenseBuffTimer -= dt;
+    if (this.player.speedBuffTimer > 0) this.player.speedBuffTimer -= dt;
+
     this.stats.timePlayed += dt;
     this.gameTime += dt;
 
@@ -820,7 +1089,8 @@ export class GameEngine {
             // Mark enemy as hit by this volley
             e.lastVolleyId = p.volleyId;
 
-            let dmg = Math.floor(p.damage * this.player.damageMultiplier * this.getAmuletDamageMult());
+            const strengthMult = this.player.strengthBuffTimer > 0 ? 1.5 : 1.0;
+            let dmg = Math.floor(p.damage * this.player.damageMultiplier * this.getAmuletDamageMult() * strengthMult);
             // Berserker
             if (this.player.berserker && this.player.hp / this.player.maxHp < 0.3) {
               dmg = Math.floor(dmg * 1.8);
@@ -1138,7 +1408,8 @@ export class GameEngine {
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
       if (Math.abs(angleDiff) > C.MELEE_ARC / 2) continue;
 
-      let dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier * this.getAmuletDamageMult());
+      const strengthMult = this.player.strengthBuffTimer > 0 ? 1.5 : 1.0;
+      let dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier * this.getAmuletDamageMult() * strengthMult);
       // Berserker
       if (this.player.berserker && this.player.hp / this.player.maxHp < 0.3) {
         dmg = Math.floor(dmg * 1.8);
@@ -1434,8 +1705,8 @@ export class GameEngine {
     const atkInterval = hasAmulet ? 0.5 : 0.8;
     const dmgMult = hasAmulet ? 0.8 : 0.5;
     const projCount = hasAmulet ? 2 : 1;
-    // Heal on hit: very weak, only every 3rd attack when amulet equipped
-    const healOnHit = hasAmulet && this.discipleAttackTimer <= 0 && Math.random() < 0.33 ? 1 : 0;
+    // Heal on hit: REMOVED (Potion overhaul)
+    // const healOnHit = hasAmulet && this.discipleAttackTimer <= 0 && Math.random() < 0.33 ? 1 : 0;
 
     this.discipleAttackTimer -= dt;
     if (this.discipleAttackTimer <= 0) {
@@ -1469,10 +1740,7 @@ export class GameEngine {
           });
         }
         spawnSpark(this.particles, p.discipleX, p.discipleY, '#66cc88', 3);
-        // Heal on hit
-        if (healOnHit > 0) {
-          p.hp = Math.min(p.maxHp, p.hp + healOnHit);
-        }
+        // Heal on hit removed
       }
     }
     // Subtle particles
@@ -1581,9 +1849,10 @@ export class GameEngine {
       room.treasureCollected = true;
       SFX.chestOpen();
       HorrorSFX.chestOpen();
-      const heal = Math.floor(p.maxHp * 0.3);
-      p.hp = Math.min(p.maxHp, p.hp + heal);
-      spawnDamageText(this.particles, p.x, p.y - 10, `+${heal} HP`, C.COLORS.healText);
+      // REMOVED: Healing from chest. Survival is potion-based now.
+      // const heal = Math.floor(p.maxHp * 0.3);
+      // p.hp = Math.min(p.maxHp, p.hp + heal);
+      // spawnDamageText(this.particles, p.x, p.y - 10, `+${heal} HP`, C.COLORS.healText);
       const xp = 15 + this.dungeon.floor * 5;
       const leveledUp = addXP(p, xp);
       spawnDamageText(this.particles, p.x, p.y - 20, `+${xp} XP`, C.COLORS.xpText);
@@ -1625,36 +1894,31 @@ export class GameEngine {
     }
 
     // Auto vendor dialogue on proximity (original behavior)
-    // Only trigger if player is closer to vendor than to sanctuary shrine
+    // Only trigger if player is close to a vendor
     if (room.type === 'vendor' && this.inVendorRoom && !this.vendorDialogueActive && !this.shopOpen && this.vendorInteractCooldown <= 0) {
       const vdist = Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
       const shrineX = Math.floor(C.dims.gw * 0.18);
       const shrineY = Math.floor(C.dims.gh * 0.5);
       const shrineDist = Math.sqrt((p.x - shrineX) ** 2 + (p.y - shrineY) ** 2);
+
+      const alchemistX = cx + 120;
+      const alchemistY = cy - 40;
+      const adist = Math.sqrt((p.x - alchemistX) ** 2 + (p.y - alchemistY) ** 2);
+
       // Only auto-trigger vendor if player is closer to vendor than shrine
-      if (vdist < 40 && vdist < shrineDist) {
+      if (vdist < 40 && vdist < shrineDist && vdist < adist) {
         this.startVendorDialogue();
+      } else if (adist < 40 && adist < shrineDist) {
+        this.startAlchemistDialogue();
       }
     }
   }
 
-  // Legacy public method — kept for mobile button compat
-  tryVendorInteract() {
+  // Sanctuary interaction method
+  trySanctuaryHeal() {
     if (this.vendorDialogueActive || this.shopOpen) return;
     const room = getCurrentRoom(this.dungeon);
     if (room.type !== 'vendor' || !this.inVendorRoom) return;
-    if (this.vendorInteractCooldown > 0) return;
-    this.startVendorDialogue();
-  }
-
-  // Public method for sanctuary open — triggered by [T] key
-  trySanctuaryHeal() {
-    // Guard: don't heal during some states
-    if (this.shopOpen || this.paused) return;
-    const room = getCurrentRoom(this.dungeon);
-    if (room.type !== 'vendor' || !this.inVendorRoom) return;
-
-    // Sanctuary position on the left side of vendor room
     const shrineX = Math.floor(C.dims.gw * 0.18);
     const shrineY = Math.floor(C.dims.gh * 0.5);
     const shrineDist = Math.sqrt((this.player.x - shrineX) ** 2 + (this.player.y - shrineY) ** 2);
@@ -1662,11 +1926,6 @@ export class GameEngine {
     if (shrineDist > 40) {
       spawnDamageText(this.particles, this.player.x, this.player.y - 10, 'Aproxime-se do Santuário', '#888888');
       return;
-    }
-
-    // If vendor dialogue is active, close it first
-    if (this.vendorDialogueActive) {
-      this.vendorDialogueActive = false;
     }
 
     // Open sanctuary modal via callback and pause engine
@@ -1817,7 +2076,8 @@ export class GameEngine {
     ctx.fillStyle = '#e8d5a0';
     ctx.font = `500 10px ${C.HUD_FONT}`;
     ctx.textAlign = 'left';
-    ctx.fillText('🧙 O Mercador', boxX + padding, boxY + 14);
+    const speaker = this.currentNPC === 'alchemist' ? '🧪 A Alquimista' : '🧙 O Mercador';
+    ctx.fillText(speaker, boxX + padding, boxY + 14);
 
     // Wrapped dialogue text
     ctx.fillStyle = '#c8b888';

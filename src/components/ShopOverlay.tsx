@@ -13,6 +13,15 @@ const VENDOR_DIALOGUES = [
   "Não se demore... eles podem sentir seu cheiro.",
 ];
 
+const ALCHEMIST_DIALOGUES = [
+  "As essências estão instáveis hoje.",
+  "Um novo espécime. Você cheira a sangue e... determinação.",
+  "A alquimia é a arte da transmutação absoluta.",
+  "Posso destilar sua agonia em cura, se tiver almas.",
+  "Meus elixires não são baratos, mas são... eficazes.",
+  "Negociaremos o fluxo da vida?",
+];
+
 const RARITY_COLORS: Record<string, string> = {
   common: '#999999',
   rare: '#6699dd',
@@ -44,18 +53,20 @@ const RARITY_LABELS: Record<string, string> = {
 interface ShopOverlayProps {
   items: ShopItem[];
   coins: number;
+  shopType: 'normal' | 'potion';
   onBuy: (index: number) => void;
   onClose: () => void;
 }
 
-const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) => {
+const ShopOverlay = ({ items, coins: souls, shopType, onBuy, onClose }: ShopOverlayProps) => {
   const [dialogue, setDialogue] = useState('');
   const [displayedText, setDisplayedText] = useState('');
   const [buyFlash, setBuyFlash] = useState<number | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    const text = VENDOR_DIALOGUES[Math.floor(Math.random() * VENDOR_DIALOGUES.length)];
+    const pool = shopType === 'potion' ? ALCHEMIST_DIALOGUES : VENDOR_DIALOGUES;
+    const text = pool[Math.floor(Math.random() * pool.length)];
     setDialogue(text);
     setDisplayedText('');
     let i = 0;
@@ -117,10 +128,10 @@ const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) 
           }}
         >
           <div className="flex items-center gap-3">
-            <span style={{ fontSize: 22 }}>🧙</span>
+            <span style={{ fontSize: 22 }}>{shopType === 'potion' ? '🧪' : '🧙'}</span>
             <h2
               style={{
-                color: '#d4c090',
+                color: shopType === 'potion' ? '#aaffaa' : '#d4c090',
                 fontFamily: "'Montserrat', sans-serif",
                 fontSize: 14,
                 fontWeight: 600,
@@ -129,7 +140,7 @@ const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) 
                 margin: 0,
               }}
             >
-              Mercador das Sombras
+              {shopType === 'potion' ? 'A Alquimista' : 'Mercador das Sombras'}
             </h2>
           </div>
 
@@ -210,17 +221,16 @@ const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) 
                       background: isSold
                         ? 'rgba(25, 25, 25, 0.4)'
                         : isSelected
-                        ? 'rgba(160, 130, 70, 0.15)'
-                        : buyFlash === idx
-                        ? 'rgba(220, 190, 80, 0.15)'
-                        : RARITY_BG[rarity],
-                      border: `1.5px solid ${
-                        isSold
+                          ? 'rgba(160, 130, 70, 0.15)'
+                          : buyFlash === idx
+                            ? 'rgba(220, 190, 80, 0.15)'
+                            : RARITY_BG[rarity],
+                      border: `1.5px solid ${isSold
                           ? 'rgba(50, 50, 50, 0.3)'
                           : isSelected
-                          ? RARITY_COLORS[rarity]
-                          : `${RARITY_COLORS[rarity]}40`
-                      }`,
+                            ? RARITY_COLORS[rarity]
+                            : `${RARITY_COLORS[rarity]}40`
+                        }`,
                       boxShadow: isSelected && !isSold ? RARITY_GLOW[rarity] : 'none',
                       opacity: isSold ? 0.35 : canAfford ? 1 : 0.5,
                       cursor: isSold ? 'not-allowed' : 'pointer',
@@ -405,20 +415,19 @@ const ShopOverlay = ({ items, coins: souls, onBuy, onClose }: ShopOverlayProps) 
                     background: selectedItem.sold
                       ? 'rgba(40, 40, 40, 0.4)'
                       : souls >= selectedItem.cost
-                      ? 'rgba(60, 130, 70, 0.5)'
-                      : 'rgba(80, 30, 30, 0.4)',
+                        ? 'rgba(60, 130, 70, 0.5)'
+                        : 'rgba(80, 30, 30, 0.4)',
                     color: selectedItem.sold
                       ? '#555'
                       : souls >= selectedItem.cost
-                      ? '#88ee88'
-                      : '#cc6666',
-                    border: `1px solid ${
-                      selectedItem.sold
+                        ? '#88ee88'
+                        : '#cc6666',
+                    border: `1px solid ${selectedItem.sold
                         ? 'rgba(60, 60, 60, 0.3)'
                         : souls >= selectedItem.cost
-                        ? 'rgba(80, 180, 100, 0.4)'
-                        : 'rgba(180, 60, 60, 0.3)'
-                    }`,
+                          ? 'rgba(80, 180, 100, 0.4)'
+                          : 'rgba(180, 60, 60, 0.3)'
+                      }`,
                     fontFamily: "'Montserrat', sans-serif",
                     fontSize: 12,
                     fontWeight: 600,

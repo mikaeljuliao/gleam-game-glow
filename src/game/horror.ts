@@ -3,6 +3,8 @@
 // No drones, no loops, no constant noise. Just dread.
 import { HorrorEvent, Particle, Viewport } from './types';
 import * as C from './constants';
+import { renderAlchemist } from './renderer';
+import { getBiome } from './biomes';
 
 // ============ AUDIO CONTEXT ============
 
@@ -80,15 +82,15 @@ export function updateCombatTension(enemyCount: number, closestEnemyDist: number
     if (closestEnemyDist < 80) target = Math.min(1, target + 0.4);
     else if (closestEnemyDist < 150) target = Math.min(1, target + 0.15);
   }
-  
+
   // Smooth transition
   const speed = target > combatIntensity ? 2.0 : 0.5; // ramp up fast, fade slow
   combatIntensity += (target - combatIntensity) * speed * dt;
   combatIntensity = Math.max(0, Math.min(1, combatIntensity));
-  
+
   if (!ambienceActive) return;
   const ctx = getBgCtx();
-  
+
   // Manage sub-bass drone that intensifies with combat
   if (combatIntensity > 0.05) {
     if (!combatDroneOsc) {
@@ -110,12 +112,12 @@ export function updateCombatTension(enemyCount: number, closestEnemyDist: number
   } else if (combatDroneOsc && combatDroneGain) {
     combatDroneGain.gain.setTargetAtTime(0, ctx.currentTime, 0.3);
     setTimeout(() => {
-      try { combatDroneOsc?.stop(); } catch {}
+      try { combatDroneOsc?.stop(); } catch { }
       combatDroneOsc = null;
       combatDroneGain = null;
     }, 1000);
   }
-  
+
   // Occasional tension pulses during high combat
   combatPulseTimer -= dt;
   if (combatIntensity > 0.4 && combatPulseTimer <= 0) {
@@ -269,7 +271,7 @@ export function stopVendorAmbience() {
   vendorMelodyTimer = null;
   setTimeout(() => {
     for (const node of vendorNodes) {
-      try { if ('stop' in node && typeof (node as any).stop === 'function') (node as OscillatorNode).stop(); } catch {}
+      try { if ('stop' in node && typeof (node as any).stop === 'function') (node as OscillatorNode).stop(); } catch { }
     }
     vendorNodes = [];
   }, 2000);
@@ -294,7 +296,7 @@ export function stopBackgroundMusic() {
   ambienceTimers.forEach(clearTimeout);
   ambienceTimers = [];
   if (combatDroneOsc) {
-    try { combatDroneOsc.stop(); } catch {}
+    try { combatDroneOsc.stop(); } catch { }
     combatDroneOsc = null;
     combatDroneGain = null;
   }
@@ -638,13 +640,41 @@ export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: strin
     ctx.font = `bold 9px ${C.HUD_FONT}`;
     ctx.textAlign = 'center';
     ctx.fillText('MERCADOR', cx, cy + 30);
-    ctx.textAlign = 'left';
+
+    // === ALQUIMISTA (top-right side) ===
+    const alchemistX = cx + 120;
+    const alchemistY = cy - 40;
+
+    // Alchemical Glow (Toxic Green/Emerald)
+    const alchGlow = ctx.createRadialGradient(alchemistX, alchemistY, 0, alchemistX, alchemistY, 40);
+    alchGlow.addColorStop(0, `rgba(50, 255, 150, ${0.1 * pulse})`);
+    alchGlow.addColorStop(1, 'rgba(50, 255, 150, 0)');
+    ctx.fillStyle = alchGlow;
+    ctx.beginPath();
+    ctx.arc(alchemistX, alchemistY, 40, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Decorative table/bottles around her
+    ctx.fillStyle = '#221108';
+    ctx.fillRect(alchemistX + 14, alchemistY - 4, 8, 12); // Small side table
+    ctx.fillStyle = '#3344cc'; // Blue liquid bottle
+    ctx.fillRect(alchemistX + 16, alchemistY - 8, 2, 4);
+    ctx.fillStyle = '#eeaa22'; // Orange liquid bottle
+    ctx.fillRect(alchemistX + 19, alchemistY - 6, 2, 3);
+
+    renderAlchemist(ctx, alchemistX, alchemistY, time);
+
+    // Label for Alchemist
+    ctx.fillStyle = `rgba(180, 140, 255, ${pulse})`;
+    ctx.font = `bold 9px ${C.HUD_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('ALQUIMISTA', alchemistX, alchemistY + 30);
 
     // === SANCTUARY (left side of vendor room) ===
     const shrineX = Math.floor(C.dims.gw * 0.18);
     const shrineY = Math.floor(C.dims.gh * 0.5);
     const sFloat = Math.sin(time * 2) * 1;
-    
+
     // Shrine glow
     const shrineGlow = ctx.createRadialGradient(shrineX, shrineY, 0, shrineX, shrineY, 35);
     shrineGlow.addColorStop(0, `rgba(60, 130, 255, ${0.15 * pulse})`);
@@ -654,14 +684,14 @@ export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: strin
     ctx.beginPath();
     ctx.arc(shrineX, shrineY, 35, 0, Math.PI * 2);
     ctx.fill();
-    
+
     // Shrine pillar
     ctx.fillStyle = '#1a2040';
     ctx.fillRect(shrineX - 5, shrineY - 8 + sFloat, 10, 18);
     ctx.fillStyle = '#222850';
     ctx.fillRect(shrineX - 7, shrineY - 10 + sFloat, 14, 4);
     ctx.fillRect(shrineX - 6, shrineY + 8 + sFloat, 12, 3);
-    
+
     // Crystal on top
     const cPulse = Math.sin(time * 3.5) * 0.3 + 0.7;
     ctx.fillStyle = `rgba(80, 160, 255, ${0.9 * cPulse})`;
@@ -681,7 +711,7 @@ export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: strin
     ctx.lineTo(shrineX - 2, shrineY - 10 + sFloat);
     ctx.closePath();
     ctx.fill();
-    
+
     // Floating particles
     for (let i = 0; i < 4; i++) {
       const a = time * 1.2 + (i / 4) * Math.PI * 2;
@@ -693,7 +723,7 @@ export function renderSpecialRoom(ctx: CanvasRenderingContext2D, roomType: strin
       ctx.arc(fpx, fpy, 1, 0, Math.PI * 2);
       ctx.fill();
     }
-    
+
     // Label
     ctx.fillStyle = `rgba(100, 170, 255, ${pulse * 0.8})`;
     ctx.font = `bold 8px ${C.HUD_FONT}`;
@@ -824,7 +854,7 @@ function playHPHeartbeat(hpRatio: number) {
   const bpm = 40 + (1 - hpRatio) * 20; // 40-60 bpm (very slow)
   const interval = 60 / bpm;
   const vol = 0.04 + (1 - hpRatio) * 0.06; // slightly louder to be audible (was 0.02 + 0.04)
-  
+
   for (let i = 0; i < 2; i++) {
     const t = ctx.currentTime + i * interval * 0.3;
     const osc = ctx.createOscillator();
@@ -910,7 +940,7 @@ export function renderHPHorror(ctx: CanvasRenderingContext2D, hpRatio: number, t
     const g = 0;
     const b = 0;
     const baseAlpha = intensity * 0.2; // much lighter max alpha
-    
+
     const vignette = ctx.createRadialGradient(
       fw / 2 + fx, fh / 2 + fy, fw * 0.25,
       fw / 2 + fx, fh / 2 + fy, fw * 0.6
@@ -925,7 +955,7 @@ export function renderHPHorror(ctx: CanvasRenderingContext2D, hpRatio: number, t
   // 2. Blood overlay — very subtle edge stains when HP < 35%
   if (hpRatio < 0.35) {
     const bloodIntensity = (0.35 - hpRatio) / 0.35;
-    
+
     // Corner blood stains — much smaller and more transparent
     const corners = [
       { x: fx, y: fy },
@@ -1077,30 +1107,30 @@ export function updateBossIntro(dt: number) {
 
 export function renderBossIntro(ctx: CanvasRenderingContext2D, time: number, vp: Viewport) {
   if (!bossIntro.active) return;
-  
+
   const floor = bossIntro.floor;
   const progress = 1 - (bossIntro.timer / bossIntro.duration);
   const fadeIn = Math.min(1, progress * 3);
   const fadeOut = Math.max(0, 1 - (progress - 0.7) * 3.33);
   const alpha = Math.min(fadeIn, fadeOut);
-  
+
   const data = BOSS_DATA[floor] || BOSS_DATA[1];
-  
+
   const fx = -vp.gox;
   const fy = -vp.goy;
   const fw = vp.rw;
   const fh = vp.rh;
-  
+
   // Dark overlay
   ctx.fillStyle = `rgba(0, 0, 0, ${0.9 * alpha})`;
   ctx.fillRect(fx, fy, fw, fh);
-  
+
   const cx = C.dims.gw / 2;
   const cy = C.dims.gh / 2;
   const silScale = 0.8 + progress * 0.2;
   const silSize = (20 + floor * 4) * silScale;
   const silY = cy - 15;
-  
+
   // Floor-specific vignette color
   const vignetteColors: Record<number, string> = {
     1: `rgba(80, 0, 0, ${0.5 * alpha})`,
@@ -1115,7 +1145,7 @@ export function renderBossIntro(ctx: CanvasRenderingContext2D, time: number, vp:
   vignette.addColorStop(1, vignetteColors[floor] || vignetteColors[1]);
   ctx.fillStyle = vignette;
   ctx.fillRect(fx, fy, fw, fh);
-  
+
   // Floor-specific glow color
   const glowPulse = Math.sin(time * 4) * 0.15 + 0.35;
   const glowColors: Record<number, string> = {
@@ -1131,10 +1161,10 @@ export function renderBossIntro(ctx: CanvasRenderingContext2D, time: number, vp:
   glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.fillStyle = glow;
   ctx.fillRect(cx - silSize * 2, silY - silSize * 2, silSize * 4, silSize * 4);
-  
+
   // Floor-specific silhouettes
   ctx.fillStyle = `rgba(10, 0, 0, ${0.95 * alpha})`;
-  
+
   switch (floor) {
     case 1: // Sombra Faminta — demonic winged shape
       ctx.beginPath();
@@ -1162,7 +1192,7 @@ export function renderBossIntro(ctx: CanvasRenderingContext2D, time: number, vp:
       ctx.closePath();
       ctx.fill();
       break;
-      
+
     case 2: // O Caçador — sleek predator with speed lines
       ctx.beginPath();
       ctx.moveTo(cx, silY - silSize * 1.1);
@@ -1190,7 +1220,7 @@ export function renderBossIntro(ctx: CanvasRenderingContext2D, time: number, vp:
         ctx.stroke();
       }
       break;
-      
+
     case 3: // O Invocador — hooded figure with floating orbs
       ctx.beginPath();
       ctx.arc(cx, silY - silSize * 0.4, silSize * 0.5, Math.PI, Math.PI * 2);
@@ -1215,7 +1245,7 @@ export function renderBossIntro(ctx: CanvasRenderingContext2D, time: number, vp:
         ctx.fill();
       }
       break;
-      
+
     case 4: // O Fantasma — ethereal transparent form
       ctx.fillStyle = `rgba(0, 180, 160, ${0.4 * alpha})`;
       ctx.beginPath();
@@ -1234,7 +1264,7 @@ export function renderBossIntro(ctx: CanvasRenderingContext2D, time: number, vp:
       ctx.arc(cx, silY, silSize * 1.2, 0, Math.PI * 2);
       ctx.fill();
       break;
-      
+
     case 5: // O Destruidor — massive hulking form
       ctx.fillStyle = `rgba(10, 0, 0, ${0.95 * alpha})`;
       // Huge body
@@ -1257,7 +1287,7 @@ export function renderBossIntro(ctx: CanvasRenderingContext2D, time: number, vp:
         ctx.stroke();
       }
       break;
-      
+
     case 6: // O Pesadelo — amorphous shifting horror
       // Multiple overlapping forms
       for (let i = 0; i < 4; i++) {
@@ -1290,7 +1320,7 @@ export function renderBossIntro(ctx: CanvasRenderingContext2D, time: number, vp:
       }
       break;
   }
-  
+
   // Eyes for floors 1, 2, 5
   if (floor <= 2 || floor === 5) {
     const eyeGlow = Math.sin(time * 6) * 0.2 + 0.8;
@@ -1299,13 +1329,13 @@ export function renderBossIntro(ctx: CanvasRenderingContext2D, time: number, vp:
     ctx.fillRect(cx - silSize * 0.25, silY - silSize * 0.2, 4, 3);
     ctx.fillRect(cx + silSize * 0.15, silY - silSize * 0.2, 4, 3);
   }
-  
+
   // Floor label
   ctx.textAlign = 'center';
   ctx.fillStyle = `rgba(150, 80, 80, ${0.7 * alpha})`;
   ctx.font = `bold 9px ${C.HUD_FONT}`;
   ctx.fillText(`— ANDAR ${floor} —`, cx, cy - 55);
-  
+
   // Boss name
   const nameShake = progress < 0.3 ? Math.sin(time * 40) * 2 * (1 - progress * 3) : 0;
   ctx.fillStyle = data.accentColor.replace(')', `, ${alpha})`).replace('#', '');
@@ -1319,17 +1349,17 @@ export function renderBossIntro(ctx: CanvasRenderingContext2D, time: number, vp:
   ctx.fillStyle = hexToRgba(data.accentColor, alpha);
   ctx.font = `bold 16px ${C.HUD_FONT}`;
   ctx.fillText(data.name, cx + nameShake, cy + 35);
-  
+
   // Title
   ctx.fillStyle = `rgba(200, 150, 150, ${0.8 * alpha})`;
   ctx.font = `10px ${C.HUD_FONT}`;
   ctx.fillText(data.title, cx, cy + 50);
-  
+
   // Scan lines
   for (let y = -vp.goy; y < vp.rh - vp.goy; y += 3) {
     ctx.fillStyle = `rgba(0, 0, 0, ${0.06 * alpha})`;
     ctx.fillRect(-vp.gox, y, vp.rw, 1);
   }
-  
+
   ctx.textAlign = 'left';
 }

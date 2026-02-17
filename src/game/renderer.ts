@@ -1625,25 +1625,9 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
           ctx.fillStyle = C.COLORS.bossAccent;
           ctx.fillRect(x - half - 3, y - half - 5 + breathe, 4, 7);
           ctx.fillRect(x + half, y - half - 5 + breathe, 4, 7);
-          // Wings
-          ctx.fillStyle = C.COLORS.bossDark;
-          ctx.fillRect(x - half - 6, y - 4 + breathe, 5, 8);
-          ctx.fillRect(x + half + 1, y - 4 + breathe, 5, 8);
-          // Eyes
-          ctx.fillStyle = e.aiState === 'attack' ? '#ff0000' : '#ffff00';
-          ctx.fillRect(x - 6, y - 4 + breathe, 4, 3);
-          ctx.fillRect(x + 3, y - 4 + breathe, 4, 3);
-          // Mouth
-          ctx.fillStyle = C.COLORS.bossDark;
-          ctx.fillRect(x - 4, y + 3 + breathe, 8, 2);
           break;
         }
       }
-      // Boss aura
-      ctx.fillStyle = 'rgba(255, 50, 50, 0.08)';
-      ctx.beginPath();
-      ctx.arc(x, y + breathe, half + 15, 0, Math.PI * 2);
-      ctx.fill();
       break;
     }
   }
@@ -1653,14 +1637,139 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
 
   // HP bar
   if (e.hp < e.maxHp) {
-    const barW = Math.max(s + 4, 12);
-    const barH = 2;
-    const bx = x - barW / 2;
+    const barW_hp = Math.max(s + 4, 12);
+    const barH_hp = 2;
+    const bx = x - barW_hp / 2;
     const by = y - half - 7;
     ctx.fillStyle = C.COLORS.hpBg;
-    ctx.fillRect(bx, by, barW, barH);
+    ctx.fillRect(bx, by, barW_hp, barH_hp);
     ctx.fillStyle = e.hp / e.maxHp > 0.3 ? C.COLORS.hpFill : '#ff6600';
-    ctx.fillRect(bx, by, barW * (e.hp / e.maxHp), barH);
+    ctx.fillRect(bx, by, barW_hp * (e.hp / e.maxHp), barH_hp);
+  }
+}
+
+export function renderAlchemist(ctx: CanvasRenderingContext2D, x: number, y: number, time: number) {
+  // --- BASE SHADOW ---
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+  ctx.beginPath();
+  ctx.ellipse(x, y + 8, 10, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Floating bob effect
+  const bob = Math.sin(time * 1.5) * 2;
+  const ay = y + bob;
+
+  // --- ROBE & BODY (Teal/Deep Emerald) ---
+  // Outer Robe/Cloak
+  ctx.fillStyle = '#1a3c34';
+  ctx.beginPath();
+  ctx.moveTo(x - 8, ay - 6);
+  ctx.lineTo(x + 8, ay - 6);
+  ctx.lineTo(x + 12, ay + 10);
+  ctx.lineTo(x - 12, ay + 10);
+  ctx.fill();
+
+  // Alchemy Apron (Leather/Brown)
+  ctx.fillStyle = '#4a3728';
+  ctx.fillRect(x - 5, ay - 2, 10, 12);
+
+  // --- BELT & UTILITIES ---
+  ctx.fillStyle = '#2a1a0a';
+  ctx.fillRect(x - 9, ay + 3, 18, 2); // Belt
+
+  // Small hanging vials on the belt
+  const vialColors = ['#ff5555', '#55ff88', '#5588ff'];
+  for (let i = 0; i < 3; i++) {
+    const vx = x - 6 + i * 6;
+    const vy = ay + 5 + Math.sin(time * 3 + i) * 0.5;
+    ctx.fillStyle = '#111111'; // Cork
+    ctx.fillRect(vx - 1, vy, 2, 1);
+    ctx.fillStyle = vialColors[i];
+    ctx.globalAlpha = 0.7 + Math.sin(time * 4 + i) * 0.3;
+    ctx.fillRect(vx - 2, vy + 1, 4, 4);
+    ctx.globalAlpha = 1;
+  }
+
+  // Large side bag
+  ctx.fillStyle = '#5c4033';
+  ctx.beginPath();
+  ctx.roundRect(x + 6, ay + 4, 6, 5, 2);
+  ctx.fill();
+
+  // --- ARMS & POTION ANIMATION ---
+  // She's hunched, holding a flask with both hands
+  const handX = x + Math.cos(time * 2) * 2;
+  const handY = ay + 2 + Math.sin(time * 2) * 1;
+
+  // Flask (Glass Texture)
+  const flaskSize = 5;
+  const grad = ctx.createRadialGradient(handX, handY, 0, handX, handY, flaskSize + 5);
+  grad.addColorStop(0, 'rgba(100, 255, 100, 0.4)');
+  grad.addColorStop(1, 'rgba(100, 255, 100, 0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(handX, handY, flaskSize + 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#aaffaa'; // Liquid
+  ctx.beginPath();
+  ctx.arc(handX, handY, flaskSize, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Flask highlights
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(handX, handY, flaskSize, -1, 1);
+  ctx.stroke();
+
+  // Rising noxious steam
+  if (Math.random() < 0.2) {
+    const steamX = handX + (Math.random() - 0.5) * 8;
+    const steamY = handY - 5 - Math.random() * 10;
+    ctx.fillStyle = `rgba(150, 255, 150, ${0.2 + Math.random() * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(steamX, steamY, 1 + Math.random() * 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // --- HEAD & DISTINCT HAT (The Silhueta) ---
+  // Neck/Hunch
+  ctx.fillStyle = '#2d4d44';
+  ctx.beginPath();
+  ctx.arc(x, ay - 8, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wide Alchemist Hat (Asymmetric pointed look)
+  ctx.fillStyle = '#0a1a15';
+  // Brim
+  ctx.beginPath();
+  ctx.ellipse(x, ay - 11, 14, 4, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  // Pointy top (relaxed/droopy)
+  ctx.beginPath();
+  ctx.moveTo(x - 8, ay - 12);
+  ctx.lineTo(x + 8, ay - 12);
+  ctx.quadraticCurveTo(x + 2, ay - 18, x - 12, ay - 24); // Drooping point to the left
+  ctx.lineTo(x - 2, ay - 15);
+  ctx.fill();
+
+  // Eyes (Glowing Amber/Cyan)
+  const eyePulse = Math.sin(time * 4) * 0.2 + 0.8;
+  ctx.fillStyle = `rgba(255, 170, 0, ${eyePulse})`;
+  ctx.fillRect(x - 4, ay - 10, 2, 1);
+  ctx.fillRect(x + 2, ay - 10, 2, 1);
+
+  // --- AMBIENT EFFECT ---
+  // Subtle glowing particles around her
+  for (let i = 0; i < 3; i++) {
+    const ang = time * 0.5 + i * (Math.PI * 2 / 3);
+    const px = x + Math.cos(ang) * 18;
+    const py = ay + Math.sin(ang * 2) * 10;
+    ctx.fillStyle = `rgba(150, 255, 220, ${0.15 * eyePulse})`;
+    ctx.beginPath();
+    ctx.arc(px, py, 1, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
@@ -1802,37 +1911,68 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   const visRight = vp.rw - vp.gox;
   const visBottom = vp.rh - vp.goy;
 
-  // --- HP Bar (top-left) ---
+  // --- Player HP & Resources ---
   const hpW = Math.round(100 * ms);
   const hpH = Math.round(10 * ms);
   const hpX = visLeft + 6;
   const hpY = visTop + 6;
+
+  // Background
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(hpX, hpY, hpW + 4, hpH + 4);
-  ctx.fillStyle = C.COLORS.hpBg;
-  ctx.fillRect(hpX + 2, hpY + 2, hpW, hpH);
-  const hpPct = player.hp / player.maxHp;
-  ctx.fillStyle = hpPct > 0.3 ? C.COLORS.hpFill : '#ff6600';
-  ctx.fillRect(hpX + 2, hpY + 2, hpW * hpPct, hpH);
-  ctx.strokeStyle = '#555';
+  ctx.fillRect(hpX, hpY, hpW, hpH);
+  ctx.strokeStyle = '#666666';
   ctx.lineWidth = 1;
-  ctx.strokeRect(hpX + 2, hpY + 2, hpW, hpH);
+  ctx.strokeRect(hpX, hpY, hpW, hpH);
+
+  // Fill
+  const hpPct = Math.max(0, player.hp / player.maxHp);
+  ctx.fillStyle = hpPct > 0.3 ? C.COLORS.hpFill : '#ff4400';
+  ctx.fillRect(hpX + 1, hpY + 1, Math.round((hpW - 2) * hpPct), hpH - 2);
+
+  // Text
   ctx.font = `500 ${Math.round(11 * ms)}px ${C.HUD_FONT}`;
   ctx.textAlign = 'left';
-  drawHudText(ctx, `${player.hp}/${player.maxHp}`, hpX + 5, hpY + 2 + Math.round(hpH * 0.75), C.COLORS.white);
+  drawHudText(ctx, `${Math.ceil(player.hp)}/${player.maxHp}`, hpX + 2, hpY + Math.round(hpH * 0.75), '#ffffff');
+
+  // --- Potions ---
+  const potY = hpY + hpH + 5;
+  for (let i = 0; i < player.maxPotions; i++) {
+    const px = visLeft + 6 + i * 14;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(px, potY, 12, 12);
+    ctx.strokeStyle = '#555555';
+    ctx.strokeRect(px, potY, 12, 12);
+
+    if (i < player.potions) {
+      // Potion liquid
+      ctx.fillStyle = '#55ff55';
+      ctx.fillRect(px + 3, potY + 4, 6, 6);
+      ctx.fillRect(px + 4, potY + 3, 4, 1);
+      // Shine
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.6;
+      ctx.fillRect(px + 4, potY + 5, 2, 2);
+      ctx.globalAlpha = 1;
+    } else {
+      // Empty slot
+      ctx.fillStyle = '#333333';
+      ctx.font = '9px monospace';
+      ctx.fillText('x', px + 3, potY + 9);
+    }
+  }
 
   // --- XP Bar ---
-  const xpY = hpY + hpH + 6;
+  const xpY = potY + 16;
   const xpH = Math.round(5 * ms);
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(hpX, xpY, hpW + 4, xpH + 4);
+  ctx.fillRect(visLeft + 6, xpY, hpW, xpH + 4);
   ctx.fillStyle = C.COLORS.xpBg;
-  ctx.fillRect(hpX + 2, xpY + 2, hpW, xpH);
+  ctx.fillRect(visLeft + 8, xpY + 2, hpW - 4, xpH);
   ctx.fillStyle = C.COLORS.xpFill;
-  ctx.fillRect(hpX + 2, xpY + 2, hpW * (player.xp / player.xpToNext), xpH);
+  ctx.fillRect(visLeft + 8, xpY + 2, (hpW - 4) * (player.xp / player.xpToNext), xpH);
   ctx.fillStyle = '#88ffaa';
   ctx.font = `500 ${Math.round(8 * ms)}px ${C.HUD_FONT}`;
-  ctx.fillText('XP', hpX + 3, xpY + 2 + Math.round(xpH * 0.8));
+  ctx.fillText('XP', visLeft + 9, xpY + 2 + Math.round(xpH * 0.8));
 
   // --- Soul Counter (next to level) ---
   const lvlX = hpW + 14;

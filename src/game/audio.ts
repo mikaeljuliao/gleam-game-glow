@@ -534,6 +534,17 @@ export const SFX = {
     });
     playNoise(0.2, 0.04, 3000);
   },
+
+  potionDrink() {
+    playNoise(0.1, 0.05, 1200);
+    setTimeout(() => playTone(600, 0.15, 'sine', 0.06), 50);
+    setTimeout(() => playTone(800, 0.2, 'sine', 0.05), 150);
+  },
+
+  uiError() {
+    playTone(150, 0.15, 'square', 0.08);
+    setTimeout(() => playTone(120, 0.15, 'square', 0.06), 100);
+  },
 };
 
 // Initialize audio on first user interaction

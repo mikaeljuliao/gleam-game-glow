@@ -12,7 +12,7 @@ import { GameEngine } from '@/game/engine';
 import { initAudio, SFX } from '@/game/audio';
 import { Upgrade, Synergy, GameStats, ShopItem, DungeonMap } from '@/game/types';
 import { hasSave, clearSave } from '@/game/save';
-import { AmuletInventory, createAmuletInventory, addAmulet, toggleEquip, getAmuletDef, isAmuletEquipped } from '@/game/amulets';
+import { AmuletInventory, createAmuletInventory, addAmulet, toggleEquip, getAmuletDef, isAmuletEquipped, addConsumable, toggleEquipConsumable } from '@/game/amulets';
 
 type GameState = 'title' | 'playing' | 'upgrading' | 'gameOver' | 'shopping' | 'inventory' | 'cartographer' | 'amuletReveal' | 'sanctuary';
 
@@ -28,6 +28,7 @@ const Index = () => {
   const engineRef = useRef<GameEngine | null>(null);
   const [shopItems, setShopItems] = useState<ShopItem[]>([]);
   const [shopCoins, setShopCoins] = useState(0);
+  const [shopType, setShopType] = useState<'normal' | 'potion'>('normal');
   const [amuletInv, setAmuletInv] = useState<AmuletInventory>(createAmuletInventory());
   const [prevGameState, setPrevGameState] = useState<GameState>('playing');
   const [cartoDungeon, setCartoDungeon] = useState<DungeonMap | null>(null);
@@ -88,9 +89,10 @@ const Index = () => {
     setTimeout(() => setFloorNotif(null), 2500);
   }, []);
 
-  const handleShopOpen = useCallback((items: ShopItem[], souls: number) => {
+  const handleShopOpen = useCallback((items: ShopItem[], souls: number, type: 'normal' | 'potion' = 'normal') => {
     setShopItems(items);
     setShopCoins(souls);
+    setShopType(type);
     SFX.uiOpen();
     setGameState('shopping');
   }, []);
@@ -100,6 +102,17 @@ const Index = () => {
     engineRef.current?.closeShop();
   }, []);
 
+  const syncInventoryFromEngine = useCallback(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const inv = engine.amuletInventory;
+    setAmuletInv({
+      ...inv,
+      owned: inv.owned.map(a => ({ ...a })),
+      consumables: inv.consumables.map(c => ({ ...c }))
+    });
+  }, []);
+
   const handleShopBuy = useCallback((index: number) => {
     const engine = engineRef.current;
     if (!engine) return;
@@ -107,14 +120,16 @@ const Index = () => {
     if (success) {
       setShopCoins(engine.player.souls);
       setShopItems(prev => prev.map((item, i) => i === index ? { ...item, sold: true } : item));
+      // Sync inventory to show purchased amulets/potions
+      syncInventoryFromEngine();
     }
-  }, []);
+  }, [syncInventoryFromEngine]);
 
   const handleAmuletDrop = useCallback((amuletId: string) => {
     const engine = engineRef.current;
     if (engine) {
       addAmulet(engine.amuletInventory, amuletId);
-      setAmuletInv({ ...engine.amuletInventory, owned: [...engine.amuletInventory.owned] });
+      syncInventoryFromEngine();
     }
     const def = getAmuletDef(amuletId);
     if (def) {
@@ -132,21 +147,21 @@ const Index = () => {
   const handleAmuletRevealComplete = useCallback(() => {
     setRevealAmuletId(null);
     setGameState('playing');
-    // Sync amulet inventory from engine → React state (critical: this is the only sync point for boss drops)
+    // Sync amulet inventory from engine → React state
+    syncInventoryFromEngine();
     if (engineRef.current) {
-      const inv = engineRef.current.amuletInventory;
-      setAmuletInv({ ...inv, owned: inv.owned.map(a => ({ ...a })) });
       (engineRef.current as any).handleBossLevelUp();
     }
-  }, []);
+  }, [syncInventoryFromEngine]);
 
   const handleInventoryOpen = useCallback(() => {
     SFX.uiOpen();
+    syncInventoryFromEngine(); // Ensure current data (including depletion from use)
     setGameState(prev => {
       setPrevGameState(prev);
       return 'inventory';
     });
-  }, []);
+  }, [syncInventoryFromEngine]);
 
   const handleInventoryClose = useCallback(() => {
     SFX.uiClose();
@@ -164,7 +179,18 @@ const Index = () => {
     } else {
       SFX.amuletEquip();
     }
-    setAmuletInv({ ...engine.amuletInventory, owned: engine.amuletInventory.owned.map(a => ({ ...a })) });
+    setAmuletInv({ ...engine.amuletInventory, owned: engine.amuletInventory.owned.map(a => ({ ...a })), consumables: engine.amuletInventory.consumables.map(c => ({ ...c })) });
+  }, []);
+
+  const handleToggleConsumable = useCallback((id: string) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const wasEquipped = engine.amuletInventory.consumables.find(c => c.id === id)?.equipped;
+    toggleEquipConsumable(engine.amuletInventory, id);
+    if (!wasEquipped) {
+      SFX.amuletEquip(); // Use same sound for now
+    }
+    setAmuletInv({ ...engine.amuletInventory, owned: engine.amuletInventory.owned.map(a => ({ ...a })), consumables: engine.amuletInventory.consumables.map(c => ({ ...c })) });
   }, []);
 
   const handleRestart = useCallback(() => {
@@ -298,6 +324,7 @@ const Index = () => {
               <ShopOverlay
                 items={shopItems}
                 coins={shopCoins}
+                shopType={shopType}
                 onBuy={handleShopBuy}
                 onClose={handleShopClose}
               />
@@ -307,6 +334,7 @@ const Index = () => {
                 inventory={amuletInv}
                 souls={engineRef.current?.player.souls ?? 0}
                 onToggleEquip={handleToggleEquip}
+                onToggleConsumable={handleToggleConsumable}
                 onClose={handleInventoryClose}
               />
             )}

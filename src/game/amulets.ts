@@ -28,6 +28,13 @@ export interface AmuletInstance {
 export interface AmuletInventory {
   owned: AmuletInstance[];
   maxEquipped: number;
+  consumables: ConsumableInstance[];
+}
+
+export interface ConsumableInstance {
+  id: string;
+  quantity: number;
+  equipped: boolean;
 }
 
 // ============ AMULET DEFINITIONS ============
@@ -77,7 +84,33 @@ export function getAmuletDef(id: string): AmuletDef | undefined {
 }
 
 export function createAmuletInventory(): AmuletInventory {
-  return { owned: [], maxEquipped: 4 };
+  return { owned: [], maxEquipped: 4, consumables: [] };
+}
+
+export function addConsumable(inv: AmuletInventory, id: string, qty: number) {
+  const existing = inv.consumables.find(c => c.id === id);
+  if (existing) {
+    existing.quantity += qty;
+  } else {
+    inv.consumables.push({ id, quantity: qty, equipped: false });
+  }
+}
+
+export function getEquippedConsumable(inv: AmuletInventory): ConsumableInstance | undefined {
+  return inv.consumables.find(c => c.equipped);
+}
+
+export function toggleEquipConsumable(inv: AmuletInventory, id: string) {
+  const target = inv.consumables.find(c => c.id === id);
+  if (!target) return;
+
+  if (target.equipped) {
+    target.equipped = false;
+  } else {
+    // Un-equip others
+    inv.consumables.forEach(c => c.equipped = false);
+    target.equipped = true;
+  }
 }
 
 export function addAmulet(inv: AmuletInventory, defId: string): boolean {
@@ -143,5 +176,5 @@ export function getSoulCollectorBonus(souls: number): number {
 // Soul Collector: speed bonus based on souls carried
 export function getSoulCollectorSpeedBonus(souls: number): number {
   // +0.5% speed per 10 souls, up to +50%
-  return Math.min(0.5, souls / 2000) ;
+  return Math.min(0.5, souls / 2000);
 }
