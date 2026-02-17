@@ -478,8 +478,55 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
   const visible = p.invincibleTime <= 0 || Math.floor(p.invincibleTime * 20) % 2 === 0;
   if (!visible) return;
 
-  const x = p.x;
-  const y = p.y;
+  // === ATTACK ANIMATION STATE ===
+  let animX = 0;
+  let animY = 0;
+  let bodyRot = 0;
+
+  if (p.meleeAttacking) {
+    const activeStep = p.activeComboStep || 1;
+    const isFinalHit = activeStep === 4;
+    const isHeavyHit = activeStep === 3;
+    const duration = C.MELEE_COOLDOWN * (isFinalHit ? 1.5 : 1.0);
+    const t = 1 - (p.meleeTimer / duration);
+
+    const fx = p.facing.x;
+    const fy = p.facing.y;
+
+    let lunge = 0;
+
+    if (activeStep === 1) {
+      // Step 1: Snap Forward (Lean In)
+      if (t < 0.2) { lunge = -2 * (t / 0.2); bodyRot = -0.1 * (t / 0.2); } // Windup
+      else if (t < 0.6) { lunge = 6; bodyRot = 0.2; } // Strike
+      else { const rt = (t - 0.6) / 0.4; lunge = 6 * (1 - rt); bodyRot = 0.2 * (1 - rt); }
+    }
+    else if (activeStep === 2) {
+      // Step 2: Backhand (Twist Back)
+      if (t < 0.2) { lunge = 2; bodyRot = 0.1; }
+      else if (t < 0.6) { lunge = 5; bodyRot = -0.15; }
+      else { lunge = 5 * (1 - (t - 0.6) / 0.4); bodyRot = 0; }
+    }
+    else if (activeStep === 3) {
+      // Step 3: Heavy Smash (Deep crouch -> Big Lunge)
+      if (t < 0.3) { lunge = -3; animY = 2; bodyRot = -0.1; } // Crouch
+      else if (t < 0.6) { lunge = 12; animY = -3; bodyRot = 0.3; } // Jump Lunge
+      else { lunge = 12 * (1 - (t - 0.6) / 0.4); animY = 0; bodyRot = 0.1; }
+    }
+    else {
+      // Step 4: Vortex (Spin/Wobble)
+      const spin = Math.sin(t * Math.PI * 4);
+      lunge = 8 + spin * 2;
+      bodyRot = spin * 0.1;
+      animX += Math.cos(t * Math.PI * 8) * 2;
+    }
+
+    animX += fx * lunge;
+    animY += fy * lunge;
+  }
+
+  const x = p.x + animX;
+  const y = p.y + animY;
   const isMoving = p.trail.length > 0 || p.isDashing;
   const breathe = Math.sin(time * 2.5) * 0.5;
   const bobY = isMoving ? Math.sin(time * 10) * 1.2 : breathe * 0.3;
@@ -563,6 +610,9 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
 
   ctx.save();
   ctx.translate(x, y + bobY - idleDeepBreathe);
+
+  // Apply Attack Body Rotation (Lean)
+  if (bodyRot !== 0) ctx.rotate(bodyRot * p.facing.x); // Rotate towards facing
 
   // === CLOAK / BODY (flowing shape) ===
   const cloakSway = Math.sin(time * 3.5) * 1 + idleLookX * 0.3;
