@@ -4,7 +4,7 @@
 import { PlayerState, EnemyState, Particle } from './types';
 import * as C from './constants';
 
-export type HiddenTrapType = 
+export type HiddenTrapType =
   | 'slowness'          // Heavy slowness debuff
   | 'blindness'         // Drastically reduces light radius
   | 'weakness'          // Reduces player damage
@@ -87,12 +87,12 @@ const ALL_TRAP_TYPES: HiddenTrapType[] = [
 export function generateHiddenTraps(roomType: string, floor: number): HiddenTrap[] {
   // Only trap rooms get hidden traps
   if (roomType !== 'trap') return [];
-  
+
   const count = 2 + Math.floor(Math.random() * 2) + Math.min(floor, 3); // 2-6 traps
   const traps: HiddenTrap[] = [];
   const usedTypes = new Set<HiddenTrapType>();
   const usedPositions = new Set<string>();
-  
+
   for (let i = 0; i < count; i++) {
     // Pick a type, try not to repeat
     let type: HiddenTrapType;
@@ -257,7 +257,15 @@ export function activateTrap(
   return result;
 }
 
-export function resetTrapEffects() {
+export function resetTrapEffects(player: PlayerState) {
+  for (const eff of activeEffects) {
+    if (eff.type === 'slowness' && eff.originalValue !== undefined) {
+      player.moveSpeedMult = eff.originalValue;
+    }
+    if (eff.type === 'weakness' && eff.originalValue !== undefined) {
+      player.damageMultiplier = eff.originalValue;
+    }
+  }
   activeEffects = [];
   lightsOutTimer = 0;
   panicTimer = 0;

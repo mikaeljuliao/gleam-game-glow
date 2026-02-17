@@ -603,7 +603,7 @@ export class GameEngine {
     const room = getCurrentRoom(this.dungeon);
     this.enemies = [];
     this.bossWasSpawned = false;
-    resetTrapEffects();
+    resetTrapEffects(this.player);
 
     // Handle vendor room ambient
     const wasInVendor = this.inVendorRoom;
@@ -1272,7 +1272,7 @@ export class GameEngine {
     // War Rhythm: apply attack speed bonus from stacks, decay when not killing
     if (isAmuletEquipped(this.amuletInventory, 'war_rhythm')) {
       const warBonus = 1 + this.warRhythm.stacks * this.warRhythm.bonusPerStack;
-      this.player.attackSpeedMult = this.getBaseAttackSpeedMult() * warBonus;
+      this.player.temporaryAttackSpeedMult = warBonus;
 
       if (this.warRhythm.stacks > 0) {
         this.warRhythm.decayTimer -= dt;
@@ -1284,19 +1284,19 @@ export class GameEngine {
       }
     } else {
       // Not equipped — ensure no War Rhythm bonus persists
+      this.player.temporaryAttackSpeedMult = 1;
       if (this.warRhythm.stacks > 0) {
         this.warRhythm.stacks = 0;
-        this.player.attackSpeedMult = this.getBaseAttackSpeedMult();
       }
     }
 
     // Soul Collector: apply speed bonus based on souls
     if (isAmuletEquipped(this.amuletInventory, 'soul_collector')) {
       const speedBonus = getSoulCollectorSpeedBonus(this.player.souls);
-      this.player.moveSpeedMult = this._baseMoveSpeedMult * (1 + speedBonus);
+      this.player.temporaryMoveSpeedMult = (1 + speedBonus);
     } else {
-      // Not equipped — reset to base speed
-      this.player.moveSpeedMult = this._baseMoveSpeedMult;
+      // Not equipped — reset to 1
+      this.player.temporaryMoveSpeedMult = 1;
     }
 
     // Doom execute - check all enemies below 15% HP
@@ -1869,6 +1869,7 @@ export class GameEngine {
       p.hp = Math.max(1, p.hp - sacrifice);
       p.damageMultiplier += 0.2;
       p.moveSpeedMult += 0.1;
+      this._baseMoveSpeedMult = p.moveSpeedMult; // Important: sync base multiplier so it persists
       spawnDamageText(this.particles, p.x, p.y - 10, `-${sacrifice} HP`, C.COLORS.damageText);
       spawnDamageText(this.particles, p.x, p.y - 25, 'PODER +20%', '#bb88ff');
       spawnExplosion(this.particles, cx, cy, 20);

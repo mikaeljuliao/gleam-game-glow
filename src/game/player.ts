@@ -1,5 +1,6 @@
 import { PlayerState, Vec2 } from './types';
 import * as C from './constants';
+import { hasEffect } from './traps';
 
 export function createPlayer(): PlayerState {
   return {
@@ -66,6 +67,8 @@ export function createPlayer(): PlayerState {
     strengthBuffTimer: 0,
     defenseBuffTimer: 0,
     speedBuffTimer: 0,
+    temporaryMoveSpeedMult: 1,
+    temporaryAttackSpeedMult: 1,
   };
 }
 
@@ -87,8 +90,8 @@ export function updatePlayer(p: PlayerState, moveDir: Vec2, dt: number) {
   const buffSpeed = p.speedBuffTimer > 0 ? 1.4 : 1.0;
   const dashSpeed = p.dashEnhanced ? C.PLAYER_DASH_SPEED * 1.5 : C.PLAYER_DASH_SPEED;
 
-  // Calculate raw speed multiplier
-  let speedMult = p.moveSpeedMult * buffSpeed;
+  // Combine multipliers: Permanent (upgrades) * Buffs * Temporary (amulets)
+  let speedMult = p.moveSpeedMult * buffSpeed * p.temporaryMoveSpeedMult;
 
   // Apply Diminishing Returns: Scaled reduction after 1.5x speed
   if (speedMult > 1.5) {
@@ -97,6 +100,13 @@ export function updatePlayer(p: PlayerState, moveDir: Vec2, dt: number) {
   }
 
   let speed = p.isDashing ? dashSpeed : p.speed * speedMult;
+
+  // PROTECTION: No silent slowdowns.
+  // We only allow speed <= baseline if a trap or debuff is explicit.
+  const isSlowedByTrap = hasEffect('slowness');
+  if (!isSlowedByTrap && speed < C.PLAYER_SPEED && !p.isDashing) {
+    speed = C.PLAYER_SPEED;
+  }
 
   // Apply Absolute Speed Cap (for non-dash movement)
   if (!p.isDashing && speed > C.PLAYER_MAX_SPEED_CAP) {
@@ -135,7 +145,8 @@ export function tryDash(p: PlayerState): boolean {
 export function tryMelee(p: PlayerState, mouseX: number, mouseY: number): boolean {
   if (p.meleeCooldown > 0) return false;
   // Melee sequence: 0.05s anticipation -> 0.1s swing -> 0.1s recovery
-  p.meleeCooldown = C.MELEE_COOLDOWN / p.attackSpeedMult;
+  const finalAttackSpeed = p.attackSpeedMult * p.temporaryAttackSpeedMult;
+  p.meleeCooldown = C.MELEE_COOLDOWN / finalAttackSpeed;
   p.meleeAttacking = true;
   p.meleeAngle = Math.atan2(mouseY - p.y, mouseX - p.x);
   p.meleeTimer = 0.25;
@@ -147,7 +158,8 @@ export function canRangedAttack(p: PlayerState): boolean {
 }
 
 export function doRangedAttack(p: PlayerState) {
-  p.rangedCooldown = C.RANGED_COOLDOWN / p.attackSpeedMult;
+  const finalAttackSpeed = p.attackSpeedMult * p.temporaryAttackSpeedMult;
+  p.rangedCooldown = C.RANGED_COOLDOWN / finalAttackSpeed;
 }
 
 export function addXP(p: PlayerState, amount: number): boolean {

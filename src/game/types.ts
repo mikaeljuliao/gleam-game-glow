@@ -81,6 +81,9 @@ export interface PlayerState {
   strengthBuffTimer: number;
   defenseBuffTimer: number;
   speedBuffTimer: number;
+  // Temporary Multipliers (Amulets, Buffs, etc)
+  temporaryMoveSpeedMult: number;
+  temporaryAttackSpeedMult: number;
 }
 
 export type EnemyType = 'chaser' | 'shooter' | 'tank' | 'boss' | 'wraith' | 'bomber' | 'swarm' | 'necromancer' | 'stalker' | 'phantom' | 'flash_hunter' | 'distortion' | 'flicker_fiend' | 'warper' | 'accelerator';
