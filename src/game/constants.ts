@@ -7,7 +7,8 @@ export const ROOM_ROWS = 20;
 
 // Player
 export const PLAYER_SIZE = 16;
-export const PLAYER_SPEED = 100;
+export const PLAYER_SPEED = 125; // Sightly faster base speed for better feel
+export const PLAYER_MAX_SPEED_CAP = 240; // Absolute limit to prevent breaking gameplay
 export const PLAYER_MAX_HP = 100;
 export const PLAYER_DASH_SPEED = 280;
 export const PLAYER_DASH_DURATION = 0.15;

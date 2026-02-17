@@ -1053,403 +1053,694 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
 
   switch (e.type) {
     case 'chaser': {
-      const bob = Math.sin(time * 8 + e.x) * 1;
-      ctx.fillRect(x - half, y - half + 2 + bob, s, s - 2);
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.chaserDark;
-      ctx.fillRect(x - half + 1, y - half + bob, s - 2, 3);
-      // Claws
-      ctx.fillRect(x - half - 2, y + half - 3 + bob, 2, 3);
-      ctx.fillRect(x + half, y + half - 3 + bob, 2, 3);
-      // Eyes
-      ctx.fillStyle = '#ffff00';
-      ctx.fillRect(x - 3, y - half + 3 + bob, 2, 2);
-      ctx.fillRect(x + 2, y - half + 3 + bob, 2, 2);
+      // ═══ UMBRAL PROWLER - O Predador de Seda Negra ═══
+      const prowl = Math.sin(time * 12) * 2;
+      const tailFlow = Math.sin(time * 6) * 5;
+
+      // SLEEK SILHOUETTE (Elongated body)
+      const cColor = e.flashTime > 0 ? C.COLORS.white : '#0a0a0a';
+      ctx.fillStyle = cColor;
+
+      // Main Torso (Elegant teardrop shape)
+      ctx.beginPath();
+      ctx.moveTo(x - half - 4, y + prowl);
+      ctx.quadraticCurveTo(x, y - half - 2 + prowl, x + half + 4, y + prowl);
+      ctx.quadraticCurveTo(x, y + half + 2 + prowl, x - half - 4, y + prowl);
+      ctx.fill();
+
+      // BLADE LIMBS (4 Sharp, elegant legs)
+      ctx.strokeStyle = '#220000';
+      ctx.lineWidth = 1.2;
+      for (let i = 0; i < 2; i++) {
+        const side = i === 0 ? -1 : 1;
+        // Legs
+        ctx.beginPath();
+        ctx.moveTo(x + (side * 4), y + prowl);
+        ctx.lineTo(x + (side * 8), y + half + 6 + prowl);
+        ctx.stroke();
+      }
+
+      // ELEGANT TAIL (Wispy shadow)
+      ctx.strokeStyle = 'rgba(60, 0, 0, 0.4)';
+      ctx.beginPath();
+      ctx.moveTo(x - half, y + prowl);
+      ctx.bezierCurveTo(x - half - 10, y + prowl - 5, x - half - 5, y + prowl + 10, x - half - 15, y + prowl + tailFlow);
+      ctx.stroke();
+
+      // THE KILLING EYE (Single sharp red glint)
+      ctx.fillStyle = '#ff0000';
+      ctx.beginPath();
+      ctx.arc(x + half + 1, y + prowl - 1, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Eye glint aura
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+      ctx.beginPath();
+      ctx.arc(x + half + 1, y + prowl - 1, 4, 0, Math.PI * 2);
+      ctx.fill();
+
       break;
     }
 
     case 'shooter': {
-      const float = Math.sin(time * 4 + e.y) * 2;
-      ctx.beginPath();
-      ctx.arc(x, y - 2 + float, half, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.shooterDark;
-      ctx.fillRect(x - half, y + float, s, 4);
-      for (let i = 0; i < s; i += 3) {
-        ctx.fillRect(x - half + i, y + 3 + float, 2, (i % 2 === 0 ? 3 : 1));
+      // ═══ ARCANE SENTINEL - Relíquia Flutuante Elegante ═══
+      const float = Math.sin(time * 4) * 5;
+      const innerSpin = time * 2;
+      const pulsing = Math.sin(time * 6) * 0.2 + 0.8;
+
+      // 1. GOLDEN ORBITAL RINGS (Clean circular geometry)
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 2; i++) {
+        const ringScale = i === 0 ? 1 : 0.7;
+        ctx.beginPath();
+        ctx.ellipse(x, y + float, half + 8, (half + 8) * 0.4, innerSpin * (i === 0 ? 1 : -1), 0, Math.PI * 2);
+        ctx.stroke();
       }
-      // Eyes
-      ctx.fillStyle = '#ff88ff';
-      ctx.fillRect(x - 2, y - 4 + float, 2, 2);
-      ctx.fillRect(x + 1, y - 4 + float, 2, 2);
-      // Aura
-      ctx.fillStyle = 'rgba(170, 68, 221, 0.15)';
+
+      // 2. THE FLOATING CROWN / SHARDS
+      ctx.fillStyle = '#111';
+      for (let i = 0; i < 3; i++) {
+        const ang = (i / 3) * Math.PI * 2 + innerSpin;
+        const sx = x + Math.cos(ang) * (half + 2);
+        const sy = y + Math.sin(ang) * (half + 2) * 0.5 + float;
+
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - 3);
+        ctx.lineTo(sx + 2, sy);
+        ctx.lineTo(sx, sy + 3);
+        ctx.lineTo(sx - 2, sy);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#88ccff';
+        ctx.fillRect(sx - 0.5, sy - 0.5, 1, 1);
+        ctx.fillStyle = '#111';
+      }
+
+      // 3. SAPPHIRE CORE (Main Body)
+      const coreGrad = ctx.createRadialGradient(x, y + float, 0, x, y + float, half);
+      coreGrad.addColorStop(0, e.flashTime > 0 ? C.COLORS.white : '#88ccff');
+      coreGrad.addColorStop(1, e.flashTime > 0 ? C.COLORS.white : '#1a0033');
+      ctx.fillStyle = coreGrad;
+
+      // Unique refined shape: Sharp diamond
       ctx.beginPath();
-      ctx.arc(x, y + float, half + 4, 0, Math.PI * 2);
+      ctx.moveTo(x, y - half - 4 + float);
+      ctx.lineTo(x + half, y + float);
+      ctx.lineTo(x, y + half + 4 + float);
+      ctx.lineTo(x - half, y + float);
+      ctx.closePath();
       ctx.fill();
+
+      // 4. INNER ENERGY (Horizontal slit eye)
+      ctx.fillStyle = `rgba(255, 255, 255, ${pulsing})`;
+      ctx.fillRect(x - 3, y - 0.5 + float, 6, 1);
+
       break;
     }
 
     case 'tank': {
-      ctx.fillRect(x - half, y - half, s, s);
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.tankDark;
-      ctx.fillRect(x - half, y - half, s, 3);
-      // Horns
-      ctx.fillRect(x - half - 2, y - half - 3, 3, 4);
-      ctx.fillRect(x + half - 1, y - half - 3, 3, 4);
-      // Armor detail
-      ctx.fillStyle = 'rgba(100, 120, 140, 0.3)';
-      ctx.fillRect(x - 2, y - 2, 4, 4);
-      // Eyes
-      ctx.fillStyle = e.aiState === 'charge' ? '#ff0000' : '#ff6600';
-      ctx.fillRect(x - 4, y - 3, 3, 2);
-      ctx.fillRect(x + 2, y - 3, 3, 2);
-      // Charge indicator
-      if (e.aiState === 'charge') {
-        ctx.fillStyle = 'rgba(255, 100, 0, 0.3)';
-        ctx.fillRect(x - half - 3, y - half - 3, s + 6, s + 6);
+      // ═══ ROYAL SENTINEL - O Guardião Imponente ═══
+      const sway = Math.sin(time * 3) * 1;
+      const charge = e.aiState === 'charge';
+      const power = charge ? Math.sin(time * 20) * 0.3 + 0.7 : 0.4;
+
+      // 1. DARK STEEL CHASSIS (Clean plate armor)
+      const armorColor = e.flashTime > 0 ? C.COLORS.white : '#1a1a1a';
+      ctx.fillStyle = armorColor;
+
+      // Main heavy body (U-shape armor)
+      ctx.beginPath();
+      ctx.moveTo(x - half - 4, y + half);
+      ctx.lineTo(x - half - 4, y - half + 8);
+      ctx.quadraticCurveTo(x, y - half - 8 + sway, x + half + 4, y - half + 8);
+      ctx.lineTo(x + half + 4, y + half);
+      ctx.closePath();
+      ctx.fill();
+
+      // 2. GOLDEN FILIGREE (Elegant strategic detail)
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x - half + 2, y);
+      ctx.lineTo(x + half - 2, y);
+      ctx.stroke();
+
+      // 3. ROYAL KITE SHIELD (Frontal presence)
+      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#2a2a2a';
+      ctx.beginPath();
+      ctx.moveTo(x + half - 2, y - half + 5 + sway);
+      ctx.lineTo(x + half + 10, y - half + 5 + sway);
+      ctx.lineTo(x + half + 8, y + half + 5 + sway);
+      ctx.lineTo(x + half - 2, y + half + 2 + sway);
+      ctx.closePath();
+      ctx.fill();
+
+      // Shield Crest (Gold diamond)
+      ctx.fillStyle = '#ffd700';
+      ctx.beginPath();
+      ctx.moveTo(x + half + 4, y + sway);
+      ctx.lineTo(x + half + 6, y + 2 + sway);
+      ctx.lineTo(x + half + 4, y + 4 + sway);
+      ctx.lineTo(x + half + 2, y + 2 + sway);
+      ctx.closePath();
+      ctx.fill();
+
+      // 4. DIVINE PRESENCE (Charge effects - elegant sparks)
+      if (charge) {
+        ctx.strokeStyle = `rgba(255, 200, 0, ${power})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y, half + 15, 0, Math.PI * 2);
+        ctx.stroke();
       }
+
+      // 5. HELMET SLIT (Menacing visor)
+      ctx.fillStyle = charge ? '#ff0000' : '#ffd700';
+      ctx.fillRect(x - 4, y - half + 4 + sway, 8, 2);
+
       break;
     }
 
     case 'wraith': {
-      // Ghostly body
-      const wFloat = Math.sin(time * 5 + e.x) * 2;
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.wraith;
-      ctx.beginPath();
-      ctx.arc(x, y - 1 + wFloat, half, 0, Math.PI * 2);
-      ctx.fill();
-      // Wispy tail
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.wraithDark;
-      for (let i = 0; i < 3; i++) {
-        const tx = x - 3 + i * 3 + Math.sin(time * 6 + i) * 2;
-        const ty = y + half + i * 2 + wFloat;
-        ctx.fillRect(tx, ty, 2, 3);
+      // ═══ ETHEREAL SPECTER - Espectro dimensional ═══
+      const wFloat = Math.sin(time * 5 + e.x) * 3;
+      const phasePulse = Math.sin(time * 4) * 0.3 + 0.7;
+      const phaseShift = e.aiState === 'teleport' ? e.phaseAlpha : 1;
+
+      ctx.globalAlpha = phaseShift;
+
+      // Dimensional rift effect (when teleporting)
+      if (e.aiState === 'teleport' && e.phaseAlpha < 0.5) {
+        for (let i = 0; i < 5; i++) {
+          const riftAngle = (i / 5) * Math.PI * 2 + time * 4;
+          const riftDist = 8 + (0.5 - e.phaseAlpha) * 20;
+          const rx = x + Math.cos(riftAngle) * riftDist;
+          const ry = y + Math.sin(riftAngle) * riftDist + wFloat;
+
+          ctx.strokeStyle = `rgba(0, 255, 220, ${0.6 - e.phaseAlpha})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x, y + wFloat);
+          ctx.lineTo(rx, ry);
+          ctx.stroke();
+        }
+
+        // Portal ring
+        ctx.strokeStyle = `rgba(0, 200, 200, ${0.8 - e.phaseAlpha})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(x, y + wFloat, 15 + (0.5 - e.phaseAlpha) * 15, 0, Math.PI * 2);
+        ctx.stroke();
       }
-      // Glowing eyes
-      ctx.fillStyle = '#00ffcc';
-      ctx.fillRect(x - 3, y - 3 + wFloat, 2, 2);
-      ctx.fillRect(x + 2, y - 3 + wFloat, 2, 2);
-      // Ghost aura
-      ctx.fillStyle = C.COLORS.wraithGlow;
+
+      // Outer spectral aura (multiple layers)
+      for (let layer = 0; layer < 3; layer++) {
+        const layerOffset = layer * 4;
+        const layerAlpha = (0.15 - layer * 0.04) * phasePulse;
+        ctx.fillStyle = `rgba(0, 220, 200, ${layerAlpha})`;
+        ctx.beginPath();
+        ctx.arc(x, y + wFloat, half + 10 + layerOffset, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Spectral rings orbiting
+      for (let i = 0; i < 3; i++) {
+        const ringAngle = time * 3 + i * (Math.PI * 2 / 3);
+        const ringRadius = half + 8 + Math.sin(time * 2 + i) * 2;
+        ctx.strokeStyle = `rgba(0, 255, 200, ${0.3 * phasePulse})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(ringAngle) * 3, y + Math.sin(ringAngle) * 2 + wFloat, ringRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Main ethereal body (translucent core)
+      const bodyGrad = ctx.createRadialGradient(x, y + wFloat, 0, x, y + wFloat, half + 2);
+      bodyGrad.addColorStop(0, e.flashTime > 0 ? C.COLORS.white : 'rgba(150, 255, 255, 0.9)');
+      bodyGrad.addColorStop(0.5, e.flashTime > 0 ? C.COLORS.white : C.COLORS.wraith);
+      bodyGrad.addColorStop(1, e.flashTime > 0 ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 200, 200, 0.2)');
+      ctx.fillStyle = bodyGrad;
       ctx.beginPath();
-      ctx.arc(x, y + wFloat, half + 5, 0, Math.PI * 2);
+      ctx.arc(x, y + wFloat, half + 1, 0, Math.PI * 2);
       ctx.fill();
+
+      // Inner etheric glow (pulsating core)
+      const innerGlow = ctx.createRadialGradient(x, y + wFloat, 0, x, y + wFloat, half * 0.6);
+      innerGlow.addColorStop(0, `rgba(200, 255, 255, ${phasePulse * 0.8})`);
+      innerGlow.addColorStop(0.7, `rgba(100, 255, 255, ${phasePulse * 0.4})`);
+      innerGlow.addColorStop(1, 'rgba(0, 200, 200, 0)');
+      ctx.fillStyle = innerGlow;
+      ctx.beginPath();
+      ctx.arc(x, y + wFloat, half * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Spectral chains/tendrils flowing down
+      ctx.strokeStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.wraithDark;
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 5; i++) {
+        const tendrilX = x - 8 + i * 4;
+        const tendrilLength = 8 + i * 1.5;
+        const wave = Math.sin(time * 6 + i * 0.5) * 2;
+
+        ctx.globalAlpha = phaseShift * (1 - i * 0.15);
+        ctx.beginPath();
+        ctx.moveTo(tendrilX, y + half + wFloat);
+        ctx.quadraticCurveTo(
+          tendrilX + wave, y + half + wFloat + tendrilLength / 2,
+          tendrilX + wave * 2, y + half + wFloat + tendrilLength
+        );
+        ctx.stroke();
+      }
+
+      ctx.globalAlpha = phaseShift;
+
+      // Haunting eyes (piercing cyan glow)
+      const eyePulse = Math.sin(time * 8) * 0.2 + 0.8;
+      ctx.fillStyle = `rgba(0, 255, 255, ${eyePulse})`;
+      ctx.fillRect(x - 4, y - 2 + wFloat, 2, 3);
+      ctx.fillRect(x + 3, y - 2 + wFloat, 2, 3);
+
+      // Eye glow aura
+      ctx.fillStyle = `rgba(0, 255, 220, ${eyePulse * 0.4})`;
+      ctx.fillRect(x - 6, y - 3 + wFloat, 6, 5);
+      ctx.fillRect(x + 1, y - 3 + wFloat, 6, 5);
+
+      // Ethereal particles drifting
+      for (let i = 0; i < 4; i++) {
+        if (Math.random() < 0.3) {
+          const px = x + (Math.random() - 0.5) * (s + 10);
+          const py = y + wFloat + (Math.random() - 0.5) * (s + 10);
+          ctx.fillStyle = `rgba(0, ${200 + Math.random() * 55}, 220, ${0.4 + Math.random() * 0.4})`;
+          ctx.fillRect(px, py, 1, 1);
+        }
+      }
+
+      ctx.globalAlpha = 1;
       break;
     }
 
     case 'bomber': {
-      const pulse = e.aiState === 'fuse' ? (Math.sin(time * 15) * 0.5 + 0.5) : 0;
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.bomber;
-      // Round body
-      ctx.beginPath();
-      ctx.arc(x, y, half, 0, Math.PI * 2);
-      ctx.fill();
-      // Fuse
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.bomberDark;
-      ctx.fillRect(x - 1, y - half - 3, 2, 4);
-      // Spark on fuse
-      if (e.aiState === 'fuse') {
-        ctx.fillStyle = `rgba(255, 255, 100, ${0.5 + pulse * 0.5})`;
-        ctx.fillRect(x - 2, y - half - 4, 4, 3);
-        // Warning glow
-        ctx.fillStyle = `rgba(255, 136, 0, ${0.2 + pulse * 0.2})`;
+      // ═══ OBSIDIAN HEART - O Núcleo de Magia Instável ═══
+      const active = e.aiState === 'fuse';
+      const float = Math.sin(time * 5) * 2;
+      const pulsing = active ? Math.sin(time * 25) * 0.4 + 0.6 : 0.4;
+      const crack = active ? (1 - e.fuseTimer / 1.5) : 0;
+
+      // 1. DARK ENERGY LEAK (Aura)
+      if (active) {
+        ctx.fillStyle = `rgba(100, 0, 255, ${0.15 * pulsing})`;
         ctx.beginPath();
-        ctx.arc(x, y, half + 8 + pulse * 5, 0, Math.PI * 2);
+        ctx.arc(x, y + float, half + 10 + crack * 15, 0, Math.PI * 2);
         ctx.fill();
       }
-      // Eyes
-      ctx.fillStyle = '#ffff00';
-      ctx.fillRect(x - 3, y - 2, 2, 2);
-      ctx.fillRect(x + 2, y - 2, 2, 2);
+
+      // 2. FLOATING OBSIDIAN SHELL (Shattered look)
+      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#080010';
+      for (let i = 0; i < 6; i++) {
+        const ang = (i / 6) * Math.PI * 2 + time * 0.5;
+        const dist = 6 + crack * 8;
+        const ox = x + Math.cos(ang) * dist;
+        const oy = y + Math.sin(ang) * dist + float;
+
+        ctx.save();
+        ctx.translate(ox, oy);
+        ctx.rotate(ang);
+        ctx.beginPath();
+        ctx.moveTo(-4, -6);
+        ctx.lineTo(4, -2);
+        ctx.lineTo(2, 6);
+        ctx.lineTo(-6, 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 3. THE UNSTABLE CORE (Energy orb)
+      const coreGrad = ctx.createRadialGradient(x, y + float, 0, x, y + float, half - 2);
+      coreGrad.addColorStop(0, '#ffffff');
+      coreGrad.addColorStop(0.4, active ? '#ff00ff' : '#4400aa');
+      coreGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(x, y + float, half - 2, 0, Math.PI * 2);
+      ctx.fill();
+
       break;
     }
 
     case 'swarm': {
-      const buzz = Math.sin(time * 12 + e.x * 3 + e.y * 7);
-      ctx.fillRect(x - half + buzz, y - half, s, s);
-      // Wings
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.swarmDark;
-      ctx.fillRect(x - half - 2 + buzz, y - 2, 2, 3);
-      ctx.fillRect(x + half + buzz, y - 2, 2, 3);
-      // Eyes
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(x - 1 + buzz, y - 2, 1, 1);
-      ctx.fillRect(x + 1 + buzz, y - 2, 1, 1);
-      break;
+      // ═══ RAZOR WASP - Predador Aéreo Bio-Mecânico ═══
+      const hover = Math.sin(time * 10) * 3;
+      const wingBeat = Math.sin(time * 40);
+
+      // DOUBLE CRYSTAL WINGS
+      ctx.fillStyle = 'rgba(150, 200, 255, 0.4)';
+      // Left Wings
+      ctx.beginPath();
+      ctx.ellipse(x - 4, y + hover, 12, 4 + wingBeat * 3, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      // Right Wings
+      ctx.beginPath();
+      ctx.ellipse(x + 4, y + hover, 12, 4 + wingBeat * 3, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // SHARP SEGMENTED BODY
+      const bodyColor = e.flashTime > 0 ? C.COLORS.white : '#ffd700';
+      ctx.fillStyle = bodyColor;
+
+      // Abdomen (Spear shape)
+      ctx.beginPath();
+      ctx.moveTo(x, y + hover - 2);
+      ctx.lineTo(x - 4, y + hover + 10);
+      ctx.lineTo(x, y + hover + 14); // The Stinger point
+      ctx.lineTo(x + 4, y + hover + 10);
+      ctx.closePath();
+      ctx.fill();
+
+      // Venom markings
+      ctx.fillStyle = '#111111';
+      ctx.fillRect(x - 3, y + hover + 4, 6, 1.5);
+      ctx.fillRect(x - 2, y + hover + 8, 4, 1.5);
     }
 
-    case 'necromancer': {
-      // Hooded dark figure with staff
-      const nFloat = Math.sin(time * 3 + e.x) * 2;
-      ctx.globalAlpha = 0.9;
-      // Dark robe
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.necroDark;
-      ctx.fillRect(x - half, y - half + nFloat, s, s + 3);
-      // Hood
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#220044';
-      ctx.beginPath();
-      ctx.arc(x, y - half + 2 + nFloat, half, Math.PI, Math.PI * 2);
-      ctx.fill();
-      // Glowing eyes inside hood
-      const eyePulse = Math.sin(time * 6) * 0.3 + 0.7;
-      ctx.fillStyle = `rgba(180, 50, 255, ${eyePulse})`;
-      ctx.fillRect(x - 3, y - half + 4 + nFloat, 2, 2);
-      ctx.fillRect(x + 2, y - half + 4 + nFloat, 2, 2);
-      // Staff
-      ctx.fillStyle = '#443322';
-      ctx.fillRect(x + half + 1, y - half - 4 + nFloat, 2, s + 8);
-      // Staff crystal
-      ctx.fillStyle = `rgba(200, 100, 255, ${eyePulse})`;
-      ctx.fillRect(x + half, y - half - 6 + nFloat, 4, 4);
-      // Purple aura
-      const aura = ctx.createRadialGradient(x, y + nFloat, 0, x, y + nFloat, half + 12);
-      aura.addColorStop(0, `rgba(153, 51, 204, ${0.1 * eyePulse})`);
-      aura.addColorStop(1, 'rgba(153, 51, 204, 0)');
-      ctx.fillStyle = aura;
-      ctx.fillRect(x - half - 12, y - half - 12 + nFloat, s + 24, s + 24);
-      // Floating skulls orbiting
-      for (let i = 0; i < 2; i++) {
-        const orbitAngle = time * 2 + i * Math.PI;
-        const ox = x + Math.cos(orbitAngle) * (half + 8);
-        const oy = y + Math.sin(orbitAngle) * (half + 6) + nFloat;
-        ctx.fillStyle = `rgba(200, 180, 160, ${0.4 * eyePulse})`;
-        ctx.fillRect(ox - 2, oy - 2, 4, 4);
-        ctx.fillStyle = `rgba(0, 0, 0, ${0.6 * eyePulse})`;
-        ctx.fillRect(ox - 1, oy - 1, 1, 1);
-        ctx.fillRect(ox + 1, oy - 1, 1, 1);
+    case 'wraith': {
+      // ═══ LOST SOUL - Espectro Dimensional ═══
+      const float = Math.sin(time * 4) * 5;
+      const alpha = e.phaseAlpha;
+      ctx.globalAlpha = alpha;
+
+      // Mist Trail
+      for (let i = 0; i < 4; i++) {
+        ctx.fillStyle = `rgba(0, 255, 200, ${(0.2 - i * 0.04) * alpha})`;
+        ctx.beginPath();
+        ctx.arc(x - e.vx * i * 3, y + float + 5 + i * 4, half - i, 0, Math.PI * 2);
+        ctx.fill();
       }
+
+      // ETHEREAL BODY (Wispy)
+      const wColor = e.flashTime > 0 ? C.COLORS.white : 'rgba(0, 255, 200, 0.6)';
+      ctx.fillStyle = wColor;
+      ctx.beginPath();
+      ctx.moveTo(x, y - half + float);
+      ctx.quadraticCurveTo(x + half + 2, y + float, x, y + half + 6 + float);
+      ctx.quadraticCurveTo(x - half - 2, y + float, x, y - half + float);
+      ctx.fill();
+
+      // Hollow Eyes
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.ellipse(x - 3, y - 2 + float, 2, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(x + 3, y - 2 + float, 2, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.globalAlpha = 1;
       break;
     }
 
     case 'stalker': {
-      // Nearly invisible predator
+      // ═══ SHADOW ASSASSIN - Predador de Lâminas ═══
+      const crouch = Math.sin(time * 6) * 1;
+      const lunge = e.lunging ? 5 : 0;
       ctx.globalAlpha = e.stealthAlpha;
-      // Hunched dark body
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#111111';
-      ctx.fillRect(x - half, y - half + 2, s, s - 2);
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#0a0a0a';
-      ctx.fillRect(x - half - 1, y + 2, s + 2, 3);
-      // Long arms/claws
-      const clawExtend = e.lunging ? 4 : 2;
-      ctx.fillStyle = '#1a1a1a';
-      ctx.fillRect(x - half - clawExtend, y, clawExtend, 2);
-      ctx.fillRect(x + half, y, clawExtend, 2);
-      // Glowing red eyes (only visible when close or lunging)
-      if (e.stealthAlpha > 0.15 || e.lunging) {
-        const redPulse = e.lunging ? 1 : Math.sin(time * 10) * 0.3 + 0.5;
-        ctx.fillStyle = `rgba(255, 0, 0, ${redPulse})`;
-        ctx.fillRect(x - 3, y - half + 3, 2, 1);
-        ctx.fillRect(x + 2, y - half + 3, 2, 1);
-        // Red eye glow
-        if (e.lunging) {
-          const eyeGlow = ctx.createRadialGradient(x, y - half + 3, 0, x, y - half + 3, 10);
-          eyeGlow.addColorStop(0, 'rgba(255, 0, 0, 0.2)');
-          eyeGlow.addColorStop(1, 'rgba(255, 0, 0, 0)');
-          ctx.fillStyle = eyeGlow;
-          ctx.fillRect(x - 10, y - half - 7, 20, 20);
-        }
-      }
-      // Lunge trail
-      if (e.lunging) {
-        ctx.fillStyle = 'rgba(20, 0, 0, 0.3)';
-        ctx.fillRect(x - e.vx * 15 - half, y - e.vy * 15 - half, s, s);
-      }
+
+      // HUNCHED SILHOUETTE
+      const sColor = e.flashTime > 0 ? C.COLORS.white : '#111111';
+      ctx.fillStyle = sColor;
+
+      // Left Scythe Arm
+      ctx.beginPath();
+      ctx.moveTo(x - 2, y + crouch);
+      ctx.quadraticCurveTo(x - half - 8 - lunge, y - half + crouch, x - half - 12 - lunge, y + half + crouch);
+      ctx.lineTo(x - half - 6, y + half + 2 + crouch);
+      ctx.fill();
+
+      // Right Scythe Arm
+      ctx.beginPath();
+      ctx.moveTo(x + 2, y + crouch);
+      ctx.quadraticCurveTo(x + half + 8 + lunge, y - half + crouch, x + half + 12 + lunge, y + half + crouch);
+      ctx.lineTo(x + half + 6, y + half + 2 + crouch);
+      ctx.fill();
+
+      // Torso
+      ctx.beginPath();
+      ctx.moveTo(x - 5, y + half + crouch);
+      ctx.lineTo(x + 5, y + half + crouch);
+      ctx.lineTo(x, y - half + crouch);
+      ctx.closePath();
+      ctx.fill();
+
+      // Red Kill-Eyes
+      ctx.fillStyle = '#ff0000';
+      ctx.fillRect(x - 2, y - half + 4 + crouch, 1, 1);
+      ctx.fillRect(x + 1, y - half + 4 + crouch, 1, 1);
+
       ctx.globalAlpha = 1;
       break;
     }
 
     case 'phantom': {
-      // Ghostly screaming phantom
+      // ═══ WAILING BANSHEE - O Grito do Desespero ═══
+      const wail = Math.sin(time * 20) * 2;
       ctx.globalAlpha = e.stealthAlpha;
-      const pFloat = Math.sin(time * 20 + e.x) * 3;
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#cc00ff';
-      ctx.beginPath();
-      ctx.arc(x, y + pFloat, half, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(x - 3, y - 2 + pFloat, 2, 3);
-      ctx.fillRect(x + 2, y - 2 + pFloat, 2, 3);
-      ctx.fillRect(x - 2, y + 2 + pFloat, 4, 2);
-      for (let i = 0; i < 3; i++) {
-        const wispX = x - e.vx * (i * 8) + (Math.random() - 0.5) * 6;
-        const wispY = y - e.vy * (i * 8) + (Math.random() - 0.5) * 6;
-        ctx.fillStyle = `rgba(200, 0, 255, ${0.2 - i * 0.06})`;
+
+      // Ghostly Wisps
+      ctx.fillStyle = 'rgba(200, 100, 255, 0.3)';
+      for (let i = 0; i < 5; i++) {
+        const ang = (i / 5) * Math.PI * 2 + time;
         ctx.beginPath();
-        ctx.arc(wispX, wispY, half - i, 0, Math.PI * 2);
+        ctx.arc(x + Math.cos(ang) * (half + 4), y + Math.sin(ang) * (half + 4), 3, 0, Math.PI * 2);
         ctx.fill();
       }
-      const screamPulse = Math.sin(time * 25) * 0.3 + 0.3;
-      const aura = ctx.createRadialGradient(x, y + pFloat, 0, x, y + pFloat, half + 15);
-      aura.addColorStop(0, `rgba(255, 0, 200, ${screamPulse})`);
-      aura.addColorStop(1, 'rgba(255, 0, 200, 0)');
-      ctx.fillStyle = aura;
-      ctx.fillRect(x - half - 15, y - half - 15 + pFloat, s + 30, s + 30);
+
+      // SOUL MASS (Flowing)
+      const pColor = e.flashTime > 0 ? C.COLORS.white : 'rgba(255, 100, 255, 0.7)';
+      ctx.fillStyle = pColor;
+      ctx.beginPath();
+      ctx.moveTo(x, y - half - 5);
+      ctx.bezierCurveTo(x + half + 10, y, x + half, y + half + 10, x, y + half + 15);
+      ctx.bezierCurveTo(x - half, y + half + 10, x - half - 10, y, x, y - half - 5);
+      ctx.fill();
+
+      // The Agonized Face
+      ctx.fillStyle = '#000000';
+      // Eyes
+      ctx.beginPath();
+      ctx.arc(x - 4, y - 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x + 4, y - 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+      // Screaming Mouth
+      ctx.beginPath();
+      ctx.ellipse(x, y + 6, 2, 5 + wail, 0, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.globalAlpha = 1;
       break;
     }
 
     case 'flash_hunter': {
-      // Blinding white figure that appears in flashes
+      // ═══ LIGHT PRISM - O Caçador de Cristais ═══
+      const spin = time * 4;
       ctx.globalAlpha = e.stealthAlpha;
-      if (e.stealthAlpha > 0.5) {
-        // Bright flash effect on appear
-        const flashGlow = ctx.createRadialGradient(x, y, 0, x, y, half + 20);
-        flashGlow.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
-        flashGlow.addColorStop(0.5, 'rgba(255, 255, 255, 0.15)');
-        flashGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        ctx.fillStyle = flashGlow;
-        ctx.fillRect(x - half - 20, y - half - 20, s + 40, s + 40);
-        // Sharp angular body
-        ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#eeeeff';
-        ctx.beginPath();
-        ctx.moveTo(x, y - half - 2);
-        ctx.lineTo(x + half + 1, y + half);
-        ctx.lineTo(x - half - 1, y + half);
-        ctx.closePath();
-        ctx.fill();
-        // Piercing eyes
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(x - 3, y - 1, 2, 2);
-        ctx.fillRect(x + 2, y - 1, 2, 2);
-        // Speed lines behind
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 1;
-        for (let i = 0; i < 4; i++) {
-          const lx = x - e.vx * (8 + i * 6);
-          const ly = y - e.vy * (8 + i * 6) + (i - 1.5) * 3;
-          ctx.beginPath();
-          ctx.moveTo(lx, ly);
-          ctx.lineTo(lx - e.vx * 12, ly - e.vy * 12);
-          ctx.stroke();
-        }
+
+      // CRYSTALLINE STRUCTURE (Hexagonal)
+      const fColor = e.flashTime > 0 ? C.COLORS.white : '#ffffff';
+      ctx.fillStyle = fColor;
+      ctx.strokeStyle = '#88ccff';
+      ctx.lineWidth = 1;
+
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const ang = spin + (i * Math.PI / 3);
+        const px = x + Math.cos(ang) * half;
+        const py = y + Math.sin(ang) * half;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
       }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // INNER CORE
+      ctx.fillStyle = '#00ccff';
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.globalAlpha = 1;
       break;
     }
 
     case 'distortion': {
-      // Glitchy, distorted dark mass
+      // ═══ VOID MIRROR - O Fragmento da Realidade ═══
       ctx.globalAlpha = e.stealthAlpha;
-      const glitchOffset = Math.sin(time * 30) * 3;
-      const glitchOffset2 = Math.cos(time * 25) * 2;
-      // Distortion aura - pulsing dark ring
-      const distPulse = Math.sin(time * 4) * 0.3 + 0.5;
-      const dAura = ctx.createRadialGradient(x, y, half, x, y, half + 18);
-      dAura.addColorStop(0, `rgba(100, 0, 150, ${distPulse * 0.4})`);
-      dAura.addColorStop(1, 'rgba(100, 0, 150, 0)');
-      ctx.fillStyle = dAura;
-      ctx.fillRect(x - half - 18, y - half - 18, s + 36, s + 36);
-      // Glitched body - offset layers for CRT-like effect
-      ctx.fillStyle = `rgba(80, 0, 120, 0.4)`;
-      ctx.fillRect(x - half + glitchOffset, y - half, s, s);
-      ctx.fillStyle = `rgba(120, 0, 60, 0.4)`;
-      ctx.fillRect(x - half - glitchOffset2, y - half + 1, s, s);
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#440066';
-      ctx.fillRect(x - half, y - half, s, s);
-      // Scan lines
-      for (let i = 0; i < s; i += 3) {
-        ctx.fillStyle = `rgba(0, 0, 0, ${0.2 + Math.sin(time * 20 + i) * 0.1})`;
-        ctx.fillRect(x - half, y - half + i, s, 1);
+      const float = Math.sin(time * 4) * 5;
+
+      // 1. DISTORTION HALO
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x, y + float, half + 10, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // 2. SHATTERED DARK GLASS (Clean geometric shards)
+      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#050010';
+      for (let i = 0; i < 5; i++) {
+        const ang = (i / 5) * Math.PI * 2 + time;
+        const dist = 5 + Math.sin(time * 2 + i) * 3;
+        const sx = x + Math.cos(ang) * dist;
+        const sy = y + Math.sin(ang) * dist + float;
+
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(ang + time);
+        ctx.beginPath();
+        ctx.moveTo(-3, -5);
+        ctx.lineTo(3, 0);
+        ctx.lineTo(-3, 5);
+        ctx.closePath();
+        ctx.fill();
+
+        // Mirror rim light
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        ctx.restore();
       }
-      // Glowing void eyes
-      ctx.fillStyle = `rgba(200, 0, 255, ${0.8 + Math.sin(time * 6) * 0.2})`;
-      ctx.fillRect(x - 4, y - 3, 3, 3);
-      ctx.fillRect(x + 2, y - 3, 3, 3);
+
+      // 3. THE VOID EYE (Single magenta slit)
+      ctx.fillStyle = '#ff00ff';
+      ctx.fillRect(x - 4, y - 1 + float, 8, 2);
+
       ctx.globalAlpha = 1;
       break;
     }
 
     case 'flicker_fiend': {
-      // Only render when visible (stealthAlpha > 0.5)
+      // ═══ ABYSSAL WRAITH - O Ser Entre Quadros ═══
       if (e.stealthAlpha < 0.5) break;
-      // Red, crackling entity
-      const flickPulse = Math.sin(time * 20) * 0.3 + 0.7;
-      // Electric aura
-      ctx.fillStyle = `rgba(255, 50, 0, ${flickPulse * 0.2})`;
+      const opacity = 0.4 + Math.sin(time * 30) * 0.3;
+
+      // 1. GHOSTLY SILHOUETTE (Contrast-heavy)
+      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : `rgba(10, 0, 20, ${opacity})`;
+
+      // Clean diamond body
       ctx.beginPath();
-      ctx.arc(x, y, half + 6, 0, Math.PI * 2);
+      ctx.moveTo(x, y - half - 10);
+      ctx.lineTo(x + half + 2, y);
+      ctx.lineTo(x, y + half + 10);
+      ctx.lineTo(x - half - 2, y);
+      ctx.closePath();
       ctx.fill();
-      // Body
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.flickerFiend;
-      ctx.fillRect(x - half, y - half, s, s);
-      // Static/glitch overlay
-      for (let i = 0; i < 4; i++) {
-        const gx = x - half + Math.random() * s;
-        const gy = y - half + Math.random() * s;
-        ctx.fillStyle = `rgba(255, 200, 0, ${0.3 + Math.random() * 0.3})`;
-        ctx.fillRect(gx, gy, 2, 1);
+
+      // 2. SHADOW FLICKER (Refined arcs of shadow)
+      ctx.strokeStyle = `rgba(255, 0, 50, ${opacity * 0.5})`;
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 2; i++) {
+        const offset = Math.sin(time * 40 + i) * 10;
+        ctx.beginPath();
+        ctx.arc(x + offset, y, half + 5, 0, Math.PI * 2);
+        ctx.stroke();
       }
-      // Eyes
+
+      // 3. PIERCING EYES (Steady yellow intensity)
       ctx.fillStyle = '#ffff00';
-      ctx.fillRect(x - 3, y - 2, 2, 2);
-      ctx.fillRect(x + 2, y - 2, 2, 2);
+      ctx.fillRect(x - 3, y - 4, 1.5, 5);
+      ctx.fillRect(x + 1.5, y - 4, 1.5, 5);
+
       break;
     }
 
     case 'warper': {
-      // Blue ethereal entity that fades between teleports
+      // ═══ RIFT WALKER - Místico do Espaço-Tempo ═══
       ctx.globalAlpha = e.stealthAlpha;
-      // Teleport rings
-      const ringAlpha = (1 - e.stealthAlpha) * 0.5;
-      if (ringAlpha > 0.05) {
-        ctx.strokeStyle = `rgba(0, 80, 200, ${ringAlpha})`;
-        ctx.lineWidth = 1;
+      const float = Math.sin(time * 5) * 3;
+      const portal = (1 - e.stealthAlpha);
+
+      // Galaxy Shroud (Aura)
+      const gGrad = ctx.createRadialGradient(x, y + float, 0, x, y + float, half + 15);
+      gGrad.addColorStop(0, 'rgba(0, 50, 200, 0.4)');
+      gGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = gGrad;
+      ctx.beginPath();
+      ctx.arc(x, y + float, half + 15, 0, Math.PI * 2);
+      ctx.fill();
+
+      // RIFT CLOAK (Flowing)
+      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#001a33';
+      ctx.beginPath();
+      ctx.moveTo(x - half, y - half + float);
+      ctx.quadraticCurveTo(x, y - half - 5 + float, x + half, y - half + float);
+      ctx.lineTo(x + half + 4, y + half + float);
+      ctx.lineTo(x - half - 4, y + half + float);
+      ctx.closePath();
+      ctx.fill();
+
+      // CRYSTAL MASK
+      ctx.fillStyle = '#88ccff';
+      ctx.beginPath();
+      ctx.moveTo(x, y - half + 2 + float);
+      ctx.lineTo(x + 4, y - half + 8 + float);
+      ctx.lineTo(x, y - half + 12 + float);
+      ctx.lineTo(x - 4, y - half + 8 + float);
+      ctx.closePath();
+      ctx.fill();
+
+      // Teleport Rings
+      if (portal > 0.1) {
+        ctx.strokeStyle = `rgba(100, 200, 255, ${portal})`;
         ctx.beginPath();
-        ctx.arc(x, y, half + 10 + (1 - e.stealthAlpha) * 15, 0, Math.PI * 2);
+        ctx.arc(x, y + float, half + 5 + portal * 20, 0, Math.PI * 2);
         ctx.stroke();
       }
-      // Body
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.warper;
-      ctx.beginPath();
-      ctx.arc(x, y, half, 0, Math.PI * 2);
-      ctx.fill();
-      // Inner glow
-      const wGlow = ctx.createRadialGradient(x, y, 0, x, y, half);
-      wGlow.addColorStop(0, 'rgba(100, 180, 255, 0.3)');
-      wGlow.addColorStop(1, 'rgba(0, 40, 100, 0)');
-      ctx.fillStyle = wGlow;
-      ctx.fillRect(x - half, y - half, s, s);
-      // Eyes
-      ctx.fillStyle = '#88ccff';
-      ctx.fillRect(x - 3, y - 2, 2, 2);
-      ctx.fillRect(x + 2, y - 2, 2, 2);
+
       ctx.globalAlpha = 1;
       break;
     }
 
     case 'accelerator': {
-      // Ember-like entity that glows brighter when accelerating
+      // ═══ SPIRIT COMET - Bólido de Energia Espectral ═══
       ctx.globalAlpha = Math.max(0.3, e.stealthAlpha);
-      const accelGlow = e.stealthAlpha; // 1 = in light/fast, 0.3 = slow/dark
-      // Flame trail when fast
-      if (accelGlow > 0.8) {
-        for (let i = 0; i < 3; i++) {
-          const tx = x + (Math.random() - 0.5) * 8;
-          const ty = y + half + i * 3;
-          ctx.fillStyle = `rgba(255, ${120 + Math.floor(Math.random() * 80)}, 0, ${0.3 - i * 0.08})`;
-          ctx.fillRect(tx - 2, ty, 4, 3);
-        }
-        // Bright glow
-        const ag = ctx.createRadialGradient(x, y, 0, x, y, half + 12);
-        ag.addColorStop(0, 'rgba(255, 170, 0, 0.3)');
-        ag.addColorStop(1, 'rgba(255, 100, 0, 0)');
-        ctx.fillStyle = ag;
-        ctx.fillRect(x - half - 12, y - half - 12, s + 24, s + 24);
+      const accel = e.stealthAlpha;
+      const stretch = accel > 0.8 ? 15 : 0;
+
+      // 1. SPECTRAL TRAIL (Graceful fire)
+      if (accel > 0.7) {
+        const tGrad = ctx.createLinearGradient(x - half - stretch, y, x + half, y);
+        tGrad.addColorStop(0, 'rgba(255, 100, 0, 0)');
+        tGrad.addColorStop(1, 'rgba(255, 200, 0, 0.4)');
+        ctx.fillStyle = tGrad;
+        ctx.beginPath();
+        ctx.moveTo(x - half - 20 - stretch, y);
+        ctx.lineTo(x, y - 5);
+        ctx.lineTo(x, y + 5);
+        ctx.closePath();
+        ctx.fill();
       }
-      // Body
-      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.accelerator;
+
+      // 2. SLEEK AERODYNAMIC CORE (Needle shape)
+      const hColor = e.flashTime > 0 ? C.COLORS.white : '#1a0000';
+      ctx.fillStyle = hColor;
       ctx.beginPath();
-      ctx.moveTo(x, y - half - 2);
-      ctx.lineTo(x + half + 2, y + 2);
-      ctx.lineTo(x, y + half + 2);
-      ctx.lineTo(x - half - 2, y + 2);
+      ctx.moveTo(x + half + 8, y);
+      ctx.lineTo(x - half - 4 - stretch, y - half + 2);
+      ctx.lineTo(x - half - 4 - stretch, y + half - 2);
       ctx.closePath();
       ctx.fill();
-      // Eyes
-      ctx.fillStyle = accelGlow > 0.8 ? '#ffffff' : '#ff6600';
-      ctx.fillRect(x - 3, y - 1, 2, 2);
-      ctx.fillRect(x + 2, y - 1, 2, 2);
+
+      // Golden Trim
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // 3. PILOT'S GAZE (Steady white slit)
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x + 2, y - 0.5, 6, 1);
+
       ctx.globalAlpha = 1;
       break;
     }
@@ -1461,170 +1752,787 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
 
       switch (bossFloor) {
         case 2: {
-          // O CAÇADOR — sleek orange predator with speed lines
-          const dashTrail = Math.sin(time * 12) * 2;
-          // Speed lines behind
-          for (let i = 0; i < 4; i++) {
-            ctx.fillStyle = `rgba(255, ${100 + i * 30}, 0, ${0.2 - i * 0.04})`;
-            ctx.fillRect(x - half - 8 - i * 6 + dashTrail, y - 2 + i, 6, 2);
-          }
-          // Body — angular and sharp
-          ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#cc5500';
+          // ═══ CELESTIAL GOLDEN HUNTER - O Caçador Divino ═══
+          const float = Math.sin(time * 3) * 4;
+          const spearPulse = Math.sin(time * 10) * 0.2 + 0.8;
+          const capeMotion = Math.sin(time * 5) * 5;
+          const powerLevel = Math.sin(time * 2) * 0.2 + 0.8;
+
+          // Divine Golden Aura
+          const divineGlow = ctx.createRadialGradient(x, y + float, 0, x, y + float, half + 30);
+          divineGlow.addColorStop(0, `rgba(255, 215, 0, ${0.3 * powerLevel})`);
+          divineGlow.addColorStop(0.5, `rgba(255, 150, 0, 0.1)`);
+          divineGlow.addColorStop(1, 'rgba(255, 100, 0, 0)');
+          ctx.fillStyle = divineGlow;
+          ctx.fillRect(x - half - 30, y - half - 30 + float, s + 60, s + 60);
+
+          // Ethereal Cape (Flowing energy)
+          ctx.fillStyle = 'rgba(255, 180, 0, 0.4)';
           ctx.beginPath();
-          ctx.moveTo(x, y - half - 3 + breathe);
-          ctx.lineTo(x + half + 3, y + breathe);
-          ctx.lineTo(x + half - 2, y + half + breathe);
-          ctx.lineTo(x - half + 2, y + half + breathe);
-          ctx.lineTo(x - half - 3, y + breathe);
+          ctx.moveTo(x - 2, y - half + float);
+          ctx.bezierCurveTo(x - 15 - capeMotion, y + half + float, x - 5, y + half + 20 + float, x - 20, y + half + 25 + float);
+          ctx.lineTo(x + 5, y + half + 10 + float);
           ctx.closePath();
           ctx.fill();
-          // Eyes — orange glowing
-          ctx.fillStyle = '#ffaa00';
-          ctx.fillRect(x - 5, y - 3 + breathe, 3, 3);
-          ctx.fillRect(x + 3, y - 3 + breathe, 3, 3);
-          // Glow
-          ctx.fillStyle = 'rgba(255, 120, 0, 0.1)';
+
+          // Body Structure - Agile Warrior Silhouette (Less Boxy)
+          const armorColor = e.flashTime > 0 ? C.COLORS.white : '#e6b800';
+          ctx.fillStyle = armorColor;
+
+          // Torso (Curved armor)
           ctx.beginPath();
-          ctx.arc(x, y + breathe, half + 12, 0, Math.PI * 2);
+          ctx.moveTo(x, y - half + float);
+          ctx.quadraticCurveTo(x + 8, y - half + 10 + float, x + 4, y + half - 2 + float);
+          ctx.lineTo(x - 4, y + half - 2 + float);
+          ctx.quadraticCurveTo(x - 8, y - half + 10 + float, x, y - half + float);
           ctx.fill();
+
+          // Pauldrons (Shoulder pads)
+          ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#ffcc00';
+          ctx.beginPath();
+          ctx.ellipse(x - 6, y - half + 5 + float, 5, 3, Math.PI / 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.ellipse(x + 6, y - half + 5 + float, 5, 3, -Math.PI / 4, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Helmet / Head
+          ctx.fillStyle = armorColor;
+          ctx.beginPath();
+          ctx.ellipse(x, y - half - 2 + float, 5, 6, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Energy Crest (Plume)
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.beginPath();
+          ctx.moveTo(x, y - half - 8 + float);
+          ctx.quadraticCurveTo(x + 10, y - half - 15 + float, x + 2, y - half - 4 + float);
+          ctx.fill();
+
+          // Eyes of Light
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(x - 3, y - half + 1 + float, 2, 2);
+          ctx.fillRect(x + 1, y - half + 1 + float, 2, 2);
+
+          // ═══ THE GOLDEN ENERGY SPEAR ═══
+          const spearX = x + 12;
+          const spearY = y + float;
+          const spearLen = 45;
+
+          // Spear shadow/glow
+          ctx.strokeStyle = `rgba(255, 200, 0, ${0.4 * spearPulse})`;
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(spearX, spearY - spearLen / 2);
+          ctx.lineTo(spearX, spearY + spearLen / 2);
+          ctx.stroke();
+
+          // Main Spear Shaft
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(spearX, spearY - spearLen / 2);
+          ctx.lineTo(spearX, spearY + spearLen / 2);
+          ctx.stroke();
+
+          // Spear Tip (Energy blade)
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.moveTo(spearX, spearY - spearLen / 2 - 10);
+          ctx.lineTo(spearX + 4, spearY - spearLen / 2);
+          ctx.lineTo(spearX - 4, spearY - spearLen / 2);
+          ctx.closePath();
+          ctx.fill();
+
+          // Sparking energy around spear
+          for (let i = 0; i < 3; i++) {
+            const sx = spearX + (Math.random() - 0.5) * 10;
+            const sy = spearY - spearLen / 2 + Math.random() * spearLen;
+            ctx.fillStyle = '#fffae6';
+            ctx.fillRect(sx, sy, 2, 2);
+          }
+
+          // Floating shards of light
+          for (let i = 0; i < 5; i++) {
+            const ang = (time * 2 + i) % (Math.PI * 2);
+            const dist = half + 15 + Math.sin(time + i) * 5;
+            const px = x + Math.cos(ang) * dist;
+            const py = y + Math.sin(ang) * dist + float;
+            ctx.fillStyle = `rgba(255, 255, 200, ${0.6})`;
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(time + i);
+            ctx.fillRect(-2, -2, 4, 4);
+            ctx.restore();
+          }
+
           break;
         }
         case 3: {
-          // O INVOCADOR — dark hooded with purple energy
-          const nFloat = Math.sin(time * 3) * 2;
-          ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#330055';
-          ctx.fillRect(x - half, y - half + nFloat, s, s + 4);
-          // Hood
+          // ═══ THE SOUL SOVEREIGN (THE INVOKER) ═══
+          const float = Math.sin(time * 3) * 6;
+          const power = Math.sin(time * 5) * 0.2 + 0.8;
+          const pulse = Math.sin(time * 2) * 0.3 + 0.7;
+          const magicSpin = time * 1.5;
+
+          // 1. DARK ENERGY VORTEX (Center presence)
+          const vortexGrad = ctx.createRadialGradient(x, y + float, 0, x, y + float, half + 20);
+          vortexGrad.addColorStop(0, `rgba(80, 0, 160, ${0.4 * power})`);
+          vortexGrad.addColorStop(0.5, `rgba(40, 0, 80, ${0.2 * pulse})`);
+          vortexGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = vortexGrad;
           ctx.beginPath();
-          ctx.arc(x, y - half + 3 + nFloat, half, Math.PI, Math.PI * 2);
+          ctx.arc(x, y + float, half + 45, 0, Math.PI * 2);
           ctx.fill();
-          // Staff
-          ctx.fillStyle = '#443322';
-          ctx.fillRect(x + half + 2, y - half - 6 + nFloat, 2, s + 12);
-          // Staff crystal
-          const pulse = Math.sin(time * 5) * 0.3 + 0.7;
-          ctx.fillStyle = `rgba(200, 100, 255, ${pulse})`;
-          ctx.fillRect(x + half + 1, y - half - 8 + nFloat, 4, 4);
-          // Eyes
-          ctx.fillStyle = `rgba(200, 100, 255, ${pulse})`;
-          ctx.fillRect(x - 4, y - half + 5 + nFloat, 2, 2);
-          ctx.fillRect(x + 3, y - half + 5 + nFloat, 2, 2);
-          // Purple aura with orbiting skulls
-          for (let i = 0; i < 3; i++) {
-            const oa = time * 2.5 + i * (Math.PI * 2 / 3);
-            const ox = x + Math.cos(oa) * (half + 10);
-            const oy = y + Math.sin(oa) * (half + 8) + nFloat;
-            ctx.fillStyle = `rgba(200, 100, 255, ${0.4 * pulse})`;
+
+          // 2. MYSTICAL AURA (Invoker presence)
+          ctx.save();
+          ctx.translate(x, y + float);
+          for (let i = 0; i < 4; i++) {
+            const rot = magicSpin + (i * Math.PI / 2);
+            ctx.rotate(rot);
+            const grad = ctx.createLinearGradient(0, 0, 0, half + 40);
+            grad.addColorStop(0, `rgba(120, 40, 255, ${0.35 * pulse})`);
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = grad;
             ctx.beginPath();
-            ctx.arc(ox, oy, 3, 0, Math.PI * 2);
+            ctx.moveTo(-14, 0);
+            ctx.quadraticCurveTo(0, half + 50, 14, 0);
             ctx.fill();
           }
+          ctx.restore();
+
+          // 3. REGAL SILHOUETTE (Intercalating Black and Purple)
+          const hoodColor = e.flashTime > 0 ? C.COLORS.white : '#05000a';
+          const robeColor = e.flashTime > 0 ? C.COLORS.white : '#1a0033'; // Dark purple instead of pure black
+          ctx.fillStyle = robeColor;
+
+          // More Elegant Hood and Tapered Robes
+          ctx.beginPath();
+          ctx.moveTo(x - half - 10, y + half + 25 + float);
+          ctx.quadraticCurveTo(x - half - 18, y - half + float, x, y - half - 35 + float);
+          ctx.quadraticCurveTo(x + half + 18, y - half + float, x + half + 10, y + half + 25 + float);
+          ctx.quadraticCurveTo(x, y + half + 20 + float, x - half - 10, y + half + 25 + float);
+          ctx.fill();
+
+          // Inner Hood (Deep black for mystery)
+          ctx.fillStyle = hoodColor;
+          ctx.beginPath();
+          ctx.moveTo(x - 12, y - half + 5 + float);
+          ctx.quadraticCurveTo(x, y - half - 25 + float, x + 12, y - half + 5 + float);
+          ctx.lineTo(x, y - half + 15 + float);
+          ctx.closePath();
+          ctx.fill();
+
+          // Inner Robe Flow (Vibrant purple shadow folds)
+          ctx.strokeStyle = `rgba(180, 50, 255, ${0.6 * pulse})`;
+          ctx.lineWidth = 1.5;
+          for (let i = -1; i <= 1; i++) {
+            ctx.beginPath();
+            ctx.moveTo(x + i * 5, y - half + 10 + float);
+            ctx.quadraticCurveTo(x + i * 12, y + half + 15 + float, x + i * 8, y + half + 40 + float);
+            ctx.stroke();
+          }
+
+          // 4. SHOULDER MANTLE (Purple-Gold Contrast)
+          ctx.strokeStyle = `rgba(220, 180, 255, ${0.7 * pulse})`;
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(x - half - 15, y + float);
+          ctx.quadraticCurveTo(x, y - 22 + float, x + half + 15, y + float);
+          ctx.stroke();
+
+          // 5. THE CROWN OF COMMAND (Controlled shards)
+          ctx.fillStyle = `rgba(200, 100, 255, ${power})`;
+          for (let i = 0; i < 6; i++) {
+            const shardAng = (i / 6) * Math.PI - Math.PI;
+            const dist = 26 + Math.sin(time * 3 + i) * 6;
+            const sx = x + Math.cos(shardAng) * dist;
+            const sy = y - half - 22 + Math.sin(shardAng) * 12 + float;
+
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(shardAng + Math.PI / 2);
+            ctx.beginPath();
+            ctx.moveTo(0, -8);
+            ctx.lineTo(4, 0);
+            ctx.lineTo(0, 8);
+            ctx.lineTo(-4, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            // Shard glow (Purple)
+            ctx.fillStyle = `rgba(220, 150, 255, ${0.4 * power})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          // 6. FLOATING SOUL RUNES (Vibrant Purple)
+          ctx.font = 'bold 10px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = `rgba(180, 100, 255, ${0.8 * pulse})`;
+          const runes = ['Ω', '†', '∆', 'Ψ', 'Ϙ', 'Ѫ'];
+          for (let i = 0; i < runes.length; i++) {
+            const rAng = -magicSpin * 0.8 + (i * Math.PI * 2 / runes.length);
+            const rx = x + Math.cos(rAng) * (half + 45);
+            const ry = y + Math.sin(rAng) * 30 + float;
+            ctx.fillText(runes[i], rx, ry);
+
+            // Rune glow aura (Purple)
+            ctx.fillStyle = `rgba(150, 50, 255, ${0.15 * pulse})`;
+            ctx.beginPath();
+            ctx.arc(rx, ry - 3, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = `rgba(180, 100, 255, ${0.8 * pulse})`;
+          }
+
+          // 7. THE COLD GAZE (Eerie White-Purple)
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(x - 7, y - half - 5 + float, 2, 10);
+          ctx.fillRect(x + 5, y - half - 5 + float, 2, 10);
+
+          // Eye glow (Purple)
+          const eyeG = ctx.createRadialGradient(x, y - half + float, 0, x, y - half + float, 20);
+          eyeG.addColorStop(0, `rgba(180, 50, 255, ${0.3 * pulse})`);
+          eyeG.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = eyeG;
+          ctx.fillRect(x - 20, y - half - 15 + float, 40, 30);
+
+          // 8. SOUL ORBS (Orbital control)
+          for (let i = 0; i < 3; i++) {
+            const orbAng = magicSpin + (i * Math.PI * 2 / 3);
+            const orbitRadX = half + 55;
+            const orbitRadY = 20;
+            const ox = x + Math.cos(orbAng) * orbitRadX;
+            const oy = y + Math.sin(orbAng) * orbitRadY + float;
+
+            // Orb Core (Vibrant Purple)
+            const orbG = ctx.createRadialGradient(ox, oy, 0, ox, oy, 8);
+            orbG.addColorStop(0, '#ffffff');
+            orbG.addColorStop(0.3, `rgba(200, 50, 255, ${power})`);
+            orbG.addColorStop(1, 'rgba(80, 0, 120, 0)');
+            ctx.fillStyle = orbG;
+            ctx.beginPath();
+            ctx.arc(ox, oy, 7 + Math.sin(time * 10 + i) * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Energy Trail (Purple)
+            ctx.strokeStyle = `rgba(150, 50, 255, ${0.25 * power})`;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(ox, oy);
+            ctx.lineTo(x, y + float);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Purple shadow particles
+            if (Math.random() < 0.4) {
+              ctx.fillStyle = 'rgba(100, 0, 200, 0.7)';
+              ctx.fillRect(ox + (Math.random() - 0.5) * 8, oy + Math.random() * 12, 2, 2);
+            }
+          }
+
           break;
         }
         case 4: {
-          // O FANTASMA — ghostly transparent, phasing
-          const gFloat = Math.sin(time * 6) * 3;
-          ctx.globalAlpha = e.phaseAlpha || 0.6;
-          ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#00aa88';
-          ctx.beginPath();
-          ctx.arc(x, y + gFloat, half, 0, Math.PI * 2);
-          ctx.fill();
-          // Wispy tendrils below
-          for (let i = 0; i < 4; i++) {
-            const wx = x - 6 + i * 4 + Math.sin(time * 5 + i * 2) * 3;
-            const wy = y + half + i * 3 + gFloat;
-            ctx.fillStyle = `rgba(0, 200, 180, ${0.3 - i * 0.06})`;
-            ctx.fillRect(wx, wy, 3, 4);
+          // O FANTASMA — SPECTRAL REAPER (Ceifador das Almas)
+          const gFloat = Math.sin(time * 6 + e.x) * 4;
+          const deathPulse = Math.sin(time * 4) * 0.3 + 0.7;
+          const reap = Math.sin(time * 3) * 0.4;
+
+          ctx.globalAlpha = 0.95;
+
+          // Death realm aura (portal to afterlife)
+          for (let layer = 0; layer < 5; layer++) {
+            const realmSize = half + 24 + layer * 6;
+            const realmAlpha = (0.18 - layer * 0.03) * deathPulse;
+            const realmGrad = ctx.createRadialGradient(x, y + gFloat, half, x, y + gFloat, realmSize);
+            realmGrad.addColorStop(0, `rgba(0, 180, 150, ${realmAlpha})`);
+            realmGrad.addColorStop(0.6, `rgba(0, 120, 100, ${realmAlpha * 0.6})`);
+            realmGrad.addColorStop(1, 'rgba(0, 80, 70, 0)');
+            ctx.fillStyle = realmGrad;
+            ctx.fillRect(x - realmSize, y - realmSize + gFloat, realmSize * 2, realmSize * 2);
           }
-          // Eyes — piercing cyan
-          ctx.fillStyle = '#44ffdd';
-          ctx.fillRect(x - 4, y - 3 + gFloat, 3, 2);
-          ctx.fillRect(x + 2, y - 3 + gFloat, 3, 2);
-          // Phase rings
-          ctx.strokeStyle = `rgba(0, 255, 220, ${0.2 * (e.phaseAlpha || 0.6)})`;
+
+          // Soul vortex (spirits being reaped)
+          for (let i = 0; i < 10; i++) {
+            const soulAngle = time * 3 + (i * Math.PI * 2 / 10);
+            const soulRadius = half + 12 + Math.sin(time * 5 + i) * 3;
+            const sx = x + Math.cos(soulAngle) * soulRadius;
+            const sy = y + Math.sin(soulAngle) * (soulRadius * 0.5) + gFloat;
+            ctx.fillStyle = `rgba(100, 255, 230, ${0.4 * deathPulse})`;
+            ctx.fillRect(sx - 1, sy - 1, 2, 2);
+          }
+
+          // Flowing spectral robes (death shroud)
+          ctx.fillStyle = e.flashTime > 0 ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 170, 150, 0.7)';
+          ctx.beginPath();
+          ctx.moveTo(x - half - 3, y - half + gFloat);
+          ctx.lineTo(x + half + 3, y - half + gFloat);
+          ctx.quadraticCurveTo(x + half + 5, y + gFloat, x + half + 4, y + half + 7 + gFloat);
+          ctx.lineTo(x - half - 4, y + half + 7 + gFloat);
+          ctx.quadraticCurveTo(x - half - 5, y + gFloat, x - half - 3, y - half + gFloat);
+          ctx.fill();
+
+          // Robe ethereal wisps (flowing tendrils)
+          ctx.strokeStyle = e.flashTime > 0 ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 200, 180, 0.5)';
+          ctx.lineWidth = 2;
+          for (let i = 0; i < 6; i++) {
+            const wx = x - 9 + i * 3.5 + Math.sin(time * 5 + i * 0.8) * 4;
+            const tendrilLength = 10 + i * 1.5;
+            ctx.beginPath();
+            ctx.moveTo(wx, y + half + gFloat);
+            ctx.quadraticCurveTo(
+              wx + Math.sin(time * 6 + i) * 3, y + half + gFloat + tendrilLength / 2,
+              wx + Math.sin(time * 4 + i) * 5, y + half + gFloat + tendrilLength
+            );
+            ctx.stroke();
+          }
+
+          // Main spectral body (translucent)
+          const bodyGrad = ctx.createRadialGradient(x, y + gFloat, 0, x, y + gFloat, half + 1);
+          bodyGrad.addColorStop(0, e.flashTime > 0 ? C.COLORS.white : 'rgba(120, 255, 240, 0.8)');
+          bodyGrad.addColorStop(0.6, e.flashTime > 0 ? C.COLORS.white : 'rgba(0, 200, 180, 0.6)');
+          bodyGrad.addColorStop(1, 'rgba(0, 150, 140, 0.3)');
+          ctx.fillStyle = bodyGrad;
+          ctx.beginPath();
+          ctx.arc(x, y + gFloat, half + 1, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Hooded skull (grim reaper)
+          ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : 'rgba(0, 100, 90, 0.9)';
+          ctx.beginPath();
+          ctx.arc(x, y - half + 2 + gFloat, half + 1, Math.PI * 0.9, Math.PI * 2.1);
+          ctx.fill();
+
+          // Deep void within hood
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+          ctx.fillRect(x - half + 2, y - half + 2 + gFloat, s - 4, 6);
+
+          // Haunting cyan eyes (death stare)
+          ctx.fillStyle = `rgba(100, 255, 255, ${deathPulse})`;
+          ctx.fillRect(x - 5, y - half + 4 + gFloat, 3, 3);
+          ctx.fillRect(x + 3, y - half + 4 + gFloat, 3, 3);
+
+          ctx.fillStyle = `rgba(0, 255, 220, ${deathPulse * 0.7})`;
+          ctx.fillRect(x - 7, y - half + 3 + gFloat, 7, 5);
+          ctx.fillRect(x + 1, y - half + 3 + gFloat, 7, 5);
+
+          // MASSIVE SCYTHE (signature weapon)
+          const scytheHandle = s + 18;
+          const scytheX = x - half - 8;
+
+          // Scythe handle (long staff)
+          ctx.fillStyle = '#0a2020';
+          ctx.fillRect(scytheX, y - half - 8 + gFloat + reap, 3, scytheHandle);
+
+          // Handle decorations
+          ctx.fillStyle = '#1a4040';
+          for (let i = 0; i < 6; i++) {
+            ctx.fillRect(scytheX - 1, y - half - 6 + i * 5 + gFloat, 5, 2);
+          }
+
+          // Scythe blade (curved death blade)
+          const bladeY = y - half - 10 + gFloat + reap;
+          ctx.fillStyle = `rgba(50, 200, 180, ${deathPulse * 0.9})`;
+
+          // Outer blade glow
+          ctx.beginPath();
+          ctx.moveTo(scytheX + 1.5, bladeY);
+          ctx.quadraticCurveTo(scytheX + 15, bladeY - 8, scytheX + 20, bladeY - 6);
+          ctx.quadraticCurveTo(scytheX + 16, bladeY - 3, scytheX + 1.5, bladeY + 2);
+          ctx.fill();
+
+          // Inner blade (sharper)
+          ctx.fillStyle = `rgba(150, 255, 240, ${deathPulse})`;
+          ctx.beginPath();
+          ctx.moveTo(scytheX + 1.5, bladeY);
+          ctx.quadraticCurveTo(scytheX + 14, bladeY - 7, scytheX + 18, bladeY - 5);
+          ctx.quadraticCurveTo(scytheX + 15, bladeY - 2, scytheX + 1.5, bladeY + 1);
+          ctx.fill();
+
+          // Blade edge highlight (deadly)
+          ctx.strokeStyle = `rgba(200, 255, 255, ${deathPulse})`;
           ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.arc(x, y + gFloat, half + 8 + Math.sin(time * 4) * 3, 0, Math.PI * 2);
+          ctx.moveTo(scytheX + 18, bladeY - 5);
+          ctx.lineTo(scytheX + 19, bladeY - 4);
           ctx.stroke();
+
+          // Soul particles around scythe
+          for (let i = 0; i < 5; i++) {
+            const px = scytheX + 10 + (Math.random() - 0.5) * 12;
+            const py = bladeY + (Math.random() - 0.5) * 8;
+            ctx.fillStyle = `rgba(100, 255, 230, ${0.5 + Math.random() * 0.5})`;
+            ctx.fillRect(px, py, 1.5, 1.5);
+          }
+
+          // Phase rings (dimensional presence)
+          for (let i = 0; i < 3; i++) {
+            ctx.strokeStyle = `rgba(0, 255, 220, ${(0.25 - i * 0.06) * deathPulse})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(x, y + gFloat, half + 10 + i * 6 + Math.sin(time * 4 - i) * 3, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
           ctx.globalAlpha = 1;
           break;
         }
         case 5: {
-          // O DESTRUIDOR — massive hulking form
-          ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#884400';
-          // Huge body
-          ctx.fillRect(x - half - 3, y - half + breathe, s + 6, s);
-          // Shoulders
-          ctx.fillRect(x - half - 6, y - half + 3 + breathe, 4, s - 6);
-          ctx.fillRect(x + half + 2, y - half + 3 + breathe, 4, s - 6);
-          // Head
-          ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#663300';
-          ctx.fillRect(x - 5, y - half - 4 + breathe, 10, 6);
-          // Eyes — fiery
-          ctx.fillStyle = e.aiState === 'charge' ? '#ff0000' : '#ff8800';
-          ctx.fillRect(x - 4, y - half - 2 + breathe, 3, 2);
-          ctx.fillRect(x + 2, y - half - 2 + breathe, 3, 2);
-          // Impact aura
-          if (e.aiState === 'charge') {
-            ctx.fillStyle = 'rgba(255, 100, 0, 0.15)';
-            ctx.beginPath();
-            ctx.arc(x, y + breathe, half + 15, 0, Math.PI * 2);
-            ctx.fill();
+          // ═══ VOID-IRON DREADNOUGHT - O Destruidor de Mundos ═══
+          const titanPower = Math.sin(time * 3.5) * 0.3 + 0.7;
+          const charge = e.aiState === 'charge';
+          const slam = Math.sin(time * 10) * (charge ? 2 : 0.5);
+          const corePulse = Math.sin(time * 8) * 0.3 + 0.7;
+
+          // Industrial War Aura
+          for (let layer = 0; layer < 5; layer++) {
+            const auraSize = half + 25 + layer * 8;
+            const auraAlpha = (0.15 - layer * 0.03) * titanPower;
+            const ironGrad = ctx.createRadialGradient(x, y + breathe, 0, x, y + breathe, auraSize);
+            ironGrad.addColorStop(0, `rgba(100, 50, 0, ${auraAlpha})`);
+            ironGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = ironGrad;
+            ctx.fillRect(x - auraSize, y - auraSize + breathe, auraSize * 2, auraSize * 2);
           }
+
+          // EXHAUST PIPES (Vapor/Sparks)
+          ctx.fillStyle = '#222222';
+          // Left Pipe
+          ctx.fillRect(x - half - 10, y - half - 5 + breathe, 6, 15);
+          // Right Pipe
+          ctx.fillRect(x + half + 4, y - half - 5 + breathe, 6, 15);
+
+          // Sparks from pipes
+          for (let i = 0; i < 6; i++) {
+            const sx = x - half - 7 + (Math.random() - 0.5) * 4;
+            const sy = y - half - 10 + breathe - (time * 20 + i * 10) % 30;
+            ctx.fillStyle = `rgba(255, 100, 0, ${Math.random()})`;
+            ctx.fillRect(sx, sy, 2, 2);
+          }
+
+          // ASYMMETRICAL TITAN SILHOUETTE
+          const plateColor = e.flashTime > 0 ? C.COLORS.white : '#333333';
+          const jointColor = '#1a1a1a';
+          ctx.fillStyle = plateColor;
+
+          // Waist (Thin center)
+          ctx.fillRect(x - 6, y + 2 + breathe, 12, 10);
+
+          // Massive Torso / Chest Plate (Hexagonal)
+          ctx.beginPath();
+          ctx.moveTo(x - 12, y - half + 5 + breathe);
+          ctx.lineTo(x + 12, y - half + 5 + breathe);
+          ctx.lineTo(x + 18, y + 2 + breathe);
+          ctx.lineTo(x - 18, y + 2 + breathe);
+          ctx.closePath();
+          ctx.fill();
+
+          // HUGE PAULDRONS (Shoulders)
+          ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#444444';
+          // Right Pauldron (The Heavy Arm)
+          ctx.beginPath();
+          ctx.arc(x + 18, y - half + 5 + breathe, 12, 0, Math.PI * 2);
+          ctx.fill();
+          // Left Pauldron
+          ctx.beginPath();
+          ctx.arc(x - 18, y - half + 5 + breathe, 10, 0, Math.PI * 2);
+          ctx.fill();
+
+          // pauldrons trim
+          ctx.strokeStyle = '#666666';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // THE NUCLEAR FUSION CORE
+          const coreGlow = ctx.createRadialGradient(x, y - 5 + breathe, 0, x, y - 5 + breathe, 10);
+          coreGlow.addColorStop(0, `rgba(0, 200, 255, ${corePulse})`);
+          coreGlow.addColorStop(0.5, `rgba(0, 100, 255, 0.5)`);
+          coreGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = coreGlow;
+          ctx.beginPath();
+          ctx.arc(x, y - 5 + breathe, 8, 0, Math.PI * 2);
+          ctx.fill();
+          // Core center
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(x, y - 5 + breathe, 3 * corePulse, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Mechanical Arms
+          ctx.fillStyle = jointColor;
+          // Right Crushing Arm
+          ctx.fillRect(x + 22, y - half + 10 + breathe + slam, 8, 25);
+          ctx.fillStyle = plateColor;
+          ctx.fillRect(x + 20, y - half + 30 + breathe + slam, 12, 10); // Massive Fist
+
+          // Left Support Arm
+          ctx.fillStyle = jointColor;
+          ctx.fillRect(x - 28, y - half + 10 + breathe, 8, 20);
+          ctx.fillStyle = plateColor;
+          ctx.beginPath(); // Shield Arm
+          ctx.moveTo(x - 32, y - half + 20 + breathe);
+          ctx.lineTo(x - 18, y - half + 20 + breathe);
+          ctx.lineTo(x - 20, y - half + 40 + breathe);
+          ctx.lineTo(x - 30, y - half + 40 + breathe);
+          ctx.closePath();
+          ctx.fill();
+
+          // HEAD - Armored visor
+          ctx.fillStyle = '#222222';
+          ctx.beginPath();
+          ctx.ellipse(x, y - half - 5 + breathe + slam, 7, 5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          // Visor Light
+          ctx.fillStyle = charge ? '#ff0000' : '#00ccff';
+          ctx.fillRect(x - 4, y - half - 6 + breathe + slam, 8, 2);
+
+          // Leg Stance (Mechanical legs)
+          ctx.fillStyle = jointColor;
+          ctx.fillRect(x - 12, y + 12 + breathe, 6, 12);
+          ctx.fillRect(x + 6, y + 12 + breathe, 6, 12);
+          ctx.fillStyle = plateColor;
+          ctx.fillRect(x - 15, y + 20 + breathe, 8, 5);
+          ctx.fillRect(x + 7, y + 20 + breathe, 8, 5);
+
           break;
         }
         case 6: {
-          // O PESADELO — shifting amorphous horror
-          // Multiple overlapping forms
-          for (let i = 0; i < 3; i++) {
-            const ox = Math.sin(time * 3 + i * 2) * 3;
-            const oy = Math.cos(time * 2.5 + i * 1.5) * 2;
-            ctx.fillStyle = `rgba(${100 - i * 20}, 0, ${20 + i * 10}, ${0.5 - i * 0.1})`;
+          // ═══ THE VOID SINGULARITY - O Pesadelo Final ═══
+          const madness = Math.sin(time * 4) * 0.3 + 0.7;
+          const shiftX = Math.sin(time * 2) * 5;
+          const shiftY = Math.cos(time * 3) * 5;
+
+          // Event Horizon Aura (Deep Space Distortion)
+          for (let layer = 0; layer < 6; layer++) {
+            const auraSize = half + 30 + layer * 10;
+            const auraAlpha = (0.25 - layer * 0.04) * madness;
+            const voidGrad = ctx.createRadialGradient(x + shiftX, y + shiftY + breathe, 0, x + shiftX, y + shiftY + breathe, auraSize);
+            voidGrad.addColorStop(0, `rgba(20, 0, 40, ${auraAlpha})`);
+            voidGrad.addColorStop(0.7, `rgba(10, 0, 20, ${auraAlpha * 0.5})`);
+            voidGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = voidGrad;
             ctx.beginPath();
-            ctx.arc(x + ox, y + oy + breathe, half - i, 0, Math.PI * 2);
+            ctx.arc(x + shiftX, y + shiftY + breathe, auraSize, 0, Math.PI * 2);
             ctx.fill();
           }
-          // Main body
-          ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#660022';
-          ctx.beginPath();
-          ctx.arc(x, y + breathe, half, 0, Math.PI * 2);
-          ctx.fill();
-          // Multiple glowing eyes
-          for (let i = 0; i < 4; i++) {
-            const ea = time * 1.5 + i * Math.PI / 2;
-            const er = half * 0.4;
-            const ex = x + Math.cos(ea) * er;
-            const ey = y + Math.sin(ea) * er * 0.6 + breathe;
-            ctx.fillStyle = `rgba(255, 0, 30, ${0.6 + Math.sin(time * 8 + i) * 0.3})`;
-            ctx.fillRect(ex - 1, ey - 1, 3, 2);
+
+          // REALITY SHARDS (Floating crystalline fragments)
+          for (let i = 0; i < 10; i++) {
+            const orbitAngle = time * 1.5 + i * (Math.PI * 2 / 10);
+            const orbitRad = s + 10 + Math.sin(time * 3 + i) * 10;
+            const sx = x + Math.cos(orbitAngle) * orbitRad;
+            const sy = y + Math.sin(orbitAngle) * orbitRad * 0.5 + breathe;
+
+            ctx.fillStyle = i % 2 === 0 ? 'rgba(100, 0, 255, 0.6)' : 'rgba(255, 0, 100, 0.6)';
+            ctx.beginPath();
+            ctx.moveTo(sx, sy - 5);
+            ctx.lineTo(sx + 3, sy);
+            ctx.lineTo(sx, sy + 5);
+            ctx.lineTo(sx - 3, sy);
+            ctx.closePath();
+            ctx.fill();
           }
-          // Horror tendrils
+
+          // WRITHING DARK TENTACLES (More organic limbs)
+          for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2 + time;
+            const length = s + 15 + Math.sin(time * 4 + i) * 10;
+            const controlX = x + Math.cos(angle + 0.5) * (length / 2);
+            const controlY = y + Math.sin(angle + 0.5) * (length / 2) + breathe;
+            const endX = x + Math.cos(angle) * length;
+            const endY = y + Math.sin(angle) * length + breathe;
+
+            ctx.strokeStyle = `rgba(40, 0, 60, ${0.8 * madness})`;
+            ctx.lineWidth = 4 - (i % 3);
+            ctx.beginPath();
+            ctx.moveTo(x + shiftX, y + shiftY + breathe);
+            ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+            ctx.stroke();
+
+            // Scurrying eyes on tentacles
+            if (i % 3 === 0) {
+              ctx.fillStyle = `rgba(255, 0, 50, ${madness})`;
+              ctx.beginPath();
+              ctx.arc(controlX, controlY, 2, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+
+          // THE SINGULARITY CORE (The Black Hole)
+          const coreSize = half + 5;
+          ctx.fillStyle = '#000000';
+          ctx.beginPath();
+          ctx.arc(x + shiftX, y + shiftY + breathe, coreSize, 0, Math.PI * 2);
+          ctx.fill();
+
+          // White Light Ring (Accretion Disk)
+          ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * madness})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(x + shiftX, y + shiftY + breathe, coreSize + 2, time * 2, time * 2 + Math.PI * 1.5);
+          ctx.stroke();
+
+          // ═══ MANY EYES OF THE VOID ═══
           for (let i = 0; i < 6; i++) {
-            const ta = (i / 6) * Math.PI * 2 + time * 0.8;
-            const tLen = half + 5 + Math.sin(time * 2 + i) * 5;
-            ctx.strokeStyle = `rgba(120, 0, 30, 0.4)`;
+            const eyeAng = time * 0.8 + i * (Math.PI / 3);
+            const eyeDist = coreSize * 0.6;
+            const ex = x + shiftX + Math.cos(eyeAng) * eyeDist;
+            const ey = y + shiftY + Math.sin(eyeAng) * eyeDist + breathe;
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.ellipse(ex, ey, 3, 1.5, eyeAng, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ff0000';
+            ctx.beginPath();
+            ctx.arc(ex, ey, 1, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // Final Void Resonance
+          for (let i = 0; i < 3; i++) {
+            const rSize = s + i * 15 + Math.sin(time * 5) * 5;
+            ctx.strokeStyle = `rgba(150, 0, 255, ${0.15 - i * 0.05})`;
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(x, y + breathe);
-            ctx.lineTo(x + Math.cos(ta) * tLen, y + Math.sin(ta) * tLen + breathe);
+            ctx.arc(x + shiftX, y + shiftY + breathe, rSize, 0, Math.PI * 2);
             ctx.stroke();
           }
-          // Dark aura
-          ctx.fillStyle = 'rgba(100, 0, 20, 0.12)';
-          ctx.beginPath();
-          ctx.arc(x, y + breathe, half + 18, 0, Math.PI * 2);
-          ctx.fill();
+
           break;
         }
         default: {
-          // Floor 1: SOMBRA FAMINTA — original design
-          ctx.fillRect(x - half, y - half + 3 + breathe, s, s - 3);
-          ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : C.COLORS.bossDark;
-          ctx.fillRect(x - half + 2, y - half + breathe, s - 4, 5);
-          // Horns
-          ctx.fillStyle = C.COLORS.bossAccent;
-          ctx.fillRect(x - half - 3, y - half - 5 + breathe, 4, 7);
-          ctx.fillRect(x + half, y - half - 5 + breathe, 4, 7);
+          // Floor 1: SOMBRA FAMINTA — DEMONIC COLOSSUS
+          // A powerful beastial silhouette that breaks the boxy look with curves and asymmetry
+          const shadowPulse = Math.sin(time * 3) * 0.3 + 0.7;
+          const roar = Math.sin(time * 8) * (e.flashTime > 0 ? 2 : 0.8);
+          const beastFloat = breathe + roar * 0.5;
+
+          // 1. VOID AZURE AURA
+          for (let layer = 0; layer < 6; layer++) {
+            const auraSize = half + 30 + layer * 10;
+            const auraAlpha = (0.24 - layer * 0.04) * shadowPulse;
+            const darkAura = ctx.createRadialGradient(x, y + beastFloat, half, x, y + beastFloat, auraSize);
+            darkAura.addColorStop(0, `rgba(20, 60, 180, ${auraAlpha})`);
+            darkAura.addColorStop(0.6, `rgba(10, 20, 80, ${auraAlpha * 0.5})`);
+            darkAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = darkAura;
+            ctx.beginPath();
+            ctx.arc(x, y + beastFloat, auraSize, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // 2. SHADOW TENDRILS (Breaking the bottom flat edge)
+          ctx.strokeStyle = '#00081a';
+          ctx.lineWidth = 3;
+          for (let i = 0; i < 8; i++) {
+            const tx = x - half + (i * s / 7);
+            const ty = y + half + beastFloat;
+            const tLen = 12 + Math.sin(time * 5 + i) * 8;
+            ctx.beginPath();
+            ctx.moveTo(tx, ty - 5);
+            ctx.quadraticCurveTo(tx + Math.sin(time * 4 + i) * 10, ty + tLen / 2, tx, ty + tLen);
+            ctx.stroke();
+          }
+
+          // 3. HUNTER'S HUNCHED BODY (Organic & Powerful - Deep Blue)
+          const bodyColor = e.flashTime > 0 ? C.COLORS.white : '#00051a';
+          ctx.fillStyle = bodyColor;
+
+          ctx.beginPath();
+          // Drawing a more beastial, hunched silhouette
+          ctx.moveTo(x - half - 8, y + half + 5 + beastFloat); // Bottom left
+          ctx.quadraticCurveTo(x - half - 15, y, x - half, y - half - 5 + beastFloat); // Left side to shoulder
+          ctx.quadraticCurveTo(x, y - half - 20 + beastFloat, x + half + 5, y - half + beastFloat); // Hunch to right shoulder
+          ctx.quadraticCurveTo(x + half + 12, y + half, x + half + 2, y + half + 5 + beastFloat); // Right side to bottom
+          ctx.bezierCurveTo(x, y + half + 15 + beastFloat, x - half, y + half + 10 + beastFloat, x - half - 8, y + half + 5 + beastFloat);
+          ctx.fill();
+
+          // 4. SCARRED ARMOR PLATES (Asymmetric Blue Armor)
+          ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#081a33';
+
+          // Main Chest Plate (Jagged)
+          ctx.beginPath();
+          ctx.moveTo(x - 12, y - 5 + beastFloat);
+          ctx.lineTo(x + 8, y - 8 + beastFloat);
+          ctx.lineTo(x + 15, y + 10 + beastFloat);
+          ctx.lineTo(x - 6, y + 15 + beastFloat);
+          ctx.closePath();
+          ctx.fill();
+
+          // Armor Detail (Azure Core in chest)
+          const coreG = ctx.createRadialGradient(x + 2, y + 5 + beastFloat, 0, x + 2, y + 5 + beastFloat, 8);
+          coreG.addColorStop(0, `rgba(0, 150, 255, ${shadowPulse})`);
+          coreG.addColorStop(1, 'rgba(0, 20, 80, 0)');
+          ctx.fillStyle = coreG;
+          ctx.beginPath();
+          ctx.arc(x + 2, y + 5 + beastFloat, 6, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 5. ASYMMETRIC HORNS (Dark Metallic Blue)
+          ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#1a2433';
+
+          // Left Horn (Large, curved upwards)
+          ctx.beginPath();
+          ctx.moveTo(x - 10, y - half - 10 + beastFloat);
+          ctx.quadraticCurveTo(x - 25, y - half - 25 + beastFloat, x - 15, y - half - 45 + beastFloat);
+          ctx.quadraticCurveTo(x - 5, y - half - 25 + beastFloat, x - 2, y - half - 12 + beastFloat);
+          ctx.fill();
+
+          // Right Horn (Broken, jagged stub)
+          ctx.beginPath();
+          ctx.moveTo(x + 8, y - half - 8 + beastFloat);
+          ctx.lineTo(x + 20, y - half - 15 + beastFloat);
+          ctx.lineTo(x + 15, y - half - 5 + beastFloat);
+          ctx.lineTo(x + 10, y - half + 2 + beastFloat);
+          ctx.closePath();
+          ctx.fill();
+
+          // 6. THE COLD GAZE (Eerie Light Blue eyes)
+          const eyeH = 2 + Math.sin(time * 12) * 1;
+          ctx.fillStyle = '#00ccff';
+          // Large main eyes
+          ctx.beginPath();
+          ctx.ellipse(x - 8, y - half + 5 + beastFloat, 5, eyeH, 0.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.ellipse(x + 6, y - half + 4 + beastFloat, 4, eyeH, -0.1, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Pupils (White/Cyan)
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(x - 9, y - half + 4 + beastFloat, 2, eyeH);
+          ctx.fillRect(x + 5, y - half + 3 + beastFloat, 1.5, eyeH);
+
+          // 7. BESTIAL JAW (Darkened blue teeth)
+          ctx.fillStyle = '#00081a';
+          ctx.beginPath();
+          ctx.moveTo(x - 12, y + half + beastFloat + roar * 2);
+          ctx.lineTo(x + 10, y + half + 2 + beastFloat + roar * 2);
+          ctx.lineTo(x, y + half + 12 + beastFloat + roar * 2);
+          ctx.closePath();
+          ctx.fill();
+
+          // Teeth glint
+          ctx.fillStyle = '#ccdeff';
+          for (let i = 0; i < 3; i++) {
+            ctx.fillRect(x - 6 + i * 5, y + half + 2 + beastFloat + roar * 2, 1.5, 3);
+          }
+
+          // 8. BLUE MIST & SPARKS
+          if (Math.random() < 0.8) {
+            const ex = x + (Math.random() - 0.5) * s * 1.5;
+            const ey = y + (Math.random() - 0.5) * s + beastFloat;
+            ctx.fillStyle = `rgba(100, 200, 255, ${0.4})`;
+            ctx.fillRect(ex, ey, 2, 2);
+          }
+
           break;
         }
       }

@@ -69,7 +69,8 @@ export class GameEngine {
   private currentNPC: 'merchant' | 'alchemist' | null = null;
   private potionCooldown = 0; // Prevent spam
   vendorInteractCooldown = 0;
-  vendorFirstMeet = true;
+  merchantFirstMeet = true;
+  alchemistFirstMeet = true;
   vendorDialogueActive = false;
   vendorDialogueLines: string[] = [];
   vendorDialogueIndex = 0;

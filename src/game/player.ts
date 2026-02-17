@@ -86,7 +86,22 @@ export function updatePlayer(p: PlayerState, moveDir: Vec2, dt: number) {
 
   const buffSpeed = p.speedBuffTimer > 0 ? 1.4 : 1.0;
   const dashSpeed = p.dashEnhanced ? C.PLAYER_DASH_SPEED * 1.5 : C.PLAYER_DASH_SPEED;
-  let speed = p.isDashing ? dashSpeed : p.speed * p.moveSpeedMult * buffSpeed;
+
+  // Calculate raw speed multiplier
+  let speedMult = p.moveSpeedMult * buffSpeed;
+
+  // Apply Diminishing Returns: Scaled reduction after 1.5x speed
+  if (speedMult > 1.5) {
+    const excess = speedMult - 1.5;
+    speedMult = 1.5 + excess * 0.4; // Only 40% of excess speed is applied
+  }
+
+  let speed = p.isDashing ? dashSpeed : p.speed * speedMult;
+
+  // Apply Absolute Speed Cap (for non-dash movement)
+  if (!p.isDashing && speed > C.PLAYER_MAX_SPEED_CAP) {
+    speed = C.PLAYER_MAX_SPEED_CAP;
+  }
 
   // Add weight/commitment to melee attacks: slow down during anticipation and swing
   if (p.meleeAttacking && p.meleeTimer > 0.1) {

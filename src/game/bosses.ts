@@ -6,9 +6,9 @@ import { createEnemy } from './enemies';
 // ============ BOSS DATA ============
 
 export const BOSS_DATA: Record<number, { name: string; title: string; color: string; accentColor: string }> = {
-  1: { name: 'SOMBRA FAMINTA', title: 'Guardião do Abismo', color: '#cc2222', accentColor: '#ff4444' },
+  1: { name: 'SOMBRA FAMINTA', title: 'Guardião do Abismo', color: '#2244cc', accentColor: '#4488ff' },
   2: { name: 'O CAÇADOR', title: 'Velocidade Implacável', color: '#ff6600', accentColor: '#ffaa00' },
-  3: { name: 'O INVOCADOR', title: 'Senhor das Hordas', color: '#9933cc', accentColor: '#cc66ff' },
+  3: { name: 'O INVOCADOR', title: 'Senhor das Hordas', color: '#7722cc', accentColor: '#aa44ff' },
   4: { name: 'O FANTASMA', title: 'Aquele Que Não Se Vê', color: '#00ccaa', accentColor: '#44ffdd' },
   5: { name: 'O DESTRUIDOR', title: 'Força Imparável', color: '#aa4400', accentColor: '#ff8800' },
   6: { name: 'O PESADELO', title: 'Terror Absoluto', color: '#880000', accentColor: '#ff0044' },
@@ -25,7 +25,7 @@ export function createBossForFloor(floor: number, x: number, y: number): EnemySt
   const hpMult = 1 + (floor - 1) * 0.6;
   const dmgMult = 1 + (floor - 1) * 0.35;
   const spdMult = 1 + (floor - 1) * 0.1;
-  
+
   boss.hp = Math.floor(C.BOSS_HP * hpMult);
   boss.maxHp = boss.hp;
   boss.damage = Math.floor(C.BOSS_DAMAGE * dmgMult);
@@ -98,6 +98,7 @@ function updateBoss1(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
         vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
         size: 4, damage: e.damage, isPlayerOwned: false, lifetime: 3,
         piercing: false, explosive: false, trail: [],
+        hitTargets: [], volleyId: 0,
       });
     }
   }
@@ -125,7 +126,7 @@ function updateBoss2(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
     const next = (idx + 1) % phases.length;
     e.aiState = phases[next] as any;
     e.stateTimer = e.aiState === 'charge' ? 0.4 : e.aiState === 'attack' ? 1.5 : 1.2;
-    
+
     if (e.aiState === 'charge') {
       e.vx = n.x;
       e.vy = n.y;
@@ -148,7 +149,7 @@ function updateBoss2(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
     const circleY = n.x * e.speed * 2 * dt;
     e.x += circleX;
     e.y += circleY;
-    
+
     if (e.attackCooldown <= 0) {
       e.attackCooldown = 0.2;
       const angle = Math.atan2(dy, dx);
@@ -159,6 +160,7 @@ function updateBoss2(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
           vy: Math.sin(angle + i * 0.3) * C.SHOOTER_PROJ_SPEED * 1.2,
           size: 4, damage: e.damage, isPlayerOwned: false, lifetime: 2.5,
           piercing: false, explosive: false, trail: [],
+          hitTargets: [], volleyId: 0,
         });
       }
     }
@@ -206,7 +208,7 @@ function updateBoss3(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
   const hpPct = e.hp / e.maxHp;
   const summonInterval = 4 * hpPct + 1; // 5s at full HP, 1s at low HP
   e.summonTimer -= dt;
-  
+
   if (e.summonTimer <= 0) {
     e.summonTimer = summonInterval;
     const minionCount = Math.min(allEnemies.length, 15) < 12 ? (3 + Math.floor((1 - hpPct) * 3)) : 0;
@@ -236,6 +238,7 @@ function updateBoss3(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
         vy: Math.sin(a) * C.SHOOTER_PROJ_SPEED * 0.5,
         size: 3, damage: e.damage, isPlayerOwned: false, lifetime: 3,
         piercing: false, explosive: false, trail: [],
+        hitTargets: [], volleyId: 0,
       });
     }
   }
@@ -271,7 +274,7 @@ function updateBoss4(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
     const next = (idx + 1) % phases.length;
     e.aiState = phases[next] as any;
     e.stateTimer = e.aiState === 'teleport' ? 0.8 : e.aiState === 'attack' ? 1.5 : 1.0;
-    
+
     if (e.aiState === 'teleport') {
       // Teleport near player from random angle
       const tAngle = Math.random() * Math.PI * 2;
@@ -300,11 +303,12 @@ function updateBoss4(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
         vy: Math.sin(angle) * C.SHOOTER_PROJ_SPEED * 1.4,
         size: 5, damage: e.damage, isPlayerOwned: false, lifetime: 3,
         piercing: false, explosive: false, trail: [],
+        hitTargets: [], volleyId: 0,
       });
     }
     e.phaseAlpha = 0.8;
   }
-  
+
   // Permanent phasing
   e.phaseAlpha = Math.min(1, e.phaseAlpha);
 
@@ -337,7 +341,7 @@ function updateBoss5(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
     const next = (idx + 1) % phases.length;
     e.aiState = phases[next] as any;
     e.stateTimer = e.aiState === 'charge' ? 0.6 : e.aiState === 'attack' ? 2.0 : 1.5;
-    
+
     if (e.aiState === 'charge') {
       e.vx = n.x;
       e.vy = n.y;
@@ -360,6 +364,7 @@ function updateBoss5(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
         vx: 0, vy: 0,
         size: 6, damage: Math.floor(e.damage * 0.7), isPlayerOwned: false, lifetime: 1.5,
         piercing: false, explosive: true, trail: [],
+        hitTargets: [], volleyId: 0,
       });
     }
   } else if (e.aiState === 'attack') {
@@ -375,6 +380,7 @@ function updateBoss5(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
           vy: Math.sin(a) * C.SHOOTER_PROJ_SPEED * 0.8,
           size: 6, damage: e.damage, isPlayerOwned: false, lifetime: 3,
           piercing: false, explosive: i % 4 === 0, trail: [],
+          hitTargets: [], volleyId: 0,
         });
       }
       emitBossAction({ screenShake: 6 });
@@ -410,7 +416,7 @@ function updateBoss6(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
     const phases: Array<'chase' | 'charge' | 'teleport' | 'attack'> = ['chase', 'charge', 'teleport', 'attack'];
     e.aiState = phases[Math.floor(Math.random() * phases.length)];
     e.stateTimer = 0.8 + Math.random() * 1.5;
-    
+
     if (e.aiState === 'charge') {
       e.vx = n.x;
       e.vy = n.y;
@@ -446,6 +452,7 @@ function updateBoss6(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
           vy: Math.sin(angle + i * 0.25) * C.SHOOTER_PROJ_SPEED * 1.5,
           size: 5, damage: e.damage, isPlayerOwned: false, lifetime: 3,
           piercing: i === 0, explosive: false, trail: [],
+          hitTargets: [], volleyId: 0,
         });
       }
     }
@@ -463,6 +470,7 @@ function updateBoss6(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
           vy: Math.sin(a) * C.SHOOTER_PROJ_SPEED * 0.9,
           size: 5, damage: e.damage, isPlayerOwned: false, lifetime: 4,
           piercing: false, explosive: i % 3 === 0, trail: [],
+          hitTargets: [], volleyId: 0,
         });
       }
       // Aimed piercing shot
@@ -472,6 +480,7 @@ function updateBoss6(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
         vy: Math.sin(angle) * C.SHOOTER_PROJ_SPEED * 2,
         size: 7, damage: Math.floor(e.damage * 1.5), isPlayerOwned: false, lifetime: 4,
         piercing: true, explosive: false, trail: [],
+        hitTargets: [], volleyId: 0,
       });
     }
   }
@@ -529,7 +538,7 @@ export function updateBossAI(
 ) {
   const n = normalize(dx, dy);
   const floor = bossFloor;
-  
+
   switch (floor) {
     case 1: updateBoss1(e, player, n, dx, dy, dist, dt, projectiles); break;
     case 2: updateBoss2(e, player, n, dx, dy, dist, dt, projectiles); break;
@@ -539,7 +548,7 @@ export function updateBossAI(
     case 6: updateBoss6(e, player, n, dx, dy, dist, dt, projectiles, allEnemies); break;
     default: updateBoss1(e, player, n, dx, dy, dist, dt, projectiles); break;
   }
-  
+
   // Clamp
   const margin = C.TILE_SIZE + e.width / 2;
   e.x = Math.max(margin, Math.min(C.dims.gw - margin, e.x));
