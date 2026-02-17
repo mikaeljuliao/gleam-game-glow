@@ -409,10 +409,50 @@ export const SFX = {
 
   // Footsteps — soft, airy, agile character feel
   footstep() {
-    const pitch = 180 + Math.random() * 80;
-    const vol = 0.014 + Math.random() * 0.006;
-    playNoise(0.018, vol * 0.6, 1200 + Math.random() * 800);
-    playTone(pitch, 0.015, 'sine', vol * 0.5);
+    const ctx = getCtx();
+    const t = ctx.currentTime;
+    const vol = 0.04 + Math.random() * 0.02;
+
+    // 1. Soft Sine 'Tap' (No click attack)
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800 + Math.random() * 200, t);
+
+    // Envelope: Soft Attack (5ms) -> Decay (30ms)
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(vol * 0.5, t + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+
+    osc.connect(gain);
+    gain.connect(masterGainNode!);
+    osc.start(t);
+    osc.stop(t + 0.05);
+
+    // 2. Airy Swish/Noise (Cloth sound)
+    const noiseDur = 0.06;
+    const bufferSize = ctx.sampleRate * noiseDur;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const nFilter = ctx.createBiquadFilter();
+    nFilter.type = 'highpass';
+    nFilter.frequency.setValueAtTime(3000, t);
+
+    const nGain = ctx.createGain();
+    nGain.gain.setValueAtTime(0, t);
+    nGain.gain.linearRampToValueAtTime(vol * 0.6, t + 0.01);
+    nGain.gain.exponentialRampToValueAtTime(0.001, t + noiseDur);
+
+    noise.connect(nFilter);
+    nFilter.connect(nGain);
+    nGain.connect(masterGainNode!);
+    noise.start(t);
   },
 
   // Critical hit — sharp metallic impact + high pitch accent

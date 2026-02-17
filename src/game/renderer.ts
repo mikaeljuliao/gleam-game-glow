@@ -566,9 +566,30 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
     }
   }
 
+  // 1. Ambient Effects (Glow, Shadow, Dash Trail)
+  drawAmbientEffects(ctx, p, x, y, time);
+
+  // 2. Pose Selection
+  if (p.meleeAttacking) {
+    const step = p.activeComboStep || 1;
+    const isFinal = step === 4;
+    const duration = C.MELEE_COOLDOWN * (isFinal ? 1.5 : 1.0);
+    const progress = 1 - (p.meleeTimer / duration);
+
+    if (step === 1) drawAttackPose1(ctx, p, x, y, time, progress);
+    else if (step === 2) drawAttackPose2(ctx, p, x, y, time, progress);
+    else if (step === 3) drawAttackPose3(ctx, p, x, y, time, progress);
+    else drawAttackPose4(ctx, p, x, y, time, progress);
+  } else {
+    drawIdleRunPose(ctx, p, x, y, time);
+  }
+}
+
+function drawAmbientEffects(ctx: CanvasRenderingContext2D, p: PlayerState, x: number, y: number, time: number) {
   // === AMBIENT SOUL GLOW (brighter during XP collection) ===
   const xpGlow = (p.xpGlowTimer || 0) > 0;
-  const glowPulse = xpGlow ? 30 + Math.sin(time * 4) * 6 : 22 + Math.sin(time * 1.8) * 4;
+  // Further decelerated idle pulse (0.4 speed) for ultra-calm feel
+  const glowPulse = xpGlow ? 30 + Math.sin(time * 4) * 6 : 22 + Math.sin(time * 0.4) * 3;
   const glowR = xpGlow ? 120 : 100;
   const glowG = xpGlow ? 255 : 180;
   const glowB = xpGlow ? 200 : 255;
@@ -602,382 +623,493 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
     ctx.globalAlpha = 1;
   }
 
-  // === DROP SHADOW ===
+  // Shadow
   ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
   ctx.beginPath();
   ctx.ellipse(x, y + 7, 6, 2.5, 0, 0, Math.PI * 2);
   ctx.fill();
+}
 
-  ctx.save();
-  ctx.translate(x, y + bobY - idleDeepBreathe);
 
-  // Apply Attack Body Rotation (Lean)
-  if (bodyRot !== 0) ctx.rotate(bodyRot * p.facing.x); // Rotate towards facing
-
+// Helper to draw the ORIGINAL character sprite (Hollow Knight-like)
+// Updated with walk mechanics: 'walkCycle' (0-1) and 'tilt' (radians)
+function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState, time: number, lookX: number, hoodShift: number, breathe: number, walkCycle: number = 0, tilt: number = 0) {
   // === CLOAK / BODY (flowing shape) ===
-  const cloakSway = Math.sin(time * 3.5) * 1 + idleLookX * 0.3;
-  const cloakSway2 = Math.cos(time * 2.8) * 0.7;
+  // Add walk cycle influence to sway
+  const walkSway = Math.sin(walkCycle * Math.PI * 2) * 2; // Side to side motion while walking
 
-  // Cloak back layer (darker, wider)
+  // Idle Sway: Reduced to almost zero for stability
+  // Extreme slow/subtle sway (0.1 speed, 0.05 amp)
+  const idleSwayBase = Math.pow(Math.sin(time * 0.1), 3) * 0.05;
+  const sway = (walkCycle > 0 ? walkSway : idleSwayBase) + lookX * 0.3;
+
+  // Secondary Sway:
+  // Almost static (0.07 speed, 0.03 amp)
+  const idleSway2 = Math.cos(time * 0.07 + 0.5) * 0.03;
+  const sway2 = (walkCycle > 0 ? Math.cos(walkCycle * Math.PI * 4) * 0.5 : idleSway2);
+
+  // Body Tilt (leans into movement)
+  ctx.rotate(tilt);
+
+  // Cloak back layer
   ctx.fillStyle = '#1a1a3a';
   ctx.beginPath();
   ctx.moveTo(-6, -2);
-  ctx.lineTo(-7 + cloakSway, 6);
-  ctx.quadraticCurveTo(-4 + cloakSway2, 9, 0, 8);
-  ctx.quadraticCurveTo(4 - cloakSway2, 9, 7 - cloakSway, 6);
+  ctx.lineTo(-7 + sway, 6);
+  // Bottom hem waves more when walking
+  const hemWave = Math.sin(walkCycle * Math.PI * 4) * 1.5;
+  ctx.quadraticCurveTo(-4 + sway2 + hemWave, 9 + Math.abs(hemWave) * 0.5, 0, 8);
+  ctx.quadraticCurveTo(4 - sway2 - hemWave, 9 + Math.abs(hemWave) * 0.5, 7 - sway, 6);
   ctx.lineTo(6, -2);
   ctx.closePath();
   ctx.fill();
 
-  // Cloak front layer (main color)
+  // Cloak front layer
   ctx.fillStyle = '#222250';
   ctx.beginPath();
   ctx.moveTo(-5, -3);
-  ctx.lineTo(-6 + cloakSway * 0.7, 5);
-  ctx.quadraticCurveTo(-3 + cloakSway2 * 0.5, 8, 0, 7);
-  ctx.quadraticCurveTo(3 - cloakSway2 * 0.5, 8, 6 - cloakSway * 0.7, 5);
+  ctx.lineTo(-6 + sway * 0.7, 5);
+  ctx.quadraticCurveTo(-3 + sway2 * 0.5 + hemWave * 0.8, 8, 0, 7 - Math.abs(tilt) * 2); // Slight compression on tilt
+  ctx.quadraticCurveTo(3 - sway2 * 0.5 - hemWave * 0.8, 8, 6 - sway * 0.7, 5);
   ctx.lineTo(5, -3);
   ctx.closePath();
   ctx.fill();
 
-  // Cloak wispy tails (animated tendrils at bottom)
+  // Wispy tails (trail behind movement)
+  ctx.save();
+  // If moving, trails drag back
+  if (Math.abs(walkCycle) > 0.01) {
+    const drag = -tilt * 15; // Drag direction opposite to tilt/move
+    ctx.translate(drag, 0);
+  }
   ctx.strokeStyle = 'rgba(30, 30, 70, 0.6)';
   ctx.lineWidth = 1.5;
   for (let i = -1; i <= 1; i++) {
-    const tendrilX = i * 3;
-    const wave = Math.sin(time * 4 + i * 2) * 2;
+    const tx = i * 3;
+    // Barely moving tails for idle (0.4 speed, 0.4 amp)
+    const waveFreq = walkCycle > 0 ? 4 : 0.4;
+    const waveAmp = walkCycle > 0 ? 2 : 0.4;
+    const w = Math.sin(time * waveFreq + i * 2) * waveAmp;
     ctx.beginPath();
-    ctx.moveTo(tendrilX, 6);
-    ctx.quadraticCurveTo(tendrilX + wave, 9, tendrilX + wave * 1.5, 11);
+    ctx.moveTo(tx, 6);
+    ctx.quadraticCurveTo(tx + w, 9, tx + w * 1.5 + (walkCycle ? -tilt * 8 : 0), 11);
     ctx.stroke();
   }
+  ctx.restore();
 
-  // === HANDHELD WEAPON (AAA Longsword with Ethereal Integration) ===
-  const isMeleeAttacking = p.meleeAttacking;
+  // === HEAD (Hood shape) ===
+  // Head counters the body tilt slightly to stay upright-ish, or leans in?
+  // Let's have head look forward.
+  const hx = lookX + tilt * 2; // Head shift
+  const hy = -hoodShift + Math.abs(walkSway) * 0.5; // Head bob
 
-  if (!isMeleeAttacking) {
-    ctx.save();
-
-    // Position comfortably in hand, or on back if truly idle for long
-    const isRestingOnBack = p.idleTime > 12; // Increased threshold
-
-    if (isRestingOnBack) {
-      // Position on back, slightly angled
-      ctx.translate(2, -2);
-      ctx.rotate(-Math.PI * 0.75 + Math.sin(time * 2) * 0.05);
-      drawLongsword(ctx, 20, 0, time); // Scaled down (24 -> 20)
-    } else {
-      // --- Ethereal Energy Hand (Side-Snapped Integration) ---
-      // Force hand to a specific side (left or right) to prevent "middle" alignment
-      const sideX = p.facing.x >= 0 ? 1 : -1;
-      const handX = sideX * 10;
-      const handY = -1 + (isMoving ? Math.sin(time * 12) * 1.5 : 0);
-
-      // Hand aura pulse
-      const pulse = 0.9 + Math.sin(time * 6) * 0.1;
-      // Connect back to character center (0,0 because we are already translated to character core)
-      drawEtherealHand(ctx, handX, handY, pulse, time, 0, 0);
-
-      // Position sword in the ethereal hand
-      ctx.translate(handX, handY);
-
-      // Angle based on movement
-      const restAngle = p.facing.x >= 0 ? Math.PI * 0.25 : Math.PI * 0.75;
-      const moveAngle = p.facing.x >= 0 ? Math.PI * 0.45 : Math.PI * 0.55;
-      ctx.rotate(isMoving ? moveAngle : restAngle);
-
-      drawLongsword(ctx, 20, 0, time); // Scaled down further (24 -> 20)
-    }
-
-    ctx.restore();
-  }
-
-  // === HEAD (hood shape — Hollow Knight-like) ===
-  const headShiftX = idleLookX;
-  const headShiftY = -idleHoodShift;
-  // Hood outer
+  // Hood Outer
   ctx.fillStyle = '#2a2a55';
   ctx.beginPath();
-  ctx.moveTo(-6 + headShiftX, -3 + headShiftY);
-  ctx.quadraticCurveTo(-7 + headShiftX, -9 + headShiftY, -3 + headShiftX, -12 + headShiftY);
-  ctx.quadraticCurveTo(0 + headShiftX, -14 + breathe * 0.3 + headShiftY, 3 + headShiftX, -12 + headShiftY);
-  ctx.quadraticCurveTo(7 + headShiftX, -9 + headShiftY, 6 + headShiftX, -3 + headShiftY);
+  ctx.moveTo(-6 + hx, -3 + hy);
+  ctx.quadraticCurveTo(-7 + hx, -9 + hy, -3 + hx, -12 + hy);
+  ctx.quadraticCurveTo(0 + hx, -14 + breathe * 0.3 + hy, 3 + hx, -12 + hy);
+  ctx.quadraticCurveTo(7 + hx, -9 + hy, 6 + hx, -3 + hy);
   ctx.closePath();
   ctx.fill();
 
-  // Hood inner shadow
+  // Hood Inner Shadow
   ctx.fillStyle = '#151530';
   ctx.beginPath();
-  ctx.moveTo(-4 + headShiftX, -3 + headShiftY);
-  ctx.quadraticCurveTo(-5 + headShiftX, -8 + headShiftY, -2 + headShiftX, -10 + headShiftY);
-  ctx.quadraticCurveTo(0 + headShiftX, -11 + headShiftY, 2 + headShiftX, -10 + headShiftY);
-  ctx.quadraticCurveTo(5 + headShiftX, -8 + headShiftY, 4 + headShiftX, -3 + headShiftY);
+  ctx.moveTo(-4 + hx, -3 + hy);
+  ctx.quadraticCurveTo(-5 + hx, -8 + hy, -2 + hx, -10 + hy);
+  ctx.quadraticCurveTo(0 + hx, -11 + hy, 2 + hx, -10 + hy);
+  ctx.quadraticCurveTo(5 + hx, -8 + hy, 4 + hx, -3 + hy);
   ctx.closePath();
   ctx.fill();
 
-  // === EYES (the signature — large, glowing, expressive) ===
-  const eyeY = -6 + headShiftY;
-  const eyeBaseX = headShiftX;
-  const eyeSpread = 2.5;
-  const blinkCycle = time % 4;
-  // During idle, occasional double-blink
-  const idleBlinkExtra = isIdle && (idleCycle > 2.8 && idleCycle < 2.85);
-  const isBlinking = (blinkCycle > 3.85 && blinkCycle < 3.95) || idleBlinkExtra;
-  // Idle squint when looking around
-  const idleSquint = isIdle && (idleCycle < 3) ? 0.3 : 0;
-  const eyeHeight = isBlinking ? 0.5 : 2.5 - idleSquint;
+  // === EYES ===
+  const eyeY = -6 + hy;
+  const eyeBaseX = hx;
+  const blink = (time % 4) > 3.85; // Blink periodically
 
-  // Eye glow backdrop (brighter during XP burst)
-  const eyeGlowIntensity = xpGlow ? 0.6 + Math.sin(time * 6) * 0.2 : 0.3 + Math.sin(time * 3) * 0.1;
-  const eyeGlow = ctx.createRadialGradient(eyeBaseX, eyeY, 0, eyeBaseX, eyeY, 8);
-  eyeGlow.addColorStop(0, `rgba(120, 200, 255, ${eyeGlowIntensity})`);
-  eyeGlow.addColorStop(1, 'rgba(120, 200, 255, 0)');
-  ctx.fillStyle = eyeGlow;
-  ctx.fillRect(-8 + eyeBaseX, eyeY - 8, 16, 16);
+  if (!blink) {
+    // Glow backdrop
+    const glow = ctx.createRadialGradient(eyeBaseX, eyeY, 0, eyeBaseX, eyeY, 8);
+    glow.addColorStop(0, 'rgba(120, 200, 255, 0.3)');
+    glow.addColorStop(1, 'rgba(120, 200, 255, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(-8 + eyeBaseX, eyeY - 8, 16, 16);
 
-  // Left eye
-  ctx.fillStyle = '#ccefff';
-  ctx.beginPath();
-  ctx.ellipse(-eyeSpread + eyeBaseX, eyeY, 1.8, eyeHeight, 0, 0, Math.PI * 2);
-  ctx.fill();
+    // Eyes
+    ctx.fillStyle = '#ccefff';
+    ctx.beginPath();
+    ctx.ellipse(-2.5 + eyeBaseX, eyeY, 1.8, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(2.5 + eyeBaseX, eyeY, 1.8, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-  // Right eye
-  ctx.beginPath();
-  ctx.ellipse(eyeSpread + eyeBaseX, eyeY, 1.8, eyeHeight, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Eye pupils (follow facing direction, or idle look)
-  if (!isBlinking) {
-    const pupilOffX = isIdle ? idleLookX * 0.5 : p.facing.x * 0.6;
-    const pupilOffY = isIdle ? idleLookY * 0.5 : p.facing.y * 0.4;
+    // Pupils
+    const px = p.facing.x * 0.6 + lookX * 0.5 + tilt; // Look into turn
+    const py = p.facing.y * 0.4;
     ctx.fillStyle = '#4488cc';
-    ctx.fillRect(-eyeSpread + eyeBaseX + pupilOffX - 0.5, eyeY + pupilOffY - 0.5, 1.2, 1.2);
-    ctx.fillRect(eyeSpread + eyeBaseX + pupilOffX - 0.5, eyeY + pupilOffY - 0.5, 1.2, 1.2);
-  }
+    ctx.fillRect(-3 + eyeBaseX + px, eyeY + py, 1.2, 1.2);
+    ctx.fillRect(3 + eyeBaseX + px, eyeY + py, 1.2, 1.2);
 
-  // Eye shine highlights
-  if (!isBlinking) {
+    // Shine
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(-eyeSpread + eyeBaseX - 0.8, eyeY - 1.2, 0.8, 0.8);
-    ctx.fillRect(eyeSpread + eyeBaseX - 0.8, eyeY - 1.2, 0.8, 0.8);
+    ctx.fillRect(-3.3 + eyeBaseX, eyeY - 1.2, 0.8, 0.8);
+    ctx.fillRect(1.7 + eyeBaseX, eyeY - 1.2, 0.8, 0.8);
+  } else {
+    // Blink line
+    ctx.fillStyle = '#1a1a3a';
+    ctx.fillRect(-4 + eyeBaseX, eyeY, 3, 0.5);
+    ctx.fillRect(1 + eyeBaseX, eyeY, 3, 0.5);
   }
 
-  // === HORN/CROWN DETAIL (small distinctive silhouette feature) ===
+  // === HORNS/CROWN ===
   ctx.fillStyle = '#3a3a6a';
-  // Left horn nub
   ctx.beginPath();
-  ctx.moveTo(-3 + headShiftX, -12 + headShiftY);
-  ctx.lineTo(-4.5 + headShiftX, -15 + headShiftY);
-  ctx.lineTo(-2 + headShiftX, -13 + headShiftY);
-  ctx.closePath();
+  ctx.moveTo(-3 + hx, -12 + hy); ctx.lineTo(-4.5 + hx, -15 + hy); ctx.lineTo(-2 + hx, -13 + hy);
   ctx.fill();
-  // Right horn nub
   ctx.beginPath();
-  ctx.moveTo(3 + headShiftX, -12 + headShiftY);
-  ctx.lineTo(4.5 + headShiftX, -15 + headShiftY);
-  ctx.lineTo(2 + headShiftX, -13 + headShiftY);
-  ctx.closePath();
+  ctx.moveTo(3 + hx, -12 + hy); ctx.lineTo(4.5 + hx, -15 + hy); ctx.lineTo(2 + hx, -13 + hy);
   ctx.fill();
 
-  // === DASHING SPEED LINES ===
-  if (p.isDashing) {
-    ctx.strokeStyle = 'rgba(100, 180, 255, 0.5)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 4; i++) {
-      const ly = -8 + i * 4;
-      const lx = p.facing.x >= 0 ? -12 : 6;
-      ctx.beginPath();
-      ctx.moveTo(lx, ly);
-      ctx.lineTo(lx - p.facing.x * 8, ly);
-      ctx.stroke();
+  // Reset rotation for caller safety
+  ctx.rotate(-tilt);
+}
+
+/** 
+ * Pose 0: Idle / Run (Original Hollow-Knight style)
+ */
+function drawIdleRunPose(ctx: CanvasRenderingContext2D, p: PlayerState, x: number, y: number, time: number) {
+  const isMoving = p.trail.length > 0 || p.isDashing;
+  // Deep, near-static vertical float (0.1 speed)
+  const breatheRaw = Math.sin(time * 0.1);
+  const breatheEased = Math.sign(breatheRaw) * Math.pow(Math.abs(breatheRaw), 2.5);
+  const breathe = breatheEased * 0.15; // Minimal amplitude
+
+  // Enhanced Walk Mechanics
+  // Smooth bobbing - floatier and Slower
+  // Walk cycle slowed down from 8 to 4 for smoothness
+  const cycleSpeed = 4;
+  const walkCycle = isMoving ? (time * cycleSpeed) % 1 : 0;
+
+  // BobY matched to walk cycle (2 bobs per cycle usually, or 1 per step)
+  // Idle breath uses our new eased organic value directly (scaled to ~0.15px max)
+  const bobY = isMoving ? Math.sin(walkCycle * Math.PI * 2) * 1.0 : breathe * 0.25;
+
+  // Tilt based on horizontal movement
+  let tilt = 0;
+  if (isMoving) {
+    tilt = p.facing.x * 0.1; // Slight lean forward into run
+  }
+
+  const idleTime = p.idleTime || 0;
+  const isIdle = idleTime >= 3;
+  const idleCycle = isIdle ? (idleTime - 3) % 8 : 0;
+
+  let lookX = 0;
+  let hoodShift = 0;
+
+  if (isIdle) {
+    if (idleCycle < 2) {
+      lookX = -Math.sin(idleCycle / 2 * Math.PI) * 1.2;
+    } else if (idleCycle < 3) {
+      lookX = Math.sin((idleCycle - 2) * Math.PI) * 1.5;
+    } else if (idleCycle < 5) {
+      lookX = (1 - (idleCycle - 3) / 2) * 0.5;
+    } else if (idleCycle < 6) {
+      hoodShift = Math.sin((idleCycle - 5) * Math.PI) * 1.5;
     }
+  }
+
+
+
+
+
+
+
+  ctx.save();
+  ctx.translate(x, y + bobY);
+
+  // Cloak
+  // Draw Character Body with Walk Cycle
+  drawOriginalCharacterBody(ctx, p, time, lookX, hoodShift, breathe, walkCycle, tilt);
+
+  // Weapon (Idle side)
+  const isResting = idleTime > 12;
+  if (!isResting) {
+    const side = p.facing.x >= 0 ? 1 : -1;
+
+    // Fixed offset: 10px to side, slightly behind body y-wise?
+    // Original was translate(2, -2) for back, or translate(side*10, ...) for hand
+    const wx = side * 10;
+    const wy = -1 + (isMoving ? Math.sin(time * 12) * 1.5 : 0);
+
+    ctx.save();
+    // Ethereal Hand logic (optional, keep it minimal if user wants strict original)
+    // We'll keep the hand drawing but keep the position strict
+    const pulse = 0.9 + Math.sin(time * 6) * 0.1;
+    drawEtherealHand(ctx, wx, wy, pulse, time, 0, 0);
+
+    ctx.translate(wx, wy);
+    // Resting angle
+    const restAngle = p.facing.x >= 0 ? Math.PI * 0.25 : Math.PI * 0.75;
+    const moveAngle = p.facing.x >= 0 ? Math.PI * 0.45 : Math.PI * 0.55;
+    ctx.rotate(isMoving ? moveAngle : restAngle + Math.sin(time * 2) * 0.05);
+
+    drawLongsword(ctx, 20, 0, time);
+    ctx.restore();
   }
 
   ctx.restore();
+}
 
-  // === MELEE SWING (Professional Swordplay) ===
-  if (p.meleeAttacking) {
-    const range = C.MELEE_RANGE * p.areaMultiplier;
+/** 
+ * Pose 1: The Lunge (Forward Slash)
+ * Body leans forward, Cloak drags back, Sword swings across.
+ */
+function drawAttackPose1(ctx: CanvasRenderingContext2D, p: PlayerState, x: number, y: number, time: number, t: number) {
+  const facing = p.facing.x;
 
-    // 3-Stage Animation Logic
-    const activeStep = p.activeComboStep || 1;
-    const isFinalHit = activeStep === 4;
-    const isHeavyHit = activeStep === 3;
-    const isBackhand = activeStep === 2;
+  // Body Lunge
+  let lunge = 0;
+  let lean = 0;
+  if (t < 0.2) { lunge = -4 * (t / 0.2); lean = -0.2; } // Windup
+  else { lunge = 8; lean = 0.4; } // Strike
 
-    // Total duration (Matches p.meleeTimer initialization in player.tryMelee)
-    const duration = C.MELEE_COOLDOWN * (isFinalHit ? 1.5 : 1.0);
-    const t = 1 - (p.meleeTimer / duration);
+  // Smooth return
+  if (t > 0.6) {
+    const rt = (t - 0.6) / 0.4;
+    lunge *= (1 - rt);
+    lean *= (1 - rt);
+  }
 
-    // Dynamic Arc based on combo step
-    let arcMult = 1.0;
-    if (activeStep === 1) arcMult = 1.0;
-    if (activeStep === 2) arcMult = 1.1;
-    if (activeStep === 3) arcMult = 1.3;
-    if (activeStep === 4) arcMult = 2.5;
+  const bx = x + facing * lunge;
+  const by = y;
 
-    const activeArc = C.MELEE_ARC * arcMult;
+  ctx.save();
+  ctx.translate(bx, by);
+  ctx.rotate(lean * facing);
 
-    // Animation Progress Variables
-    let swingProgress = 0;
-    let bladeScale = 1.0;
-    let handOffset = 0;
+  // Draw Character Body (Original Art)
+  // Slight look forward during lunge
+  drawOriginalCharacterBody(ctx, p, time, facing * 1.5, 0, 0);
 
-    // --- CUSTOM EASING PER COMBO STEP ---
-    // Phase 1: Anticipation (0% - 20%)
-    if (t < 0.2) {
-      const pt = t / 0.2;
-      // Step 3 (Heavy) has a longer, deeper windup
-      const windupForce = isHeavyHit ? 0.25 : 0.15;
-      swingProgress = -pt * windupForce;
-      handOffset = pt * (isHeavyHit ? 4 : 2);
-    }
-    // Phase 2: Strike (20% - 70%) - Extended strike phase for smoothness
-    else if (t < 0.7) {
-      const pt = (t - 0.2) / 0.5;
+  ctx.restore();
 
-      if (activeStep === 1) {
-        // Fast Snap (Cubic Out)
-        swingProgress = -0.15 + (1.25 * (1 - Math.pow(1 - pt, 3)));
-      } else if (activeStep === 2) {
-        // Fluid Backhand
-        swingProgress = -0.15 + (1.25 * (1 - Math.pow(1 - pt, 2.5)));
-        handOffset = 2 * (1 - pt);
-      } else if (activeStep === 3) {
-        // Heavy Smash (Exponential -> Elastic feel)
-        const heavyEase = pt < 0.5 ? 2 * pt * pt : 1 - Math.pow(-2 * pt + 2, 2) / 2;
-        swingProgress = -0.25 + (1.4 * heavyEase);
-        bladeScale = 1.25 + Math.sin(pt * Math.PI) * 0.15;
-      } else {
-        // Vortex Finisher (Power Curve)
-        swingProgress = -0.15 + (1.3 * (1 - Math.pow(1 - pt, 4)));
-        bladeScale = 1.4 + Math.sin(pt * Math.PI) * 0.2;
-      }
-    }
-    // Phase 3: Recovery (70% - 100%)
-    else {
-      const pt = (t - 0.7) / 0.3;
-      swingProgress = 1.1 + pt * 0.05; // Very slow drift at end
-      bladeScale = 1.0;
+  // Weapon: Right -> Left Slash
+  const angleStart = p.meleeAngle - C.MELEE_ARC / 2;
+  const angleEnd = p.meleeAngle + C.MELEE_ARC / 2;
 
-      // Step 3 (Heavy) has a slight "bounce" recoil
-      if (isHeavyHit) {
-        swingProgress -= Math.sin(pt * Math.PI) * 0.05;
-      }
-    }
+  // Snap Swing Easing
+  let swingT = 0;
+  if (t > 0.2 && t < 0.7) {
+    const st = (t - 0.2) / 0.5;
+    swingT = 1 - Math.pow(1 - st, 3);
+  } else if (t >= 0.7) swingT = 1;
 
-    // Directional orientation
-    let startAngle = p.meleeAngle - activeArc / 2;
-    // Step 3 (Overhead) starts higher relative to facing
-    if (activeStep === 3) startAngle -= 0.2;
+  const currentAngle = angleStart + (angleEnd - angleStart) * swingT;
 
-    let currentAngle = startAngle + activeArc * swingProgress;
+  const handDist = 14;
+  const hx = bx + Math.cos(currentAngle) * handDist;
+  const hy = by + Math.sin(currentAngle) * handDist;
 
-    if (isBackhand) {
-      // Step 2: Reverse direction (Left to Right)
-      startAngle = p.meleeAngle + activeArc / 2;
-      currentAngle = startAngle - activeArc * swingProgress;
-    }
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(currentAngle);
+  drawLongsword(ctx, C.MELEE_RANGE, 1, time);
+  ctx.restore();
 
-    // --- VISUAL EFFECTS ---
-    if (t > 0.15 && t < 0.9) {
-      const trailAlpha = Math.sin((t - 0.15) / 0.75 * Math.PI) * (isFinalHit ? 0.9 : 0.6);
-
-      // 1. BLADE TRAIL (Solid Core + Glow)
-      const layers = isFinalHit ? 6 : 4;
-      for (let i = 0; i < layers; i++) {
-        const layerRange = range + (i * (isFinalHit ? 3 : 1.5));
-
-        // Dynamic Color Palettes
-        let r, g, b;
-        if (isFinalHit) { r = 255; g = 50; b = 100; }        // Crimson/Pink Vortex
-        else if (isHeavyHit) { r = 255; g = 200; b = 50; }   // Golden Heavy
-        else { r = 100; g = 200; b = 255; }                  // Azure Light
-
-        // Gradient construction
-        const grad = ctx.createRadialGradient(x, y, range * 0.5, x, y, layerRange);
-        grad.addColorStop(0, `rgba(${r},${g},${b}, 0)`);
-        grad.addColorStop(0.8, `rgba(${r},${g},${b}, ${trailAlpha * 0.4})`);
-        grad.addColorStop(0.95, `rgba(${Math.min(r + 100, 255)},${Math.min(g + 100, 255)},${Math.min(b + 100, 255)}, ${trailAlpha * 0.8})`); // White-hot tip
-        grad.addColorStop(1, `rgba(${r},${g},${b}, 0)`);
-
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        if (isBackhand) {
-          ctx.arc(x, y, layerRange, startAngle, currentAngle, true);
-        } else {
-          ctx.arc(x, y, layerRange, startAngle, currentAngle);
-        }
-        ctx.closePath();
-        ctx.fill();
-
-        // 2. TIP EMISSION (Bright sharp line at the edge)
-        if (i === layers - 1) {
-          ctx.strokeStyle = `rgba(255, 255, 255, ${trailAlpha})`;
-          ctx.lineWidth = isFinalHit ? 2 : 1;
-          ctx.beginPath();
-          if (isBackhand) ctx.arc(x, y, layerRange, startAngle, currentAngle, true);
-          else ctx.arc(x, y, layerRange, startAngle, currentAngle);
-          ctx.stroke();
-        }
-
-        // 3. DIRECTIONAL SPARKS
-        // Sparks fly TANGENT to the arc (perpendicular to radius)
-        if (Math.random() < (isFinalHit ? 0.4 : 0.15)) {
-          const sparkT = Math.random();
-          // Lerp angle
-          const sAngle = startAngle + (currentAngle - startAngle) * sparkT;
-          const sDist = range * (0.9 + Math.random() * 0.2);
-          const px = x + Math.cos(sAngle) * sDist;
-          const py = y + Math.sin(sAngle) * sDist;
-
-          // Tangent direction (+90 deg if normal, -90 if backhand)
-          const tangent = sAngle + (isBackhand ? -Math.PI / 2 : Math.PI / 2);
-          const speed = Math.random() * 4 + 2;
-
-          // Draw 'flying' spark line based on tangent velocity
-          ctx.strokeStyle = isFinalHit ? '#ffccaa' : '#ccffff';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(px, py);
-          ctx.lineTo(px + Math.cos(tangent) * speed, py + Math.sin(tangent) * speed);
-          ctx.stroke();
-        }
-      }
-    }
-
-    // --- The Sword Rendering ---
-    ctx.save();
-
-    // Increased base offset during attack to stay outside the body
-    const baseAttackRadius = 13;
-    const sideX = Math.cos(p.meleeAngle) >= 0 ? 1 : -1;
-
-    // Position of the Hand during attack - Side Snapped
-    const handX = x + sideX * (baseAttackRadius + handOffset);
-    const handY = y + Math.sin(currentAngle) * handOffset;
-
-    // Draw Ethereal Hand during strike (connecting back to player center x,y)
-    // Draw Ethereal Hand during strike (connecting back to player center x,y)
-    const pulse = 1.1 + Math.sin(time * 10) * 0.2;
-    drawEtherealHand(ctx, handX, handY, pulse, time, x, y);
-
-    ctx.translate(handX, handY);
-
-    // Wrist rotation nuance
-    let bladeAngleOffset = 0;
-    if (activeStep === 3) bladeAngleOffset = Math.sin(swingProgress * Math.PI) * 0.3; // Overhead tilt
-    if (activeStep === 4) bladeAngleOffset = time * 10; // Vortex spin effect on blade itself
-
-    ctx.rotate(currentAngle + bladeAngleOffset);
-    ctx.scale(bladeScale * 0.8, 1 / (bladeScale * 0.8)); // Scaled down 20% total (0.8 multiplier)
-
-    drawLongsword(ctx, range, 1, time);
-
-    ctx.restore();
+  // VFX (World Space)
+  if (t > 0.2 && t < 0.7) {
+    drawSlashTrail(ctx, bx, by, C.MELEE_RANGE, angleStart, currentAngle, 'azure');
   }
 }
+
+/** 
+ * Pose 2: The Twist (Backhand)
+ * Body twists back, Sword swings Left -> Right (Reverse).
+ */
+function drawAttackPose2(ctx: CanvasRenderingContext2D, p: PlayerState, x: number, y: number, time: number, t: number) {
+  const facing = p.facing.x; // e.g. 1
+
+  // Body Twist (step forward but lean back)
+  let offset = 4;
+  let lean = -0.3; // Leaning away from slash direction
+
+  if (t > 0.6) {
+    const rt = (t - 0.6) / 0.4;
+    offset *= (1 - rt);
+    lean *= (1 - rt);
+  }
+
+  const bx = x + facing * offset;
+
+  ctx.save();
+  ctx.translate(bx, y);
+  ctx.rotate(lean * facing);
+
+  // Draw Character Body (Original Art)
+  // Look back slightly during twist
+  drawOriginalCharacterBody(ctx, p, time, -facing * 0.5, 0, 0);
+
+  ctx.restore();
+
+  // Weapon: Left -> Right (REVERSE)
+  const angleStart = p.meleeAngle + C.MELEE_ARC / 2; // Start from end
+  const angleEnd = p.meleeAngle - C.MELEE_ARC / 2;   // Go to start
+
+  let swingT = 0;
+  if (t > 0.2 && t < 0.7) {
+    const st = (t - 0.2) / 0.5;
+    swingT = 1 - Math.pow(1 - st, 3);
+  } else if (t >= 0.7) swingT = 1;
+
+  const currentAngle = angleStart + (angleEnd - angleStart) * swingT;
+
+  const hx = bx + Math.cos(currentAngle) * 12;
+  const hy = y + Math.sin(currentAngle) * 12;
+
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(currentAngle);
+  // Upside down sword for backhand feel?
+  ctx.scale(1, -1);
+  drawLongsword(ctx, C.MELEE_RANGE, 1, time);
+  ctx.restore();
+
+  // VFX
+  if (t > 0.2 && t < 0.7) drawSlashTrail(ctx, bx, y, C.MELEE_RANGE, angleStart, currentAngle, 'azure');
+}
+
+/** 
+ * Pose 3: The Heavy Smash
+ * Jump up -> Slam down. Sword Overhead.
+ */
+function drawAttackPose3(ctx: CanvasRenderingContext2D, p: PlayerState, x: number, y: number, time: number, t: number) {
+  const facing = p.facing.x;
+
+  let jumpY = 0;
+  let lunge = 0;
+
+  // Jump phase
+  if (t < 0.4) {
+    // Windup/Jump
+    jumpY = -8 * Math.sin((t / 0.4) * Math.PI);
+    lunge = -2;
+  } else if (t < 0.6) {
+    // Slam Impact
+    jumpY = 2;
+    lunge = 10;
+  } else {
+    // Recovery
+    lunge = 10 * (1 - (t - 0.6) / 0.4);
+  }
+
+  const bx = x + facing * lunge;
+  const by = y + jumpY;
+
+  ctx.save();
+  ctx.translate(bx, by);
+
+  // Draw Character Body (Original Art)
+  // Look down/ahead during smash
+  drawOriginalCharacterBody(ctx, p, time, facing * 0.5, 0, 0);
+
+  ctx.restore();
+
+  // Weapon: Overhead Arc
+  // Start high (-PI/2 relative), end low
+  const baseAngle = Math.atan2(p.facing.y, p.facing.x); // Should be mouse angle ideally, but simple for now
+  const angleStart = p.meleeAngle - 0.5;
+  const angleEnd = p.meleeAngle + 0.5;
+
+  let swingT = 0;
+  if (t > 0.4 && t < 0.7) {
+    const st = (t - 0.4) / 0.3;
+    swingT = st * st; // Accelerate
+  } else if (t >= 0.7) swingT = 1;
+
+  // Manual override for overhead look: strictly vertical chop logic could be better but reusing arc
+  const currentAngle = angleStart + (angleEnd - angleStart) * swingT;
+
+  const hx = bx + Math.cos(currentAngle) * 10;
+  const hy = by + Math.sin(currentAngle) * 10;
+
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(currentAngle);
+  drawLongsword(ctx, C.MELEE_RANGE * 1.3, 1, time);
+  ctx.restore();
+
+  // VFX
+  if (t > 0.4 && t < 0.7) drawSlashTrail(ctx, bx, by, C.MELEE_RANGE * 1.3, angleStart, currentAngle, 'gold');
+}
+
+/** 
+ * Pose 4: The Vortex (Finisher)
+ * 360 Spin.
+ */
+function drawAttackPose4(ctx: CanvasRenderingContext2D, p: PlayerState, x: number, y: number, time: number, t: number) {
+  // Spin physics
+  // t 0->1
+  // rotations: 2 full spins?
+  const rotations = 2;
+  const angle = t * Math.PI * 2 * rotations;
+
+  // Body "wobble" to simulate spin
+  const widthScale = Math.cos(angle);
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(widthScale, 1); // Flip width back and forth
+
+  // Draw Character Body (Original Art)
+  drawOriginalCharacterBody(ctx, p, time, 0, 0, 0);
+
+  ctx.restore();
+
+  // Weapon: Orbiting
+  const swordAngle = angle + p.meleeAngle;
+  const radius = 16;
+  const sx = x + Math.cos(swordAngle) * radius;
+  const sy = y + Math.sin(swordAngle) * radius;
+
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(swordAngle + Math.PI / 2); // Tangent
+  drawLongsword(ctx, C.MELEE_RANGE * 1.5, 1, time);
+
+  // VFX - Circular Ring
+  if (t > 0.1 && t < 0.9) {
+    ctx.strokeStyle = `rgba(255, 50, 50, 0.5)`;
+    ctx.lineWidth = 20 * (Math.sin(t * Math.PI));
+    ctx.beginPath();
+    ctx.arc(0, 0, C.MELEE_RANGE * 1.2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// Helper for VFX Trail
+function drawSlashTrail(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, start: number, end: number, color: 'azure' | 'gold' | 'crimson') {
+  const grad = ctx.createRadialGradient(x, y, r * 0.5, x, y, r);
+  if (color === 'azure') {
+    grad.addColorStop(0, 'rgba(100,200,255,0)');
+    grad.addColorStop(1, 'rgba(200,255,255,0.6)');
+  } else if (color === 'gold') {
+    grad.addColorStop(0, 'rgba(255,200,0,0)');
+    grad.addColorStop(1, 'rgba(255,255,200,0.8)');
+  }
+
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, r, start, end, start > end); // smart arc direction
+  ctx.fill();
+}
+
+
 
 /** Draws a mystical ethereal hand */
 function drawEtherealHand(ctx: CanvasRenderingContext2D, handX: number, handY: number, scale: number, time: number, coreX: number, coreY: number) {

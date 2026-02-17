@@ -1,5 +1,6 @@
 import { PlayerState, Vec2 } from './types';
 import * as C from './constants';
+import { SFX } from './audio';
 import { hasEffect } from './traps';
 
 export function createPlayer(): PlayerState {
@@ -72,6 +73,7 @@ export function createPlayer(): PlayerState {
     speedBuffTimer: 0,
     temporaryMoveSpeedMult: 1,
     temporaryAttackSpeedMult: 1,
+    footstepTimer: 0,
   };
 }
 
@@ -96,6 +98,20 @@ export function updatePlayer(p: PlayerState, moveDir: Vec2, dt: number) {
   if (p.isDashing) {
     p.dashTimer -= dt;
     if (p.dashTimer <= 0) p.isDashing = false;
+  }
+
+  // Footstep Sound Logic (Ghostly Walk)
+  if ((moveDir.x !== 0 || moveDir.y !== 0) && !p.isDashing) {
+    if (p.footstepTimer > 0) {
+      p.footstepTimer -= dt;
+    } else {
+      SFX.footstep();
+      // Random interval for natural feel (0.32s to 0.38s)
+      p.footstepTimer = 0.35 + Math.random() * 0.06;
+    }
+  } else {
+    // Reset timer when stopping so next step is immediate
+    p.footstepTimer = 0.05;
   }
 
   const buffSpeed = p.speedBuffTimer > 0 ? 1.4 : 1.0;
