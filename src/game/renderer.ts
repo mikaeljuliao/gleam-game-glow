@@ -753,80 +753,108 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
     const activeStep = p.activeComboStep || 1;
     const isFinalHit = activeStep === 4;
     const isHeavyHit = activeStep === 3;
+    const isBackhand = activeStep === 2;
 
     // Total duration (Matches p.meleeTimer initialization in player.tryMelee)
     const duration = C.MELEE_COOLDOWN * (isFinalHit ? 1.5 : 1.0);
     const t = 1 - (p.meleeTimer / duration);
 
     // Dynamic Arc based on combo step
-    const arcMult = isFinalHit ? 2.5 : (isHeavyHit ? 1.4 : 1.0);
+    let arcMult = 1.0;
+    if (activeStep === 1) arcMult = 1.0;
+    if (activeStep === 2) arcMult = 1.1;
+    if (activeStep === 3) arcMult = 1.3;
+    if (activeStep === 4) arcMult = 2.5;
+
     const activeArc = C.MELEE_ARC * arcMult;
 
-    // 4-Hit Combo Directional Logic
-    // Step 1: Forward Slash (Right to Left)
-    // Step 2: Backhand Slash (Left to Right)
-    // Step 3: Overhead Smash
-    // Step 4: Full Sweep (Vortex)
-
+    // Animation Progress Variables
     let swingProgress = 0;
     let bladeScale = 1.0;
     let handOffset = 0;
 
+    // --- CUSTOM EASING PER COMBO STEP ---
     // Phase 1: Anticipation (0% - 20%)
     if (t < 0.2) {
       const pt = t / 0.2;
-      swingProgress = -pt * 0.15; // Pullback
-      handOffset = pt * 2;
+      // Step 3 (Heavy) has a longer, deeper windup
+      const windupForce = isHeavyHit ? 0.25 : 0.15;
+      swingProgress = -pt * windupForce;
+      handOffset = pt * (isHeavyHit ? 4 : 2);
     }
-    // Phase 2: Strike (20% - 60%)
-    else if (t < 0.6) {
-      const pt = (t - 0.2) / 0.4;
-      const ease = isFinalHit ? (1 - Math.pow(1 - pt, 4)) : (1 - Math.pow(1 - pt, 3));
-      swingProgress = -0.15 + (1.3 * ease);
-      bladeScale = (isFinalHit ? 1.3 : 1.1) + Math.sin(pt * Math.PI) * 0.2;
+    // Phase 2: Strike (20% - 70%) - Extended strike phase for smoothness
+    else if (t < 0.7) {
+      const pt = (t - 0.2) / 0.5;
+
+      if (activeStep === 1) {
+        // Fast Snap (Cubic Out)
+        swingProgress = -0.15 + (1.25 * (1 - Math.pow(1 - pt, 3)));
+      } else if (activeStep === 2) {
+        // Fluid Backhand
+        swingProgress = -0.15 + (1.25 * (1 - Math.pow(1 - pt, 2.5)));
+        handOffset = 2 * (1 - pt);
+      } else if (activeStep === 3) {
+        // Heavy Smash (Exponential -> Elastic feel)
+        const heavyEase = pt < 0.5 ? 2 * pt * pt : 1 - Math.pow(-2 * pt + 2, 2) / 2;
+        swingProgress = -0.25 + (1.4 * heavyEase);
+        bladeScale = 1.25 + Math.sin(pt * Math.PI) * 0.15;
+      } else {
+        // Vortex Finisher (Power Curve)
+        swingProgress = -0.15 + (1.3 * (1 - Math.pow(1 - pt, 4)));
+        bladeScale = 1.4 + Math.sin(pt * Math.PI) * 0.2;
+      }
     }
-    // Phase 3: Recovery (60% - 100%)
+    // Phase 3: Recovery (70% - 100%)
     else {
-      const pt = (t - 0.6) / 0.4;
-      swingProgress = 1.15 + pt * 0.1;
+      const pt = (t - 0.7) / 0.3;
+      swingProgress = 1.1 + pt * 0.05; // Very slow drift at end
       bladeScale = 1.0;
+
+      // Step 3 (Heavy) has a slight "bounce" recoil
+      if (isHeavyHit) {
+        swingProgress -= Math.sin(pt * Math.PI) * 0.05;
+      }
     }
 
     // Directional orientation
     let startAngle = p.meleeAngle - activeArc / 2;
+    // Step 3 (Overhead) starts higher relative to facing
+    if (activeStep === 3) startAngle -= 0.2;
+
     let currentAngle = startAngle + activeArc * swingProgress;
 
-    if (activeStep === 2) {
-      // Step 2: Reverse direction
+    if (isBackhand) {
+      // Step 2: Reverse direction (Left to Right)
       startAngle = p.meleeAngle + activeArc / 2;
       currentAngle = startAngle - activeArc * swingProgress;
     }
 
-    // --- AAA Motion Blur Trail ---
+    // --- VISUAL EFFECTS ---
     if (t > 0.15 && t < 0.9) {
-      const trailAlpha = Math.sin((t - 0.15) / 0.75 * Math.PI) * (isFinalHit ? 0.8 : 0.5);
+      const trailAlpha = Math.sin((t - 0.15) / 0.75 * Math.PI) * (isFinalHit ? 0.9 : 0.6);
 
-      // Multi-layered trail for volume
-      const layers = isFinalHit ? 5 : 3;
+      // 1. BLADE TRAIL (Solid Core + Glow)
+      const layers = isFinalHit ? 6 : 4;
       for (let i = 0; i < layers; i++) {
-        const layerRange = range + (i * (isFinalHit ? 4 : 2));
-        const grad = ctx.createRadialGradient(x, y, range * 0.3, x, y, layerRange);
-        const alpha = trailAlpha / (i + 1);
+        const layerRange = range + (i * (isFinalHit ? 3 : 1.5));
 
-        // Color variation per step
-        let colorCore = 'rgba(135, 206, 250,';
-        if (isFinalHit) colorCore = 'rgba(255, 100, 100,'; // Red/Pink for finisher
-        else if (isHeavyHit) colorCore = 'rgba(255, 200, 100,'; // Gold for heavy
+        // Dynamic Color Palettes
+        let r, g, b;
+        if (isFinalHit) { r = 255; g = 50; b = 100; }        // Crimson/Pink Vortex
+        else if (isHeavyHit) { r = 255; g = 200; b = 50; }   // Golden Heavy
+        else { r = 100; g = 200; b = 255; }                  // Azure Light
 
-        grad.addColorStop(0, `${colorCore} 0)`);
-        grad.addColorStop(0.7, `${colorCore} ${alpha * 0.5})`);
-        grad.addColorStop(0.9, `${colorCore} ${alpha})`);
-        grad.addColorStop(1, `${colorCore} 0)`);
+        // Gradient construction
+        const grad = ctx.createRadialGradient(x, y, range * 0.5, x, y, layerRange);
+        grad.addColorStop(0, `rgba(${r},${g},${b}, 0)`);
+        grad.addColorStop(0.8, `rgba(${r},${g},${b}, ${trailAlpha * 0.4})`);
+        grad.addColorStop(0.95, `rgba(${Math.min(r + 100, 255)},${Math.min(g + 100, 255)},${Math.min(b + 100, 255)}, ${trailAlpha * 0.8})`); // White-hot tip
+        grad.addColorStop(1, `rgba(${r},${g},${b}, 0)`);
 
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.moveTo(x, y);
-        if (activeStep === 2) {
+        if (isBackhand) {
           ctx.arc(x, y, layerRange, startAngle, currentAngle, true);
         } else {
           ctx.arc(x, y, layerRange, startAngle, currentAngle);
@@ -834,12 +862,37 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
         ctx.closePath();
         ctx.fill();
 
-        // Extra finisher sparks
-        if (isFinalHit && Math.random() < 0.3) {
-          const sparkAngle = startAngle + (currentAngle - startAngle) * Math.random();
-          const sparkDist = range * (0.8 + Math.random() * 0.4);
-          ctx.fillStyle = '#ffaaaa';
-          ctx.fillRect(x + Math.cos(sparkAngle) * sparkDist, y + Math.sin(sparkAngle) * sparkDist, 2, 2);
+        // 2. TIP EMISSION (Bright sharp line at the edge)
+        if (i === layers - 1) {
+          ctx.strokeStyle = `rgba(255, 255, 255, ${trailAlpha})`;
+          ctx.lineWidth = isFinalHit ? 2 : 1;
+          ctx.beginPath();
+          if (isBackhand) ctx.arc(x, y, layerRange, startAngle, currentAngle, true);
+          else ctx.arc(x, y, layerRange, startAngle, currentAngle);
+          ctx.stroke();
+        }
+
+        // 3. DIRECTIONAL SPARKS
+        // Sparks fly TANGENT to the arc (perpendicular to radius)
+        if (Math.random() < (isFinalHit ? 0.4 : 0.15)) {
+          const sparkT = Math.random();
+          // Lerp angle
+          const sAngle = startAngle + (currentAngle - startAngle) * sparkT;
+          const sDist = range * (0.9 + Math.random() * 0.2);
+          const px = x + Math.cos(sAngle) * sDist;
+          const py = y + Math.sin(sAngle) * sDist;
+
+          // Tangent direction (+90 deg if normal, -90 if backhand)
+          const tangent = sAngle + (isBackhand ? -Math.PI / 2 : Math.PI / 2);
+          const speed = Math.random() * 4 + 2;
+
+          // Draw 'flying' spark line based on tangent velocity
+          ctx.strokeStyle = isFinalHit ? '#ffccaa' : '#ccffff';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(px + Math.cos(tangent) * speed, py + Math.sin(tangent) * speed);
+          ctx.stroke();
         }
       }
     }
@@ -856,11 +909,18 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
     const handY = y + Math.sin(currentAngle) * handOffset;
 
     // Draw Ethereal Hand during strike (connecting back to player center x,y)
+    // Draw Ethereal Hand during strike (connecting back to player center x,y)
     const pulse = 1.1 + Math.sin(time * 10) * 0.2;
     drawEtherealHand(ctx, handX, handY, pulse, time, x, y);
 
     ctx.translate(handX, handY);
-    ctx.rotate(currentAngle);
+
+    // Wrist rotation nuance
+    let bladeAngleOffset = 0;
+    if (activeStep === 3) bladeAngleOffset = Math.sin(swingProgress * Math.PI) * 0.3; // Overhead tilt
+    if (activeStep === 4) bladeAngleOffset = time * 10; // Vortex spin effect on blade itself
+
+    ctx.rotate(currentAngle + bladeAngleOffset);
     ctx.scale(bladeScale * 0.8, 1 / (bladeScale * 0.8)); // Scaled down 20% total (0.8 multiplier)
 
     drawLongsword(ctx, range, 1, time);
