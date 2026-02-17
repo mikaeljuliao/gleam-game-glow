@@ -1392,7 +1392,9 @@ export class GameEngine {
   private doMeleeHit() {
     const range = C.MELEE_RANGE * this.player.areaMultiplier;
     const angle = this.player.meleeAngle;
-    this.addEffect('shake', 5, 0.12);
+    const isFinisher = this.player.activeComboStep === 4;
+    const shakeInt = isFinisher ? 14 : (this.player.activeComboStep === 3 ? 8 : 5);
+    this.addEffect('shake', shakeInt, 0.15);
     let hitAny = false;
     const meleeDeadSet = new Set<EnemyState>();
 
@@ -1407,10 +1409,17 @@ export class GameEngine {
       let angleDiff = enemyAngle - angle;
       while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-      if (Math.abs(angleDiff) > C.MELEE_ARC / 2) continue;
+
+      // Dynamic Arc based on combo step
+      const arcMult = this.player.activeComboStep === 4 ? 2.2 : (this.player.activeComboStep === 3 ? 1.4 : 1.0);
+      const currentArc = C.MELEE_ARC * arcMult;
+
+      if (Math.abs(angleDiff) > currentArc / 2) continue;
 
       const strengthMult = this.player.strengthBuffTimer > 0 ? 1.5 : 1.0;
-      let dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier * this.getAmuletDamageMult() * strengthMult);
+      const comboDmgMult = this.player.activeComboStep === 4 ? 1.6 : (this.player.activeComboStep === 3 ? 1.3 : 1.0);
+
+      let dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier * this.getAmuletDamageMult() * strengthMult * comboDmgMult);
       // Berserker
       if (this.player.berserker && this.player.hp / this.player.maxHp < 0.3) {
         dmg = Math.floor(dmg * 1.8);
@@ -1428,9 +1437,12 @@ export class GameEngine {
       this.stats.damageDealt += dmg;
       spawnDamageText(this.particles, e.x, e.y, `${dmg}`);
       spawnBlood(this.particles, e.x, e.y, 8);
-      spawnSpark(this.particles, e.x, e.y, C.COLORS.playerLight, 8);
-      spawnSpark(this.particles, e.x, e.y, '#88ccff', 4); // Blue spark instead of white
+      spawnSpark(this.particles, e.x, e.y, C.COLORS.playerLight, isFinisher ? 16 : 8);
+      spawnSpark(this.particles, e.x, e.y, '#88ccff', isFinisher ? 8 : 4);
       spawnSlashMark(e.x, e.y, this.player.meleeAngle);
+      if (isFinisher) {
+        spawnExplosion(this.particles, e.x, e.y, 15); // Extra impact
+      }
       spawnImpactMark(e.x, e.y);
       hitAny = true;
 
@@ -1446,8 +1458,9 @@ export class GameEngine {
 
     if (hitAny) {
       SFX.meleeHit();
-      this.hitStopTimer = 0.08; // Impact pause
-      this.addEffect('shake', 10, 0.15); // Stronger shake
+      const isFinisher = this.player.activeComboStep === 4;
+      this.hitStopTimer = isFinisher ? 0.15 : 0.08; // Impact pause
+      this.addEffect('shake', isFinisher ? 15 : 10, 0.15); // Stronger shake
       // Melee hit reduces dash cooldown
       this.player.dashCooldown = Math.max(0, this.player.dashCooldown - 0.25);
     } else {

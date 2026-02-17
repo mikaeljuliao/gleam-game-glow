@@ -32,6 +32,9 @@ export function createPlayer(): PlayerState {
     meleeAttacking: false,
     meleeAngle: 0,
     meleeTimer: 0,
+    meleeComboStep: 1,
+    activeComboStep: 1,
+    meleeComboTimer: 0,
     lifesteal: 0,
     piercing: false,
     explosive: false,
@@ -80,6 +83,14 @@ export function updatePlayer(p: PlayerState, moveDir: Vec2, dt: number) {
   if (p.meleeTimer > 0) {
     p.meleeTimer -= dt;
     if (p.meleeTimer <= 0) p.meleeAttacking = false;
+  }
+
+  // Combo reset timer: if player waits too long, back to step 1
+  if (p.meleeComboTimer > 0) {
+    p.meleeComboTimer -= dt;
+    if (p.meleeComboTimer <= 0 && !p.meleeAttacking) {
+      p.meleeComboStep = 1;
+    }
   }
 
   if (p.isDashing) {
@@ -144,12 +155,25 @@ export function tryDash(p: PlayerState): boolean {
 
 export function tryMelee(p: PlayerState, mouseX: number, mouseY: number): boolean {
   if (p.meleeCooldown > 0) return false;
+
   // Melee sequence: 0.05s anticipation -> 0.1s swing -> 0.1s recovery
   const finalAttackSpeed = p.attackSpeedMult * p.temporaryAttackSpeedMult;
-  p.meleeCooldown = C.MELEE_COOLDOWN / finalAttackSpeed;
+
+  // Progression: 4th hit is slightly slower but more powerful (handled in engine/renderer)
+  const isFinalHit = p.meleeComboStep === 4;
+  const cooldownMult = isFinalHit ? 1.5 : 1.0;
+
+  p.meleeCooldown = (C.MELEE_COOLDOWN * cooldownMult) / finalAttackSpeed;
   p.meleeAttacking = true;
   p.meleeAngle = Math.atan2(mouseY - p.y, mouseX - p.x);
-  p.meleeTimer = 0.25;
+  p.meleeTimer = 0.25 * cooldownMult;
+
+  // Update combo state
+  p.meleeComboTimer = 0.8; // Window to continue (0.8s is generous for fluid feel)
+
+  p.activeComboStep = p.meleeComboStep;
+  p.meleeComboStep = (p.meleeComboStep % 4) + 1;
+
   return true;
 }
 

@@ -40,6 +40,9 @@ export interface PlayerState {
   meleeAttacking: boolean;
   meleeAngle: number;
   meleeTimer: number;
+  meleeComboStep: number;  // Next hit in sequence (1 to 4)
+  activeComboStep: number; // Hit currently being performed
+  meleeComboTimer: number; // Window to continue combo
   lifesteal: number;
   piercing: boolean;
   explosive: boolean;

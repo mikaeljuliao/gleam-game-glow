@@ -750,9 +750,23 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
     const range = C.MELEE_RANGE * p.areaMultiplier;
 
     // 3-Stage Animation Logic
-    // Total duration is C.MELEE_COOLDOWN (0.25s)
-    // T goes from 1.0 (start) to 0.0 (end)
-    const t = 1 - (p.meleeTimer / C.MELEE_COOLDOWN);
+    const activeStep = p.activeComboStep || 1;
+    const isFinalHit = activeStep === 4;
+    const isHeavyHit = activeStep === 3;
+
+    // Total duration (Matches p.meleeTimer initialization in player.tryMelee)
+    const duration = C.MELEE_COOLDOWN * (isFinalHit ? 1.5 : 1.0);
+    const t = 1 - (p.meleeTimer / duration);
+
+    // Dynamic Arc based on combo step
+    const arcMult = isFinalHit ? 2.5 : (isHeavyHit ? 1.4 : 1.0);
+    const activeArc = C.MELEE_ARC * arcMult;
+
+    // 4-Hit Combo Directional Logic
+    // Step 1: Forward Slash (Right to Left)
+    // Step 2: Backhand Slash (Left to Right)
+    // Step 3: Overhead Smash
+    // Step 4: Full Sweep (Vortex)
 
     let swingProgress = 0;
     let bladeScale = 1.0;
@@ -761,46 +775,72 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
     // Phase 1: Anticipation (0% - 20%)
     if (t < 0.2) {
       const pt = t / 0.2;
-      swingProgress = -pt * 0.15; // Slight pullback
+      swingProgress = -pt * 0.15; // Pullback
       handOffset = pt * 2;
     }
     // Phase 2: Strike (20% - 60%)
     else if (t < 0.6) {
       const pt = (t - 0.2) / 0.4;
-      // Explosive Cubic-Out for the strike
-      swingProgress = -0.15 + (1.3 * (1 - Math.pow(1 - pt, 3)));
-      bladeScale = 1.1 + Math.sin(pt * Math.PI) * 0.1; // Slight stretch for speed
+      const ease = isFinalHit ? (1 - Math.pow(1 - pt, 4)) : (1 - Math.pow(1 - pt, 3));
+      swingProgress = -0.15 + (1.3 * ease);
+      bladeScale = (isFinalHit ? 1.3 : 1.1) + Math.sin(pt * Math.PI) * 0.2;
     }
     // Phase 3: Recovery (60% - 100%)
     else {
       const pt = (t - 0.6) / 0.4;
-      swingProgress = 1.15 + pt * 0.1; // Slow follow-through
+      swingProgress = 1.15 + pt * 0.1;
       bladeScale = 1.0;
     }
 
-    const startAngle = p.meleeAngle - C.MELEE_ARC / 2;
-    const currentAngle = startAngle + C.MELEE_ARC * swingProgress;
+    // Directional orientation
+    let startAngle = p.meleeAngle - activeArc / 2;
+    let currentAngle = startAngle + activeArc * swingProgress;
+
+    if (activeStep === 2) {
+      // Step 2: Reverse direction
+      startAngle = p.meleeAngle + activeArc / 2;
+      currentAngle = startAngle - activeArc * swingProgress;
+    }
 
     // --- AAA Motion Blur Trail ---
     if (t > 0.15 && t < 0.9) {
-      const trailAlpha = Math.sin((t - 0.15) / 0.75 * Math.PI) * 0.5;
+      const trailAlpha = Math.sin((t - 0.15) / 0.75 * Math.PI) * (isFinalHit ? 0.8 : 0.5);
 
       // Multi-layered trail for volume
-      for (let i = 0; i < 3; i++) {
-        const layerRange = range + (i * 2);
-        const grad = ctx.createRadialGradient(x, y, range * 0.4, x, y, layerRange);
+      const layers = isFinalHit ? 5 : 3;
+      for (let i = 0; i < layers; i++) {
+        const layerRange = range + (i * (isFinalHit ? 4 : 2));
+        const grad = ctx.createRadialGradient(x, y, range * 0.3, x, y, layerRange);
         const alpha = trailAlpha / (i + 1);
-        grad.addColorStop(0, 'rgba(135, 206, 250, 0)'); // Blue transparent
-        grad.addColorStop(0.7, `rgba(100, 180, 255, ${alpha * 0.5})`); // Sky blue layer
-        grad.addColorStop(0.9, `rgba(135, 206, 250, ${alpha})`); // Light blue core
-        grad.addColorStop(1, 'rgba(135, 206, 250, 0)'); // Fade out to blue transparent
+
+        // Color variation per step
+        let colorCore = 'rgba(135, 206, 250,';
+        if (isFinalHit) colorCore = 'rgba(255, 100, 100,'; // Red/Pink for finisher
+        else if (isHeavyHit) colorCore = 'rgba(255, 200, 100,'; // Gold for heavy
+
+        grad.addColorStop(0, `${colorCore} 0)`);
+        grad.addColorStop(0.7, `${colorCore} ${alpha * 0.5})`);
+        grad.addColorStop(0.9, `${colorCore} ${alpha})`);
+        grad.addColorStop(1, `${colorCore} 0)`);
 
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.moveTo(x, y);
-        ctx.arc(x, y, layerRange, startAngle, currentAngle);
+        if (activeStep === 2) {
+          ctx.arc(x, y, layerRange, startAngle, currentAngle, true);
+        } else {
+          ctx.arc(x, y, layerRange, startAngle, currentAngle);
+        }
         ctx.closePath();
         ctx.fill();
+
+        // Extra finisher sparks
+        if (isFinalHit && Math.random() < 0.3) {
+          const sparkAngle = startAngle + (currentAngle - startAngle) * Math.random();
+          const sparkDist = range * (0.8 + Math.random() * 0.4);
+          ctx.fillStyle = '#ffaaaa';
+          ctx.fillRect(x + Math.cos(sparkAngle) * sparkDist, y + Math.sin(sparkAngle) * sparkDist, 2, 2);
+        }
       }
     }
 
