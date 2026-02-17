@@ -1,4 +1,4 @@
-import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, GameStats, GameCallbacks, ScreenEffect, Upgrade, DungeonRoom, HorrorEvent, ShopItem } from './types';
+import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, GameStats, GameCallbacks, ScreenEffect, Upgrade, DungeonRoom, HorrorEvent, ShopItem, WeaponType } from './types';
 import { InputManager } from './input';
 import { createPlayer, updatePlayer, tryDash, tryMelee, canRangedAttack, doRangedAttack, addXP, damagePlayer } from './player';
 import { createEnemy, updateEnemy, damageEnemy, scaleEnemyForFloor, getXPForEnemy, createBossForFloor, consumeBossAction, setBossFloor } from './enemies';
@@ -11,7 +11,7 @@ import {
   spawnImpactGlint, spawnBladeShard
 } from './particles';
 import { getRandomUpgrades, checkSynergies, getOwnedTags, SYNERGIES } from './upgrades';
-import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins } from './renderer';
+import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins, renderWeaponSelectionOverlay } from './renderer';
 import { SFX, initAudio } from './audio';
 import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive, updateHPHorror, renderHPHorror, getHPLightPulse } from './horror';
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
@@ -98,6 +98,14 @@ export class GameEngine {
   sanctuaryPortal: { x: number, y: number } | null = null;
   slowMoFactor = 1;
   lastFrameTime = 0;
+  weaponSelectionOpen = false;
+  private weaponOptions: { id: WeaponType; name: string; desc: string; locked?: boolean }[] = [
+    { id: 'sword', name: 'Espada', desc: 'Equilibrada & Precisa' },
+    { id: 'axe', name: 'Machado', desc: 'Pesado & Brutal' },
+    { id: 'daggers', name: 'Adagas', desc: 'Indisponível', locked: true },
+    { id: 'staff', name: 'Cajado', desc: 'Indisponível', locked: true },
+  ];
+  private selectedWeaponIndex = 0;
 
   constructor(displayCanvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     this.displayCanvas = displayCanvas;
@@ -188,6 +196,11 @@ export class GameEngine {
     this.running = true;
     this.lastTime = performance.now();
     this.loop();
+  }
+
+  startNewGame() {
+    this.weaponSelectionOpen = true;
+    SFX.playTone(400, 0.2, 'sine', 0.1);
   }
 
   stop() {
@@ -571,15 +584,13 @@ export class GameEngine {
           if (this.input.isMouseJustPressed(0) || this.input.isMouseJustPressed(2) || this.input.wantsDash()) {
             this.advanceVendorDialogue();
           }
+        } else if (this.weaponSelectionOpen) {
+          this.updateWeaponSelection(dt);
         } else {
           this.update(effectiveDt);
 
           // Alchemist Interaction
           if (this.inVendorRoom && !this.shopOpen && !this.vendorDialogueActive) {
-            // Check if near Alchemist position (defined in render or logical pos?)
-            // For now, assume Alchemist is at x=200, y=200 in vendor room (just an example pos)
-            // Actually, let's use a key press or simple distance check if we had an entity.
-            // Since we just render him, let's check distance to center-left area.
             const alchX = C.dims.gw / 2 - 80;
             const alchY = C.dims.gh / 2;
             const dist = Math.sqrt((this.player.x - alchX) ** 2 + (this.player.y - alchY) ** 2);
@@ -595,6 +606,31 @@ export class GameEngine {
     this.input.clearFrame();
     this.animFrameId = requestAnimationFrame(this.loop);
   };
+
+  private updateWeaponSelection(dt: number) {
+    if (this.input.isJustPressed('Enter') || this.input.isJustPressed('Space')) {
+      const opt = this.weaponOptions[this.selectedWeaponIndex];
+      if (!opt.locked) {
+        this.selectWeapon();
+      } else {
+        SFX.uiError();
+      }
+    }
+    if (this.input.isJustPressed('ArrowLeft') || this.input.isJustPressed('KeyA')) {
+      this.selectedWeaponIndex = (this.selectedWeaponIndex - 1 + this.weaponOptions.length) % this.weaponOptions.length;
+      SFX.playTone(440, 0.05, 'sine', 0.05);
+    }
+    if (this.input.isJustPressed('ArrowRight') || this.input.isJustPressed('KeyD')) {
+      this.selectedWeaponIndex = (this.selectedWeaponIndex + 1) % this.weaponOptions.length;
+      SFX.playTone(480, 0.05, 'sine', 0.05);
+    }
+  }
+
+  private selectWeapon() {
+    this.player.weapon = this.weaponOptions[this.selectedWeaponIndex].id;
+    this.weaponSelectionOpen = false;
+    SFX.playTone(660, 0.1, 'sine', 0.1);
+  }
 
   private bossKillTimer = 0;
   private bossKillFloor = 1;
@@ -2257,6 +2293,11 @@ export class GameEngine {
     // Vendor dialogue overlay
     if (this.vendorDialogueActive) {
       this.renderVendorDialogue(ctx);
+    }
+
+    // Weapon selection overlay
+    if (this.weaponSelectionOpen) {
+      renderWeaponSelectionOverlay(ctx, this.selectedWeaponIndex, this.weaponOptions, this.gameTime, vp);
     }
 
     ctx.restore(); // game offset translate

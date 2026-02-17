@@ -240,10 +240,12 @@ const Index = () => {
     if (loadSave && engineRef.current) {
       engineRef.current.loadFromSave();
       setLoadSave(false);
-    }
-    if (devFloor && engineRef.current) {
+    } else if (devFloor && engineRef.current) {
       engineRef.current.startAtFloor(devFloor);
       setDevFloor(null);
+    } else if (engineRef.current && !loadSave && !devFloor) {
+      // It's a fresh New Game
+      engineRef.current.startNewGame();
     }
   }, [loadSave, devFloor, gameKey]);
 

@@ -1,4 +1,4 @@
-import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, DungeonRoom, Obstacle, ScreenEffect, Viewport } from './types';
+﻿import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, DungeonRoom, Obstacle, ScreenEffect, Viewport, WeaponType } from './types';
 import { HiddenTrap } from './traps';
 import * as C from './constants';
 import { getBrightness } from './brightness';
@@ -856,7 +856,7 @@ function drawIdleRunPose(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
     const moveAngle = p.facing.x >= 0 ? Math.PI * 0.45 : Math.PI * 0.55;
     ctx.rotate(isMoving ? moveAngle : restAngle + Math.sin(time * 2) * 0.05);
 
-    drawLongsword(ctx, 20, 0, time);
+    drawEquippedWeapon(ctx, p, 20, 0, time);
     ctx.restore();
   }
 
@@ -916,12 +916,13 @@ function drawAttackPose1(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   ctx.save();
   ctx.translate(hx, hy);
   ctx.rotate(currentAngle);
-  drawLongsword(ctx, C.MELEE_RANGE, 1, time);
+  drawEquippedWeapon(ctx, p, C.MELEE_RANGE, 1, time);
   ctx.restore();
 
   // VFX (World Space)
   if (t > 0.2 && t < 0.7) {
-    drawSlashTrail(ctx, bx, by, C.MELEE_RANGE, angleStart, currentAngle, 'azure');
+    const trailColor = p.weapon === 'axe' ? 'iron' : 'azure';
+    drawSlashTrail(ctx, bx, by, C.MELEE_RANGE, angleStart, currentAngle, trailColor);
   }
 }
 
@@ -974,7 +975,7 @@ function drawAttackPose2(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   ctx.rotate(currentAngle);
   // Upside down sword for backhand feel?
   ctx.scale(1, -1);
-  drawLongsword(ctx, C.MELEE_RANGE, 1, time);
+  drawEquippedWeapon(ctx, p, C.MELEE_RANGE, 1, time);
   ctx.restore();
 
   // VFX
@@ -1033,7 +1034,7 @@ function drawAttackPose3(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   ctx.save();
   ctx.translate(hx, hy);
   ctx.rotate(currentAngle);
-  drawLongsword(ctx, C.MELEE_RANGE * 1.1, 1, time);
+  drawEquippedWeapon(ctx, p, C.MELEE_RANGE * 1.1, 1, time);
   ctx.restore();
 
   // VFX
@@ -1072,7 +1073,7 @@ function drawAttackPose4(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   ctx.save();
   ctx.translate(sx, sy);
   ctx.rotate(swordAngle + Math.PI / 2); // Tangent
-  drawLongsword(ctx, C.MELEE_RANGE * 1.5, 1, time);
+  drawEquippedWeapon(ctx, p, C.MELEE_RANGE * 1.5, 1, time);
 
   // VFX - Clean azure spin circle
   if (t > 0.05 && t < 0.95) {
@@ -1086,7 +1087,7 @@ function drawAttackPose4(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   ctx.restore();
 }
 
-function drawSlashTrail(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, start: number, end: number, color: 'azure' | 'gold' | 'crimson') {
+function drawSlashTrail(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, start: number, end: number, color: 'azure' | 'gold' | 'crimson' | 'iron') {
   ctx.save();
 
   let mainColor = 'rgba(100, 200, 255, 0.12)'; // Default azure
@@ -1101,11 +1102,16 @@ function drawSlashTrail(ctx: CanvasRenderingContext2D, x: number, y: number, r: 
     mainColor = 'rgba(255, 50, 50, 0.12)';
     sharpColor = 'rgba(255, 200, 200, 0.8)';
     glowColor = 'rgba(255, 50, 50, 0)';
+  } else if (color === 'iron') {
+    // Heavy, brutal, metallic trail for axe
+    mainColor = 'rgba(120, 120, 130, 0.20)';
+    sharpColor = 'rgba(200, 200, 210, 0.9)';
+    glowColor = 'rgba(80, 80, 90, 0)';
   }
 
   // Layer 1: Focused Blade Edge (The sharp part)
   const bladeGrad = ctx.createRadialGradient(x, y, r * 0.95, x, y, r);
-  bladeGrad.addColorStop(0, 'rgba(200, 240, 255, 0)');
+  bladeGrad.addColorStop(0, color === 'iron' ? 'rgba(150, 150, 160, 0)' : 'rgba(200, 240, 255, 0)');
   bladeGrad.addColorStop(0.5, sharpColor); // Sharp white core
   bladeGrad.addColorStop(1, glowColor);
 
@@ -1115,16 +1121,16 @@ function drawSlashTrail(ctx: CanvasRenderingContext2D, x: number, y: number, r: 
   ctx.arc(x, y, r, start, end, start > end);
   ctx.fill();
 
-  // Layer 2: Ethereal Energy Tail (Subtle dissipation)
-  const auraGrad = ctx.createRadialGradient(x, y, r * 0.7, x, y, r * 1.05);
-  auraGrad.addColorStop(0, 'rgba(100, 180, 255, 0)');
+  // Layer 2: Ethereal Energy Tail (Subtle dissipation) - wider and denser for axe
+  const auraGrad = ctx.createRadialGradient(x, y, r * 0.7, x, y, r * (color === 'iron' ? 1.15 : 1.05));
+  auraGrad.addColorStop(0, color === 'iron' ? 'rgba(100, 100, 110, 0)' : 'rgba(100, 180, 255, 0)');
   auraGrad.addColorStop(0.5, mainColor);
-  auraGrad.addColorStop(1, 'rgba(100, 180, 255, 0)');
+  auraGrad.addColorStop(1, color === 'iron' ? 'rgba(80, 80, 90, 0)' : 'rgba(100, 180, 255, 0)');
 
   ctx.fillStyle = auraGrad;
   ctx.beginPath();
   ctx.moveTo(x, y);
-  ctx.arc(x, y, r * 1.05, start, end, start > end);
+  ctx.arc(x, y, r * (color === 'iron' ? 1.15 : 1.05), start, end, start > end);
   ctx.fill();
   ctx.restore();
 }
@@ -1203,6 +1209,17 @@ function drawEtherealHand(ctx: CanvasRenderingContext2D, handX: number, handY: n
 
   ctx.restore();
 }
+
+/** Draws the equipped weapon based on player choice */
+function drawEquippedWeapon(ctx: CanvasRenderingContext2D, p: PlayerState, length: number, isAttacking: number, time: number) {
+  switch (p.weapon) {
+    case 'axe': drawBattleAxe(ctx, length, isAttacking, time); break;
+    case 'daggers': drawDualDaggers(ctx, length, isAttacking, time); break;
+    case 'staff': drawVoidStaff(ctx, length, isAttacking, time); break;
+    default: drawLongsword(ctx, length, isAttacking, time); break;
+  }
+}
+
 
 /** Draws a professional-grade AAA longsword */
 function drawLongsword(ctx: CanvasRenderingContext2D, length: number, isAttacking: number, time: number) {
@@ -1331,6 +1348,336 @@ function drawLongsword(ctx: CanvasRenderingContext2D, length: number, isAttackin
   ctx.strokeStyle = `rgba(150, 220, 255, ${0.1 + Math.sin(time * 2) * 0.05})`;
   ctx.lineWidth = 0.5;
   ctx.stroke();
+}
+
+/** Battle Axe - Dark Elegant Asymmetric Design (Refined & Sharper) */
+function drawBattleAxe(ctx: CanvasRenderingContext2D, length: number, isAttacking: number, time: number) {
+  // === PROPORTIONS ===
+  // Handle length slightly reduced to emphasize the large head feeling without bulk
+  const handleLen = length * 0.95;
+  const headPos = -handleLen * 0.15; // Position where head meets handle
+
+  // 1. HANDLE (Anatomical Dark Wood & Metal)
+  // --------------------------------------------------
+  // Gradient: Dark, almost blackened wood with subtle reddish/brown undertone
+  const hGrad = ctx.createLinearGradient(-handleLen, 0, 0, 0);
+  hGrad.addColorStop(0, '#0f0b0d');   // Pommel
+  hGrad.addColorStop(0.3, '#2a1f22'); // Grip
+  hGrad.addColorStop(0.6, '#1a1214'); // Neck
+  hGrad.addColorStop(1, '#0f0b0d');   // Head
+  ctx.fillStyle = hGrad;
+
+  ctx.beginPath();
+  // Pommel start
+  ctx.moveTo(-handleLen, -2);
+  // Curved ergonomic grip (thinner at top, swells at grip)
+  ctx.bezierCurveTo(-handleLen * 0.8, -3.5, -handleLen * 0.4, -3, headPos - 1, -2); // Top curve
+  ctx.lineTo(headPos + 3, -2); // Socket connection
+  ctx.lineTo(headPos + 3, 2);
+  ctx.lineTo(headPos - 1, 2);
+  // Bottom curve with grip swell
+  ctx.bezierCurveTo(-handleLen * 0.4, 3, -handleLen * 0.8, 3.5, -handleLen, 2);
+  ctx.closePath();
+  ctx.fill();
+
+  // Subtle Highlights on Handle
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-handleLen + 5, -1);
+  ctx.lineTo(-handleLen * 0.5, -1.5);
+  ctx.stroke();
+
+  // Wrapping / Grip Texture (Leather straps)
+  ctx.strokeStyle = 'rgba(10, 5, 8, 0.6)';
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i < 6; i++) {
+    const x = -handleLen * 0.85 + i * 8;
+    ctx.beginPath();
+    ctx.moveTo(x, -3);
+    ctx.lineTo(x + 2, 3);
+    ctx.stroke();
+  }
+
+  // Pommel Cap (Spiked/Geometric)
+  ctx.fillStyle = '#2a2a35';
+  ctx.beginPath();
+  ctx.moveTo(-handleLen, -3);
+  ctx.lineTo(-handleLen - 4, 0);
+  ctx.lineTo(-handleLen, 3);
+  ctx.fill();
+
+  // 2. AXE HEAD (Socket & Blade)
+  // --------------------------------------------------
+  ctx.translate(headPos, 0);
+
+  // -- Central Socket (Connection Point) -- 
+  ctx.fillStyle = '#15151a'; // Pitch black metal
+  ctx.fillRect(-3, -5, 6, 10);
+
+  // -- Rear Spike / Hammer Poll --
+  // Small, sharp, functional
+  const pollGrad = ctx.createLinearGradient(-8, 0, -3, 0);
+  pollGrad.addColorStop(0, '#0a0a0e');
+  pollGrad.addColorStop(1, '#252530');
+  ctx.fillStyle = pollGrad;
+  ctx.beginPath();
+  ctx.moveTo(-3, -3);
+  ctx.lineTo(-6, -1.5);
+  ctx.lineTo(-9, 0);     // Sharp point
+  ctx.lineTo(-6, 1.5);
+  ctx.lineTo(-3, 3);
+  ctx.fill();
+
+  // -- MAIN BLADE (The "Elegant" Part) --
+  // Sleek, swept back "Bearded" design, not fat.
+  // The metal should feel thin but the shape is large.
+
+  // Main Body Gradient (Dark Steel)
+  const bladeGrad = ctx.createLinearGradient(0, 0, 30, 0);
+  bladeGrad.addColorStop(0, '#101015');  // Darkest near handle
+  bladeGrad.addColorStop(0.4, '#20202a'); // Mid-body
+  bladeGrad.addColorStop(0.8, '#4a4a5a'); // Stronger steel tone near edge
+  bladeGrad.addColorStop(1, '#8a9ab0');   // Edge brightness
+  ctx.fillStyle = bladeGrad;
+
+  ctx.beginPath();
+  // Start at top socket
+  ctx.moveTo(0, -5);
+  // Sweeping top curve (Goes UP and FORWARD aggressively)
+  // Reaches high (Y: -18) and forward (X: 12)
+  ctx.bezierCurveTo(2, -10, 6, -16, 14, -18);
+  // Top Tip to Cutting Edge
+  // Imagine a sharp crescent edge from (14, -18) to (8, 22)
+  // The Control Points define the "C" shape of the edge
+  // We want a jagged or very sharp curve
+  ctx.bezierCurveTo(24, -10, 26, 10, 10, 24); // Bottom tip (Long beard)
+  // Return curve (Underneath, hooking back deep)
+  ctx.bezierCurveTo(8, 16, 5, 8, 2, 5); // Back to bottom socket
+  ctx.closePath();
+  ctx.fill();
+
+  // Hard outline for definition
+  ctx.strokeStyle = '#050508';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // -- CUTTING EDGE & MAGICAL GLOW --
+  // We draw the edge separately to make it glow
+  const edgePulse = 0.8 + Math.sin(time * 3) * 0.2;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter'; // Additive blending for glow
+
+  // Edge Glow (Cold Blue / Ethereal)
+  ctx.shadowColor = `rgba(60, 160, 255, ${edgePulse})`;
+  ctx.shadowBlur = 8;
+  ctx.strokeStyle = `rgba(180, 220, 255, ${edgePulse})`;
+  ctx.lineWidth = 1.5;
+
+  ctx.beginPath();
+  // Trace exactly the cutting edge curve from the main shape
+  ctx.moveTo(14, -18);
+  ctx.bezierCurveTo(24, -10, 26, 10, 10, 24);
+  ctx.stroke();
+
+  // Secondary inner highlight (sharpening line)
+  ctx.lineWidth = 0.8;
+  ctx.strokeStyle = `rgba(100, 200, 255, ${edgePulse * 0.5})`;
+  ctx.beginPath();
+  ctx.moveTo(13, -16);
+  ctx.bezierCurveTo(22, -8, 24, 8, 10, 22);
+  ctx.stroke();
+
+  ctx.restore();
+
+  // -- DETAILS (Runes & Engravings) --
+  // A glowing rune in the center of the dark blade
+  const runeX = 8;
+  const runeY = 0;
+
+  ctx.save();
+  ctx.translate(runeX, runeY);
+  ctx.scale(0.8, 0.8); // Smaller rune
+
+  ctx.shadowColor = 'rgba(80, 180, 255, 0.6)';
+  ctx.shadowBlur = 4;
+  ctx.strokeStyle = `rgba(100, 200, 255, ${edgePulse * 0.8})`;
+  ctx.lineWidth = 1.2;
+
+  ctx.beginPath();
+  // "Diamond" rune shape with vertical line
+  ctx.moveTo(0, -5); ctx.lineTo(0, 5); // Vertical
+  ctx.moveTo(-3, 0); ctx.lineTo(0, -3); ctx.lineTo(3, 0); ctx.lineTo(0, 3); ctx.lineTo(-3, 0); // Diamond
+  ctx.stroke();
+
+  // Small dot in center
+  ctx.fillStyle = `rgba(200, 240, 255, ${edgePulse})`;
+  ctx.beginPath();
+  ctx.arc(0, 0, 1, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // -- FULLER (Blood Groove) --
+  // A deep groove running parallel to the top
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(3, -6);
+  ctx.quadraticCurveTo(8, -10, 12, -12);
+  ctx.stroke();
+
+  // Restore context (undo translate)
+  ctx.translate(-headPos, 0);
+}
+
+/** Draws realistic Dual Daggers */
+function drawDualDaggers(ctx: CanvasRenderingContext2D, length: number, isAttacking: number, time: number) {
+  const dagLen = length * 0.8;
+  const hiltLen = 6;
+  const bladeLen = dagLen - hiltLen;
+
+  const drawOne = (offsetY: number, angle: number) => {
+    ctx.save();
+    ctx.translate(0, offsetY);
+    ctx.rotate(angle);
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(-hiltLen, -1.2, hiltLen, 2.4);
+    ctx.fillStyle = '#999';
+    ctx.fillRect(-1, -3, 2, 6);
+    const bGrad = ctx.createLinearGradient(0, -1.5, 0, 1.5);
+    bGrad.addColorStop(0, '#333');
+    bGrad.addColorStop(0.5, '#fff');
+    bGrad.addColorStop(1, '#333');
+    ctx.fillStyle = bGrad;
+    ctx.beginPath();
+    ctx.moveTo(1, -1.5);
+    ctx.lineTo(bladeLen - 4, -1.2);
+    ctx.lineTo(bladeLen, 0);
+    ctx.lineTo(bladeLen - 4, 1.2);
+    ctx.lineTo(1, 1.5);
+    ctx.fill();
+    ctx.restore();
+  };
+  drawOne(-4, Math.sin(time * 2) * 0.1);
+  drawOne(4, Math.cos(time * 2) * 0.1);
+}
+
+/** Draws a realistic Void Staff */
+function drawVoidStaff(ctx: CanvasRenderingContext2D, length: number, isAttacking: number, time: number) {
+  const staffLen = length * 1.2;
+  const shaftGrad = ctx.createLinearGradient(-staffLen + 10, 0, 0, 0);
+  shaftGrad.addColorStop(0, '#050505');
+  shaftGrad.addColorStop(0.5, '#1a100a');
+  shaftGrad.addColorStop(1, '#050505');
+  ctx.fillStyle = shaftGrad;
+  ctx.beginPath();
+  ctx.moveTo(-staffLen + 10, -2);
+  ctx.lineTo(0, -3);
+  ctx.lineTo(0, 3);
+  ctx.lineTo(-staffLen + 10, 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(8, 0);
+  const orbPulse = 0.9 + Math.sin(time * 3) * 0.1;
+  const orbGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 6);
+  orbGrad.addColorStop(0, '#ffffff');
+  orbGrad.addColorStop(0.2, '#cc88ff');
+  orbGrad.addColorStop(0.5, '#330066');
+  orbGrad.addColorStop(1, '#050010');
+  ctx.fillStyle = orbGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, 5 * orbPulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** ═══ WEAPON SELECTION OVERLAY ═══ */
+export function renderWeaponSelectionOverlay(ctx: CanvasRenderingContext2D, selectedIndex: number, options: { id: WeaponType; name: string; desc: string; locked?: boolean }[], time: number, vp: Viewport) {
+  const { rw, rh } = vp;
+  const cx = rw / 2;
+  const cy = rh / 2;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+  ctx.fillRect(0, 0, rw, rh);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold 24px ${C.HUD_FONT}`;
+  ctx.fillText('ESCOLHA SUA ARMA', cx, rh * 0.2);
+  ctx.font = `12px ${C.HUD_FONT}`;
+  ctx.fillStyle = 'rgba(200, 200, 200, 0.7)';
+  ctx.fillText('Aperte [A / D] para navegar • [ENTRE] para confirmar', cx, rh * 0.25);
+
+  const cardW = 90;
+  const cardH = 140;
+  const spacing = 20;
+  const startX = cx - (options.length * (cardW + spacing) - spacing) / 2 + cardW / 2;
+
+  options.forEach((opt, i) => {
+    const isSelected = i === selectedIndex;
+    const isLocked = opt.locked;
+    const x = startX + i * (cardW + spacing);
+    const y = cy;
+    const hover = (isSelected && !isLocked) ? Math.sin(time * 4) * 5 : 0;
+    const scale = isSelected ? 1.1 : 1.0;
+
+    ctx.save();
+    ctx.translate(x, y + hover);
+    ctx.scale(scale, scale);
+
+    if (isLocked) {
+      ctx.globalAlpha = 0.5;
+    }
+
+    // Card Background
+    const cardGrad = ctx.createLinearGradient(0, -cardH / 2, 0, cardH / 2);
+    if (isLocked) {
+      cardGrad.addColorStop(0, '#0a0a0a');
+      cardGrad.addColorStop(1, '#050505');
+    } else {
+      cardGrad.addColorStop(0, isSelected ? '#1a2a3a' : '#111111');
+      cardGrad.addColorStop(1, isSelected ? '#0a0f1a' : '#050505');
+    }
+
+    ctx.fillStyle = cardGrad;
+    ctx.strokeStyle = isSelected ? (isLocked ? '#666' : '#ffffff') : '#333333';
+    ctx.lineWidth = isSelected ? 2 : 1;
+
+    ctx.fillRect(-cardW / 2, -cardH / 2, cardW, cardH);
+    ctx.strokeRect(-cardW / 2, -cardH / 2, cardW, cardH);
+
+    // Weapon Preview
+    ctx.save();
+    ctx.translate(0, -20);
+    ctx.rotate(-Math.PI / 4);
+    if (isLocked) {
+      ctx.filter = 'grayscale(100%) brightness(50%)';
+    }
+    const pDummy = { weapon: opt.id } as any;
+    drawEquippedWeapon(ctx, pDummy, 40, 0, time);
+    ctx.restore();
+
+    // Lock Icon
+    if (isLocked) {
+      ctx.fillStyle = '#ff4444';
+      ctx.textAlign = 'center';
+      ctx.font = '16px serif';
+      ctx.fillText('🔒', 0, 0);
+    }
+
+    // Text Label
+    ctx.fillStyle = isSelected ? (isLocked ? '#888' : '#ffffff') : '#444444';
+    ctx.font = `bold 13px ${C.HUD_FONT}`;
+    ctx.fillText(opt.name.toUpperCase(), 0, cardH / 2 - 30);
+
+    ctx.fillStyle = isSelected ? (isLocked ? '#555' : '#33ccff') : '#333333';
+    ctx.font = `9px ${C.HUD_FONT}`;
+    ctx.fillText(opt.desc, 0, cardH / 2 - 15);
+
+    ctx.restore();
+  });
 }
 
 export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: number) {

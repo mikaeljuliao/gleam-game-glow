@@ -3,6 +3,7 @@ export class InputManager {
   private mousePos = { x: 0, y: 0 };
   private buttonsDown = new Set<number>();
   private buttonsJustPressed = new Set<number>();
+  private keysJustPressed = new Set<string>();
   private scale = 1;
   private offsetX = 0;
   private offsetY = 0;
@@ -31,7 +32,7 @@ export class InputManager {
     this.onTouchEnd = this.onTouchEnd.bind(this);
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
-    
+
     // Detect mobile
     this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   }
@@ -57,6 +58,9 @@ export class InputManager {
 
   private onKeyDown(e: KeyboardEvent) {
     const key = e.key.toLowerCase();
+    if (!this.keys.has(key)) {
+      this.keysJustPressed.add(key);
+    }
     this.keys.add(key);
     if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key)) {
       e.preventDefault();
@@ -92,13 +96,13 @@ export class InputManager {
     e.preventDefault();
     if (!this.canvas) return;
     const rect = this.canvas.getBoundingClientRect();
-    
+
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
       const tx = touch.clientX - rect.left;
       const ty = touch.clientY - rect.top;
       const halfW = rect.width / 2;
-      
+
       if (tx < halfW) {
         // Left side — joystick
         this.touchPointerId = touch.identifier;
@@ -124,10 +128,10 @@ export class InputManager {
     e.preventDefault();
     if (!this.canvas) return;
     const rect = this.canvas.getBoundingClientRect();
-    
+
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
-      
+
       if (touch.identifier === this.touchPointerId && this.touchJoystickActive) {
         const tx = touch.clientX - rect.left;
         const ty = touch.clientY - rect.top;
@@ -194,6 +198,10 @@ export class InputManager {
     return this.keys.has(key);
   }
 
+  isJustPressed(key: string): boolean {
+    return this.keysJustPressed.has(key.toLowerCase());
+  }
+
   isMouseDown(btn: number): boolean {
     return this.buttonsDown.has(btn);
   }
@@ -235,6 +243,7 @@ export class InputManager {
 
   clearFrame() {
     this.buttonsJustPressed.clear();
+    this.keysJustPressed.clear();
     this.touchDashPressed = false;
   }
 

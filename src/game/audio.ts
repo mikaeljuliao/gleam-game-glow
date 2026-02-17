@@ -104,6 +104,10 @@ export const SFX = {
     });
   },
 
+  playTone(freq: number, duration: number, type: OscillatorType = 'square', volume = 0.15, decay = true) {
+    playTone(freq, duration, type, volume, decay);
+  },
+
   meleeSwing() {
     // REALISTIC STEEL SWING - Mid-range whoosh + subtle resonance
     // 1. Natural air displacement (Mid-low noise)
