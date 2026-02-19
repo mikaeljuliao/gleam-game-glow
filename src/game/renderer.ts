@@ -1919,26 +1919,32 @@ export function renderWeaponSelectionOverlay(ctx: CanvasRenderingContext2D, sele
   const { rw, rh } = vp;
   const cx = rw / 2;
   const cy = rh / 2;
+  const isMobileScreen = rw < 500 || rh < 380;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
   ctx.fillRect(0, 0, rw, rh);
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffffff';
-  ctx.font = `bold 24px ${C.HUD_FONT}`;
+  const titleSize = isMobileScreen ? 18 : 24;
+  ctx.font = `bold ${titleSize}px ${C.HUD_FONT}`;
   ctx.fillText('ESCOLHA SUA ARMA', cx, rh * 0.2);
-  ctx.font = `12px ${C.HUD_FONT}`;
+  ctx.font = `${isMobileScreen ? 10 : 12}px ${C.HUD_FONT}`;
   ctx.fillStyle = 'rgba(200, 200, 200, 0.7)';
-  ctx.fillText('Aperte [A / D] para navegar • [ENTRE] para confirmar', cx, rh * 0.25);
+  if (isMobileScreen) {
+    ctx.fillText('TOQUE na carta para selecionar', cx, rh * 0.28);
+  } else {
+    ctx.fillText('Aperte [A / D] para navegar  •  [ENTER] para confirmar  •  ou clique na carta', cx, rh * 0.25);
+  }
 
-  const cardW = 90;
-  const cardH = 140;
-  const spacing = 20;
+  const cardW = isMobileScreen ? 78 : 90;
+  const cardH = isMobileScreen ? 118 : 140;
+  const spacing = isMobileScreen ? 12 : 20;
   const startX = cx - (options.length * (cardW + spacing) - spacing) / 2 + cardW / 2;
 
   options.forEach((opt, i) => {
     const isSelected = i === selectedIndex;
     const isLocked = opt.locked;
     const x = startX + i * (cardW + spacing);
-    const y = cy;
+    const y = cy + (isMobileScreen ? 12 : 0);
     const hover = (isSelected && !isLocked) ? Math.sin(time * 4) * 5 : 0;
     const scale = isSelected ? 1.1 : 1.0;
 
@@ -1948,6 +1954,13 @@ export function renderWeaponSelectionOverlay(ctx: CanvasRenderingContext2D, sele
 
     if (isLocked) {
       ctx.globalAlpha = 0.5;
+    }
+
+    // Mobile: tap glow on unlocked cards
+    if (isMobileScreen && !isLocked) {
+      const tapGlowAlpha = 0.08 + Math.sin(time * 3 + i) * 0.06;
+      ctx.fillStyle = `rgba(80, 160, 255, ${tapGlowAlpha})`;
+      ctx.fillRect(-cardW / 2 - 5, -cardH / 2 - 5, cardW + 10, cardH + 10);
     }
 
     // Card Background
@@ -1969,35 +1982,43 @@ export function renderWeaponSelectionOverlay(ctx: CanvasRenderingContext2D, sele
 
     // Weapon Preview
     ctx.save();
-    ctx.translate(0, -20);
+    ctx.translate(0, -cardH / 2 + (isMobileScreen ? 42 : 55));
     ctx.rotate(-Math.PI / 4);
     if (isLocked) {
       ctx.filter = 'grayscale(100%) brightness(50%)';
     }
     const pDummy = { weapon: opt.id } as any;
-    drawEquippedWeapon(ctx, pDummy, 40, 0, time);
+    drawEquippedWeapon(ctx, pDummy, isMobileScreen ? 30 : 40, 0, time);
     ctx.restore();
 
     // Lock Icon
     if (isLocked) {
       ctx.fillStyle = '#ff4444';
       ctx.textAlign = 'center';
-      ctx.font = '16px serif';
+      ctx.font = `${isMobileScreen ? 13 : 16}px serif`;
       ctx.fillText('🔒', 0, 0);
     }
 
     // Text Label
     ctx.fillStyle = isSelected ? (isLocked ? '#888' : '#ffffff') : '#444444';
-    ctx.font = `bold 13px ${C.HUD_FONT}`;
-    ctx.fillText(opt.name.toUpperCase(), 0, cardH / 2 - 30);
+    ctx.font = `bold ${isMobileScreen ? 11 : 13}px ${C.HUD_FONT}`;
+    ctx.fillText(opt.name.toUpperCase(), 0, cardH / 2 - (isMobileScreen ? 22 : 30));
 
     ctx.fillStyle = isSelected ? (isLocked ? '#555' : '#33ccff') : '#333333';
-    ctx.font = `9px ${C.HUD_FONT}`;
-    ctx.fillText(opt.desc, 0, cardH / 2 - 15);
+    ctx.font = `${isMobileScreen ? 8 : 9}px ${C.HUD_FONT}`;
+    ctx.fillText(opt.desc, 0, cardH / 2 - (isMobileScreen ? 10 : 15));
+
+    // Mobile TAP hint
+    if (isMobileScreen && !isLocked) {
+      ctx.fillStyle = `rgba(100, 200, 255, ${0.5 + Math.sin(time * 4) * 0.3})`;
+      ctx.font = `7px ${C.HUD_FONT}`;
+      ctx.fillText('▼ TOQUE', 0, cardH / 2 - 1);
+    }
 
     ctx.restore();
   });
 }
+
 
 export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: number) {
   if (e.spawnTimer > 0) {

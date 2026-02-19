@@ -99,12 +99,12 @@ export class GameEngine {
   slowMoFactor = 1;
   lastFrameTime = 0;
   weaponSelectionOpen = false;
-  private weaponOptions: { id: WeaponType; name: string; desc: string; locked?: boolean }[] = [
+  weaponOptions: { id: WeaponType; name: string; desc: string; locked?: boolean }[] = [
     { id: 'sword', name: 'Espada', desc: 'Equilibrada & Precisa' },
     { id: 'daggers', name: 'Catanas Duplas', desc: 'Rápidas & Mortais' },
     { id: 'staff', name: 'Cajado', desc: 'Indisponível', locked: true },
   ];
-  private selectedWeaponIndex = 0;
+  selectedWeaponIndex = 0;
 
   constructor(displayCanvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     this.displayCanvas = displayCanvas;
@@ -606,7 +606,7 @@ export class GameEngine {
     this.animFrameId = requestAnimationFrame(this.loop);
   };
 
-  private updateWeaponSelection(dt: number) {
+  private updateWeaponSelection(_dt: number) {
     if (this.input.isJustPressed('Enter') || this.input.isJustPressed('Space')) {
       const opt = this.weaponOptions[this.selectedWeaponIndex];
       if (!opt.locked) {
@@ -622,6 +622,47 @@ export class GameEngine {
     if (this.input.isJustPressed('ArrowRight') || this.input.isJustPressed('KeyD')) {
       this.selectedWeaponIndex = (this.selectedWeaponIndex + 1) % this.weaponOptions.length;
       SFX.playTone(480, 0.05, 'sine', 0.05);
+    }
+
+    // Mobile tap on canvas: detect which card was tapped
+    if (this.input.isMobile && this.input.isMouseJustPressed(0)) {
+      const mouse = this.input.getMousePos();
+      const rw = C.dims.gw;
+      const rh = C.dims.gh;
+      const cx = rw / 2;
+      const cy = rh / 2;
+      const cardW = 90;
+      const cardH = 140;
+      const spacing = 20;
+      const startX = cx - (this.weaponOptions.length * (cardW + spacing) - spacing) / 2 + cardW / 2;
+
+      for (let i = 0; i < this.weaponOptions.length; i++) {
+        const x = startX + i * (cardW + spacing);
+        const y = cy;
+        if (
+          mouse.x >= x - cardW / 2 &&
+          mouse.x <= x + cardW / 2 &&
+          mouse.y >= y - cardH / 2 &&
+          mouse.y <= y + cardH / 2
+        ) {
+          if (!this.weaponOptions[i].locked) {
+            this.selectedWeaponIndex = i;
+            this.selectWeapon();
+          } else {
+            SFX.uiError();
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  selectWeaponByIndex(index: number) {
+    if (index >= 0 && index < this.weaponOptions.length && !this.weaponOptions[index].locked) {
+      this.selectedWeaponIndex = index;
+      this.selectWeapon();
+    } else {
+      SFX.uiError();
     }
   }
 

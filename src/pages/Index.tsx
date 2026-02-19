@@ -298,7 +298,7 @@ const Index = () => {
 
       {isGameActive && (
         <div className="relative w-full h-full flex flex-col items-center justify-center">
-          <div className="relative w-full h-[64vh] md:h-full">
+          <div className="relative w-full h-full">
             <GameCanvas
               key={gameKey}
               onLevelUp={handleLevelUp}
