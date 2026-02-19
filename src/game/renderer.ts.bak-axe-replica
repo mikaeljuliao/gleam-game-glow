@@ -3,7 +3,6 @@ import { HiddenTrap } from './traps';
 import * as C from './constants';
 import { getBrightness } from './brightness';
 import { getBiome, Biome } from './biomes';
-import { roomKey, getCurrentRoom } from './dungeon';
 
 /** Draw text with letter-spacing by rendering each character individually */
 function drawSpacedText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, spacing: number, stroke = false) {
@@ -111,6 +110,8 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
   ctx.fillStyle = grad;
   ctx.fillRect(-gox, -goy, rw, rh);
 }
+import { roomKey, getCurrentRoom } from './dungeon';
+
 export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor = 1) {
   const biome = getBiome(floor);
   const ts = C.TILE_SIZE;
@@ -565,8 +566,8 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
     }
   }
 
-  // Effects disabled — pure sprite visualisation mode
-  // drawAmbientEffects(ctx, p, x, y, time);
+  // 1. Ambient Effects (Glow, Shadow, Dash Trail)
+  drawAmbientEffects(ctx, p, x, y, time);
 
   // 2. Pose Selection
   if (p.meleeAttacking) {
@@ -584,653 +585,285 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
   }
 }
 
+function drawAmbientEffects(ctx: CanvasRenderingContext2D, p: PlayerState, x: number, y: number, time: number) {
+  // === AMBIENT SOUL GLOW (brighter during XP collection) ===
+  const xpGlow = (p.xpGlowTimer || 0) > 0;
+  // Further decelerated idle pulse (0.4 speed) for ultra-calm feel
+  const glowPulse = xpGlow ? 30 + Math.sin(time * 4) * 6 : 22 + Math.sin(time * 0.4) * 3;
+  const glowR = xpGlow ? 120 : 100;
+  const glowG = xpGlow ? 255 : 180;
+  const glowB = xpGlow ? 200 : 255;
+  const glowAlpha1 = xpGlow ? 0.25 : 0.12;
+  const glowAlpha2 = xpGlow ? 0.1 : 0.04;
+  const soulGlow = ctx.createRadialGradient(x, y - 2, 0, x, y - 2, glowPulse);
+  soulGlow.addColorStop(0, `rgba(${glowR}, ${glowG}, ${glowB}, ${glowAlpha1})`);
+  soulGlow.addColorStop(0.5, `rgba(${glowR}, ${glowG}, ${glowB}, ${glowAlpha2})`);
+  soulGlow.addColorStop(1, `rgba(${glowR}, ${glowG}, ${glowB}, 0)`);
+  ctx.fillStyle = soulGlow;
+  ctx.fillRect(x - glowPulse, y - 2 - glowPulse, glowPulse * 2, glowPulse * 2);
 
-
-function drawAmbientEffects(_ctx: CanvasRenderingContext2D, _p: PlayerState, _x: number, _y: number, _time: number) {
-  // All effects removed — pure sprite visualisation mode.
-}
-
-
-
-
-// ============================================================
-// PLAYER SPRITE — OFFICIAL CHARACTER ASSET
-// ============================================================
-// Body rendered via ctx.drawImage() only. Canvas = zero effects.
-// ============================================================
-
-// ── Types ─────────────────────────────────────────────────────
-type SpriteDir = 'down' | 'up' | 'left' | 'right'
-  | 'down-left' | 'down-right' | 'up-left' | 'up-right';
-
-interface SpriteFrame {
-  src: string;
-  fallback?: boolean;
-  flipX?: boolean;
-  // Ponto exato onde a mão estaria na imagem (relativo ao centro/pivô do sprite)
-  handSocket?: { x: number; y: number };
-}
-
-// ── 8-Direction Sprite Map ─────────────────────────────────────
-// Drop the PNG in /public and set fallback: false to activate a direction.
-// Até termos a arte final, apontamos para 'main_character_idle.png'
-// Socket coordinates values (calibrados estruturalmente para as artes 80x80)
-const SOCKET_FRONT_L = { x: -16, y: -26 };
-const SOCKET_FRONT_R = { x: 16, y: -26 };
-const SOCKET_SIDE = { x: -2, y: -26 }; // Refinamento: Mão lateral em posição ideal
-
-const SPRITE_FRAMES: Record<SpriteDir, SpriteFrame | SpriteFrame[]> = {
-  'down': {
-    src: '/player-de-frente.png',
-    handSocket: SOCKET_FRONT_R // Usa a mão direita por padrão
-  },
-  'up': {
-    src: '/player-de-frente.png',
-    handSocket: SOCKET_FRONT_R
-  },
-  'right': [
-    { src: '/player-de-lado-1.png', handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-2.png', handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-3.png', handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-4.png', handSocket: SOCKET_SIDE },
-  ],
-  'left': [
-    { src: '/player-de-lado-1.png', flipX: true, handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-2.png', flipX: true, handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-3.png', flipX: true, handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-4.png', flipX: true, handSocket: SOCKET_SIDE },
-  ],
-  'down-right': [
-    { src: '/player-de-lado-1.png', handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-2.png', handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-3.png', handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-4.png', handSocket: SOCKET_SIDE },
-  ],
-  'down-left': [
-    { src: '/player-de-lado-1.png', flipX: true, handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-2.png', flipX: true, handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-3.png', flipX: true, handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-4.png', flipX: true, handSocket: SOCKET_SIDE },
-  ],
-  'up-right': [
-    { src: '/player-de-lado-1.png', handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-2.png', handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-3.png', handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-4.png', handSocket: SOCKET_SIDE },
-  ],
-  'up-left': [
-    { src: '/player-de-lado-1.png', flipX: true, handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-2.png', flipX: true, handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-3.png', flipX: true, handSocket: SOCKET_SIDE },
-    { src: '/player-de-lado-4.png', flipX: true, handSocket: SOCKET_SIDE },
-  ],
-};
-
-// ── Constants ──────────────────────────────────────────────────
-const SPRITE_SIZE = 80;               // Size in game units (slightly larger for the ears)
-const PIVOT_X = SPRITE_SIZE / 2;  // horizontal anchor
-const PIVOT_Y = SPRITE_SIZE * 0.55; // Lower pivot to account for large ears/head
-const WEAPON_HAND_Y = -38;        // Altura do peito/ombro para as armas
-const WEAPON_HAND_BASE_X = 18;    // Espaçamento das mãos (ombro a ombro)
-
-// ── Sprite Cache & Loader ─────────────────────────────────────
-const _loadedSprites: Record<string, HTMLImageElement> = {};
-function getSprite(src: string): HTMLImageElement {
-  if (!_loadedSprites[src]) {
-    const img = new Image();
-    img.src = src;
-    _loadedSprites[src] = img;
-  }
-  return _loadedSprites[src];
-}
-
-// Pre-load idle sprite on module init
-const initialFrame = SPRITE_FRAMES['down'];
-const initialSrc = Array.isArray(initialFrame) ? initialFrame[0].src : initialFrame.src;
-getSprite(initialSrc);
-
-// ── Direction Selector ────────────────────────────────────────
-// Update helper to handle idle and vertical preference
-function getSpriteFrameForFacing(p: PlayerState): SpriteFrame | SpriteFrame[] {
-  const fx = p.facing.x;
-  const fy = p.facing.y;
-  const isMoving = p.isMoving || p.isDashing;
-
-  // Prioridade de Vista Frontal: Se parado ou se estiver indo para cima/baixo (incluindo diagonais)
-  // Isso garante que se o jogador clicar W enquanto anda de lado, ele volta a ficar de frente
-  if (!isMoving || (Math.abs(fy) > 0.1)) {
-    return SPRITE_FRAMES['down'];
-  }
-
-  // Vista lateral apenas se estiver indo estritamente para os lados
-  if (fx < 0) return SPRITE_FRAMES['left'];
-  if (fx > 0) return SPRITE_FRAMES['right'];
-
-  return SPRITE_FRAMES['down'];
-}
-
-// ── Main Draw Function ────────────────────────────────────────
-/**
- * Render the official player character.
- * Body: ctx.drawImage ONLY.
- */
-export function renderPlayerSprite(ctx: CanvasRenderingContext2D, p: PlayerState, time: number) {
-  const frameOrFrames = getSpriteFrameForFacing(p);
-
-  // Usar a flag explícita do PlayerState
-  const isMoving = p.isMoving || p.isDashing;
-
-  let frame: SpriteFrame;
-  if (Array.isArray(frameOrFrames)) {
-    if (isMoving) {
-      // Ajuste de velocidade da animação (10 frames/s para um visual mais ágil)
-      const animSpeed = 10;
-      const index = Math.floor(time * animSpeed) % frameOrFrames.length;
-      frame = frameOrFrames[index];
-    } else {
-      // Quando parado de lado, usa o frame 1 como Idle Lateral
-      frame = frameOrFrames[0];
+  // === DASH TRAIL (afterimages) ===
+  if (p.isDashing && p.trail.length > 0) {
+    for (let i = 0; i < p.trail.length; i++) {
+      const t = p.trail[i];
+      const alpha = (i / p.trail.length) * 0.35;
+      const tx = Math.floor(t.x);
+      const ty = Math.floor(t.y);
+      ctx.globalAlpha = alpha;
+      // Ghost silhouette
+      ctx.fillStyle = '#3366cc';
+      ctx.beginPath();
+      ctx.ellipse(tx, ty - 1, 5, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Ghost eyes
+      ctx.fillStyle = `rgba(200, 230, 255, ${alpha})`;
+      ctx.fillRect(tx - 3, ty - 5, 2, 2);
+      ctx.fillRect(tx + 1, ty - 5, 2, 2);
     }
-  } else {
-    frame = frameOrFrames;
+    ctx.globalAlpha = 1;
   }
 
-  // Safety fallback
-  if (!frame) frame = { src: '/player-de-frente.png' };
-
-  const flipX = frame.flipX === true;
-  const src = frame.src || '/player-de-frente.png';
-  const sprite = getSprite(src);
-
-  if (sprite.complete && sprite.naturalWidth !== 0) {
-    ctx.save();
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-
-    const scale = SPRITE_SIZE / Math.max(sprite.naturalWidth, 1);
-    const h = sprite.naturalHeight * scale;
-
-    let walkBob = 0;
-    if (isMoving) {
-      // Bobbing vertical suave para dar peso aos passos
-      walkBob = Math.sin(time * 20) * 1.8;
-    }
-
-    ctx.translate(0, walkBob);
-
-    if (flipX) {
-      ctx.scale(-1, 1);
-      ctx.drawImage(sprite, -SPRITE_SIZE / 2, -h, SPRITE_SIZE, h);
-    } else {
-      ctx.drawImage(sprite, -SPRITE_SIZE / 2, -h, SPRITE_SIZE, h);
-    }
-
-    ctx.restore();
-  } else {
-    // Visibility guard: Show a simple shape if assets are missing/loading
-    ctx.save();
-    // Head shape
-    ctx.fillStyle = '#08080c';
-    ctx.beginPath();
-    ctx.arc(0, -45, 12, 0, Math.PI * 2);
-    ctx.fill();
-    // Body shape
-    ctx.fillRect(-10, -35, 20, 30);
-    ctx.restore();
-  }
-}
-
-function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState, time: number) {
-  renderPlayerSprite(ctx, p, time);
-}
-
-
-// OLD (Hyper-Detailed) - Disabled
-/* function drawOriginalCharacterBody_OLD(ctx: CanvasRenderingContext2D, p: PlayerState, time: number, lookX: number, hoodShift: number, breathe: number, walkCycle: number = 0, tilt: number = 0) {
-
-
-  // Palette (Darker, richer, higher contrast)
-  const C_BASE_DARK = '#08080c';
-  const C_BASE_MID = '#12121a';
-  const C_BASE_LIGHT = '#202030'; // Highlight base
-  const C_RIM_LIGHT = 'rgba(180, 220, 255, 0.5)'; // Sharp rim
-  const C_ACCENT_CYAN = 'rgba(0, 255, 255, 0.2)';
-
-  // Helpers
-  const grad = (x1: number, y1: number, x2: number, y2: number, c1: string, c2: string) => {
-    const g = ctx.createLinearGradient(x1, y1, x2, y2);
-    g.addColorStop(0, c1);
-    g.addColorStop(1, c2);
-    return g;
-  };
-
-  const gRadial = (x: number, y: number, r: number, c1: string, c2: string) => {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, c1);
-    g.addColorStop(1, c2);
-    return g;
-  };
-
-  // === 1. CAPE (Epic Flow) ===
-  // Outer layer (Dark Void)
-  const capeG = grad(0, -10, 0, 15, '#050508', '#000000');
-  ctx.fillStyle = capeG;
+  // Shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
   ctx.beginPath();
-  ctx.moveTo(-7, -4);
-  ctx.lineTo(-12, 12); // Wide flare
-  ctx.quadraticCurveTo(0, 15, 12, 12);
-  ctx.lineTo(7, -4);
+  ctx.ellipse(x, y + 7, 6, 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+
+// Helper to draw the ORIGINAL character sprite (Hollow Knight-like)
+// Updated with walk mechanics: 'walkCycle' (0-1) and 'tilt' (radians)
+function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState, time: number, lookX: number, hoodShift: number, breathe: number, walkCycle: number = 0, tilt: number = 0) {
+  // === CLOAK / BODY (flowing shape) ===
+  // Add walk cycle influence to sway
+  const walkSway = Math.sin(walkCycle * Math.PI * 2) * 2; // Side to side motion while walking
+
+  // Idle Sway: Reduced to almost zero for stability
+  // Extreme slow/subtle sway (0.1 speed, 0.05 amp)
+  const idleSwayBase = Math.pow(Math.sin(time * 0.1), 3) * 0.05;
+  const sway = (walkCycle > 0 ? walkSway : idleSwayBase) + lookX * 0.3;
+
+  // Secondary Sway:
+  // Almost static (0.07 speed, 0.03 amp)
+  const idleSway2 = Math.cos(time * 0.07 + 0.5) * 0.03;
+  const sway2 = (walkCycle > 0 ? Math.cos(walkCycle * Math.PI * 4) * 0.5 : idleSway2);
+
+  // Body Tilt (leans into movement)
+  ctx.rotate(tilt);
+
+  // Cloak back layer
+  ctx.fillStyle = '#1a1a3a';
+  ctx.beginPath();
+  ctx.moveTo(-6, -2);
+  ctx.lineTo(-7 + sway, 6);
+  // Bottom hem waves more when walking
+  const hemWave = Math.sin(walkCycle * Math.PI * 4) * 1.5;
+  ctx.quadraticCurveTo(-4 + sway2 + hemWave, 9 + Math.abs(hemWave) * 0.5, 0, 8);
+  ctx.quadraticCurveTo(4 - sway2 - hemWave, 9 + Math.abs(hemWave) * 0.5, 7 - sway, 6);
+  ctx.lineTo(6, -2);
+  ctx.closePath();
   ctx.fill();
 
-  // Volume folds (Subtle highlight)
-  ctx.fillStyle = 'rgba(20, 20, 30, 0.3)';
+  // Cloak front layer
+  ctx.fillStyle = '#222250';
   ctx.beginPath();
-  ctx.moveTo(-6, -4);
-  ctx.lineTo(-9, 11);
-  ctx.lineTo(-7, 12);
-  ctx.lineTo(-4, -4);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(6, -4);
-  ctx.lineTo(9, 11);
-  ctx.lineTo(7, 12);
-  ctx.lineTo(4, -4);
+  ctx.moveTo(-5, -3);
+  ctx.lineTo(-6 + sway * 0.7, 5);
+  ctx.quadraticCurveTo(-3 + sway2 * 0.5 + hemWave * 0.8, 8, 0, 7 - Math.abs(tilt) * 2); // Slight compression on tilt
+  ctx.quadraticCurveTo(3 - sway2 * 0.5 - hemWave * 0.8, 8, 6 - sway * 0.7, 5);
+  ctx.lineTo(5, -3);
+  ctx.closePath();
   ctx.fill();
 
-  // === 2. LEGS (Cyber-Armor) ===
-  const drawLeg = (mx: number) => {
-    const side = mx < 0 ? -1 : 1;
-
-    // Thigh (Muscular Armor)
-    const thighG = grad(mx + side, 4, mx - side, 8, C_BASE_LIGHT, C_BASE_DARK);
-    ctx.fillStyle = thighG;
+  // Wispy tails (trail behind movement)
+  ctx.save();
+  // If moving, trails drag back
+  if (Math.abs(walkCycle) > 0.01) {
+    const drag = -tilt * 15; // Drag direction opposite to tilt/move
+    ctx.translate(drag, 0);
+  }
+  ctx.strokeStyle = 'rgba(30, 30, 70, 0.6)';
+  ctx.lineWidth = 1.5;
+  for (let i = -1; i <= 1; i++) {
+    const tx = i * 3;
+    // Barely moving tails for idle (0.4 speed, 0.4 amp)
+    const waveFreq = walkCycle > 0 ? 4 : 0.4;
+    const waveAmp = walkCycle > 0 ? 2 : 0.4;
+    const w = Math.sin(time * waveFreq + i * 2) * waveAmp;
     ctx.beginPath();
-    ctx.moveTo(mx + side, 4);
-    ctx.lineTo(mx + side * 0.5, 9);
-    ctx.lineTo(mx - side * 1.5, 8); // Inner knee
-    ctx.lineTo(mx, 4);
-    ctx.fill();
-
-    // Knee Plating (Diamond)
-    ctx.fillStyle = '#1a1a25';
-    ctx.beginPath();
-    ctx.moveTo(mx + side * 0.5, 7);
-    ctx.lineTo(mx + side * 2, 8);
-    ctx.lineTo(mx + side * 0.5, 10);
-    ctx.lineTo(mx - side, 8.5);
-    ctx.fill();
-    // Sharp Highlight
-    ctx.fillStyle = '#4a4a60';
-    ctx.beginPath();
-    ctx.moveTo(mx + side * 0.5, 7);
-    ctx.lineTo(mx + side * 1.5, 8);
-    ctx.lineTo(mx + side * 0.5, 8.5);
-    ctx.fill();
-
-    // Boot (Heavy & Sleek)
-    const bootG = grad(mx, 9, mx, 14, '#151520', '#020204');
-    ctx.fillStyle = bootG;
-    ctx.beginPath();
-    ctx.moveTo(mx - side * 1.5, 9);
-    ctx.lineTo(mx + side * 1.5, 9);
-    ctx.lineTo(mx + side * 2, 13);
-    ctx.lineTo(mx - side * 1, 14); // Heel
-    ctx.fill();
-
-    // Boot Tip (Grounded)
-    ctx.fillStyle = '#050508';
-    ctx.beginPath();
-    ctx.moveTo(mx + side * 2, 13);
-    ctx.lineTo(mx + side * 3.5, 14.5); // Pointier toe
-    ctx.lineTo(mx + side * 0.5, 15);
-    ctx.lineTo(mx - side, 14);
-    ctx.fill();
-
-    // Boot Rim Light
-    ctx.strokeStyle = C_RIM_LIGHT;
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(mx + side * 1.5, 9);
-    ctx.lineTo(mx + side * 2, 13);
+    ctx.moveTo(tx, 6);
+    ctx.quadraticCurveTo(tx + w, 9, tx + w * 1.5 + (walkCycle ? -tilt * 8 : 0), 11);
     ctx.stroke();
-  };
+  }
+  ctx.restore();
 
-  drawLeg(-3.2);
-  drawLeg(3.2);
+  // === HEAD (Hood shape) ===
+  // Head counters the body tilt slightly to stay upright-ish, or leans in?
+  // Let's have head look forward.
+  const hx = lookX + tilt * 2; // Head shift
+  const hy = -hoodShift + Math.abs(walkSway) * 0.5; // Head bob
 
-  // === 3. TORSO (Anatomical Scuplture) ===
-
-  // Waist / Core
-  const waistG = grad(0, 4, 0, 7, C_BASE_MID, C_BASE_DARK);
-  ctx.fillStyle = waistG;
+  // Hood Outer
+  ctx.fillStyle = '#2a2a55';
   ctx.beginPath();
-  ctx.moveTo(-4, 4);
-  ctx.lineTo(4, 4);
-  ctx.lineTo(3, 7);
-  ctx.lineTo(-3, 7);
+  ctx.moveTo(-6 + hx, -3 + hy);
+  ctx.quadraticCurveTo(-7 + hx, -9 + hy, -3 + hx, -12 + hy);
+  ctx.quadraticCurveTo(0 + hx, -14 + breathe * 0.3 + hy, 3 + hx, -12 + hy);
+  ctx.quadraticCurveTo(7 + hx, -9 + hy, 6 + hx, -3 + hy);
+  ctx.closePath();
   ctx.fill();
 
-  // Abdominal Plating (Ultra-defined)
-  ctx.fillStyle = '#050508'; // Dark gaps
-  ctx.globalAlpha = 0.6;
-  ctx.fillRect(-0.5, 1, 1, 6); // Center channel
-  ctx.fillRect(-3, 3, 6, 0.5); // Horiz line
-  ctx.fillRect(-2.5, 4.5, 5, 0.5); // Horiz line
-  ctx.globalAlpha = 1;
-
-  // Chest / Pecs (Power Armor)
-  const chestG = grad(0, -5, 0, 2, '#252535', '#101015');
-  ctx.fillStyle = chestG;
+  // Hood Inner Shadow
+  ctx.fillStyle = '#151530';
   ctx.beginPath();
-  ctx.moveTo(-6, -5);
-  ctx.lineTo(6, -5);
-  ctx.lineTo(4, 4); // Taper to waist
-  ctx.lineTo(-4, 4);
+  ctx.moveTo(-4 + hx, -3 + hy);
+  ctx.quadraticCurveTo(-5 + hx, -8 + hy, -2 + hx, -10 + hy);
+  ctx.quadraticCurveTo(0 + hx, -11 + hy, 2 + hx, -10 + hy);
+  ctx.quadraticCurveTo(5 + hx, -8 + hy, 4 + hx, -3 + hy);
+  ctx.closePath();
   ctx.fill();
 
-  // Pec Separation (Deep groove)
-  ctx.fillStyle = '#050508';
-  ctx.beginPath();
-  ctx.moveTo(0, -5);
-  ctx.lineTo(-0.5, 0); // Sternum
-  ctx.lineTo(0.5, 0);
-  ctx.lineTo(0, -5);
-  ctx.fill();
+  // === EYES ===
+  const eyeY = -6 + hy;
+  const eyeBaseX = hx;
+  const blink = (time % 4) > 3.85; // Blink periodically
 
-  // Pec Rim Light (Definition)
-  ctx.strokeStyle = C_RIM_LIGHT;
-  ctx.lineWidth = 0.5;
-  ctx.beginPath();
-  ctx.moveTo(-6, -2); ctx.quadraticCurveTo(-3, -1, -0.5, 0);
-  ctx.moveTo(6, -2); ctx.quadraticCurveTo(3, -1, 0.5, 0);
-  ctx.stroke();
+  if (!blink) {
+    // Glow backdrop
+    const glow = ctx.createRadialGradient(eyeBaseX, eyeY, 0, eyeBaseX, eyeY, 8);
+    glow.addColorStop(0, 'rgba(120, 200, 255, 0.3)');
+    glow.addColorStop(1, 'rgba(120, 200, 255, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(-8 + eyeBaseX, eyeY - 8, 16, 16);
 
-  // === 4. ARMS & HANDS (Detailed) ===
-  const drawArm = (mx: number) => {
-    const side = mx < 0 ? -1 : 1;
-
-    // Shoulder (Pauldrons) - Multi-faceted
-    const shG = grad(mx, -6, mx, -1, C_BASE_LIGHT, C_BASE_DARK);
-    ctx.fillStyle = shG;
+    // Eyes
+    ctx.fillStyle = '#ccefff';
     ctx.beginPath();
-    ctx.moveTo(mx, -5);
-    ctx.lineTo(mx + side * 4.5, -4.5);
-    ctx.lineTo(mx + side * 3.5, 1);
-    ctx.lineTo(mx + side, 0);
+    ctx.ellipse(-2.5 + eyeBaseX, eyeY, 1.8, 2.5, 0, 0, Math.PI * 2);
     ctx.fill();
-    // Pauldron Rim
-    ctx.strokeStyle = C_RIM_LIGHT;
-    ctx.lineWidth = 0.5;
     ctx.beginPath();
-    ctx.moveTo(mx, -5); ctx.lineTo(mx + side * 4.5, -4.5); ctx.lineTo(mx + side * 3.5, 1);
-    ctx.stroke();
-
-    // Arm (Bicep)
-    ctx.fillStyle = C_BASE_MID;
-    ctx.fillRect(mx + side * 1.5 - 1.5, 0, 3, 4.5);
-
-    // -- DETAILED HAND / GAUNTLET --
-    const hx = mx + side * 1.5;
-    const hy = 4.5;
-
-    // Gauntlet Bracer
-    ctx.fillStyle = '#1a1a25';
-    ctx.beginPath();
-    ctx.moveTo(hx - 2, hy);
-    ctx.lineTo(hx + 2, hy);
-    ctx.lineTo(hx + 2.5, hy + 3);
-    ctx.lineTo(hx - 2.5, hy + 3);
+    ctx.ellipse(2.5 + eyeBaseX, eyeY, 1.8, 2.5, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Hand Base (Palm/Back)
-    ctx.fillStyle = '#0a0a10';
-    ctx.fillRect(hx - 2, hy + 3, 4, 3);
+    // Pupils
+    const px = p.facing.x * 0.6 + lookX * 0.5 + tilt; // Look into turn
+    const py = p.facing.y * 0.4;
+    ctx.fillStyle = '#4488cc';
+    ctx.fillRect(-3 + eyeBaseX + px, eyeY + py, 1.2, 1.2);
+    ctx.fillRect(3 + eyeBaseX + px, eyeY + py, 1.2, 1.2);
 
-    // Knuckles (Defined)
-    ctx.fillStyle = '#252535';
-    ctx.beginPath();
-    ctx.arc(hx - 1.5, hy + 6, 0.8, 0, Math.PI * 2); // Index
-    ctx.arc(hx + 0, hy + 6.2, 0.8, 0, Math.PI * 2); // Middle
-    ctx.arc(hx + 1.5, hy + 6, 0.8, 0, Math.PI * 2); // Ring
-    ctx.fill();
+    // Shine
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-3.3 + eyeBaseX, eyeY - 1.2, 0.8, 0.8);
+    ctx.fillRect(1.7 + eyeBaseX, eyeY - 1.2, 0.8, 0.8);
+  } else {
+    // Blink line
+    ctx.fillStyle = '#1a1a3a';
+    ctx.fillRect(-4 + eyeBaseX, eyeY, 3, 0.5);
+    ctx.fillRect(1 + eyeBaseX, eyeY, 3, 0.5);
+  }
 
-    // Fingers (Closed Fist Grip)
-    ctx.fillStyle = '#151520';
-    ctx.beginPath();
-    ctx.moveTo(hx - 2, hy + 6);
-    ctx.lineTo(hx + 2, hy + 6);
-    ctx.lineTo(hx + 1.5, hy + 8.5); // Tapered finger tips
-    ctx.lineTo(hx - 1.5, hy + 8.5);
-    ctx.fill();
-
-    // Thumb (Wrapped)
-    ctx.fillStyle = '#202030';
-    ctx.beginPath();
-    ctx.moveTo(hx - side * 2, hy + 4);
-    ctx.lineTo(hx - side * 0.5, hy + 5);
-    ctx.lineTo(hx - side * 0.5, hy + 6.5);
-    ctx.lineTo(hx - side * 2.2, hy + 5.5);
-    ctx.fill();
-  };
-
-  drawArm(-5.5);
-  drawArm(5.5);
-
-  // === 5. SYMBOL (Celestial) ===
-  ctx.shadowColor = '#00ffff';
-  ctx.shadowBlur = 12;
-  ctx.fillStyle = '#ffffff';
-
-  // Moon
+  // === HORNS/CROWN ===
+  ctx.fillStyle = '#3a3a6a';
   ctx.beginPath();
-  ctx.arc(0, -2, 2.2, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Cutout
-  ctx.globalCompositeOperation = 'destination-out';
-  ctx.beginPath();
-  ctx.arc(0.7, -2.2, 1.8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalCompositeOperation = 'source-over';
-
-  // Star (Sharp)
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  const sx = 0.4, sy = -2.0;
-  const sSize = 0.6;
-  ctx.moveTo(sx, sy - sSize);
-  ctx.quadraticCurveTo(sx + sSize * 0.1, sy - sSize * 0.1, sx + sSize, sy);
-  ctx.quadraticCurveTo(sx + sSize * 0.1, sy + sSize * 0.1, sx, sy + sSize);
-  ctx.quadraticCurveTo(sx - sSize * 0.1, sy + sSize * 0.1, sx - sSize, sy);
-  ctx.quadraticCurveTo(sx - sSize * 0.1, sy - sSize * 0.1, sx, sy - sSize);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-
-  // === 6. HEAD (The Nano Helmet) ===
-  const hy = -7;
-
-  // Helmet Gradient (Metallic sheen)
-  const headG = grad(0, hy - 8, 0, hy + 6, '#303045', '#020204');
-  ctx.fillStyle = headG;
-
-  // Silhouette Path
-  ctx.beginPath();
-  ctx.moveTo(0, hy + 5); // Chin
-  ctx.quadraticCurveTo(5, hy + 4, 6.5, hy - 1); // Cheek R (Wider)
-  ctx.lineTo(7.5, hy - 14); // Ear Tip R (Sharper)
-  ctx.lineTo(3, hy - 7);    // Top R
-  ctx.quadraticCurveTo(0, hy - 6, -3, hy - 7); // Top L
-  ctx.lineTo(-7.5, hy - 14); // Ear Tip L
-  ctx.lineTo(-6.5, hy - 1);  // Cheek L
-  ctx.quadraticCurveTo(-5, hy + 4, 0, hy + 5);  // Chin
-  ctx.fill();
-
-  // Helmet Inner Detail (Contrast)
-  ctx.fillStyle = '#000000';
-  ctx.beginPath();
-  ctx.moveTo(-5, hy - 4); ctx.lineTo(-6.5, hy - 11); ctx.lineTo(-3.5, hy - 6); ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(5, hy - 4); ctx.lineTo(6.5, hy - 11); ctx.lineTo(3.5, hy - 6); ctx.fill();
-
-  // Helmet Highlights (Glisten)
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-  ctx.lineWidth = 0.8;
-  ctx.beginPath();
-  ctx.moveTo(-2, hy - 7); ctx.quadraticCurveTo(0, hy - 6, 2, hy - 7); // Forehead
-  ctx.stroke();
-
-  // Eyes (Piercing Soul)
-  ctx.shadowColor = '#00ffff';
-  ctx.shadowBlur = 18;
-  ctx.fillStyle = '#ffffff';
-
-  // Left Eye
-  ctx.beginPath();
-  ctx.ellipse(-2.8, hy, 2.2, 3.4, 0.35, 0, Math.PI * 2);
-  ctx.fill();
-  // Right Eye
-  ctx.beginPath();
-  ctx.ellipse(2.8, hy, 2.2, 3.4, -0.35, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.shadowBlur = 0;
-
-  // Pupil/Depth Illusion
-  ctx.fillStyle = '#00ffff';
-  ctx.globalAlpha = 0.5;
-  ctx.beginPath();
-  ctx.ellipse(-2.8, hy, 1.4, 2.4, 0.35, 0, Math.PI * 2);
+  ctx.moveTo(-3 + hx, -12 + hy); ctx.lineTo(-4.5 + hx, -15 + hy); ctx.lineTo(-2 + hx, -13 + hy);
   ctx.fill();
   ctx.beginPath();
-  ctx.ellipse(2.8, hy, 1.4, 2.4, -0.35, 0, Math.PI * 2);
+  ctx.moveTo(3 + hx, -12 + hy); ctx.lineTo(4.5 + hx, -15 + hy); ctx.lineTo(2 + hx, -13 + hy);
   ctx.fill();
-  ctx.globalAlpha = 1;
 
-  // Final Rim Light (Backlighting - Crucial for "Pop")
-  ctx.strokeStyle = 'rgba(180, 230, 255, 0.4)';
-  ctx.lineWidth = 0.8;
-  ctx.beginPath();
-  ctx.moveTo(-6.5, hy - 1);
-  ctx.quadraticCurveTo(-5, hy - 8, -7.5, hy - 14); // Ear Rim L
-  ctx.stroke();
+  // Reset rotation for caller safety
+  ctx.rotate(-tilt);
+}
 
-  ctx.beginPath();
-  ctx.moveTo(6.5, hy - 1);
-  ctx.quadraticCurveTo(5, hy - 8, 7.5, hy - 14); // Ear Rim R
-  ctx.stroke();
-} */
-
-/**
- * Pose 0: Idle / Run (Sprite Integrated)
+/** 
+ * Pose 0: Idle / Run (Original Hollow-Knight style)
  */
 function drawIdleRunPose(ctx: CanvasRenderingContext2D, p: PlayerState, x: number, y: number, time: number) {
   const isMoving = p.trail.length > 0 || p.isDashing;
+  // Deep, near-static vertical float (0.1 speed)
+  const breatheRaw = Math.sin(time * 0.1);
+  const breatheEased = Math.sign(breatheRaw) * Math.pow(Math.abs(breatheRaw), 2.5);
+  const breathe = breatheEased * 0.15; // Minimal amplitude
+
+  // Enhanced Walk Mechanics
+  // Smooth bobbing - floatier and Slower
+  // Walk cycle slowed down from 8 to 4 for smoothness
+  const cycleSpeed = 4;
+  const walkCycle = isMoving ? (time * cycleSpeed) % 1 : 0;
+
+  // BobY matched to walk cycle (2 bobs per cycle usually, or 1 per step)
+  // Idle breath uses our new eased organic value directly (scaled to ~0.15px max)
+  const bobY = isMoving ? Math.sin(walkCycle * Math.PI * 2) * 1.0 : breathe * 0.25;
+
+  // Tilt based on horizontal movement
+  let tilt = 0;
+  if (isMoving) {
+    tilt = p.facing.x * 0.1; // Slight lean forward into run
+  }
+
   const idleTime = p.idleTime || 0;
+  const isIdle = idleTime >= 3;
+  const idleCycle = isIdle ? (idleTime - 3) % 8 : 0;
+
+  let lookX = 0;
+  let hoodShift = 0;
+
+  if (isIdle) {
+    if (idleCycle < 2) {
+      lookX = -Math.sin(idleCycle / 2 * Math.PI) * 1.2;
+    } else if (idleCycle < 3) {
+      lookX = Math.sin((idleCycle - 2) * Math.PI) * 1.5;
+    } else if (idleCycle < 5) {
+      lookX = (1 - (idleCycle - 3) / 2) * 0.5;
+    } else if (idleCycle < 6) {
+      hoodShift = Math.sin((idleCycle - 5) * Math.PI) * 1.5;
+    }
+  }
+
+
+
+
+
+
 
   ctx.save();
-  ctx.translate(x, y);
+  ctx.translate(x, y + bobY);
 
-  // Character Body - Includes bobbing and sprite frame selection
-  drawOriginalCharacterBody(ctx, p, time);
+  // Cloak
+  // Draw Character Body with Walk Cycle
+  drawOriginalCharacterBody(ctx, p, time, lookX, hoodShift, breathe, walkCycle, tilt);
 
-  // --- Weapon Attachment (Structural Sockets) ---
-  if (idleTime <= 12) {
-    const isDual = p.weapon === 'daggers';
+  // Weapon (Idle side)
+  const isResting = idleTime > 12;
+  if (!isResting) {
     const side = p.facing.x >= 0 ? 1 : -1;
-    const pulse = 0.9 + Math.sin(time * 6) * 0.1;
 
-    // Resolve o frame atual para pegar o socket
-    const frameOrFrames = getSpriteFrameForFacing(p);
-    let currentFrame: SpriteFrame;
-    if (Array.isArray(frameOrFrames)) {
-      const animSpeed = 10;
-      const index = Math.floor(time * animSpeed) % frameOrFrames.length;
-      currentFrame = frameOrFrames[index];
-    } else {
-      currentFrame = frameOrFrames;
-    }
-
-    // Calibragem estrutural do socket com base no flip do sprite
-    let socket = currentFrame.handSocket || SOCKET_FRONT_R;
-
-    // Troca dinâmica de mão na vista frontal baseada na direção
-    const isFrontFrame = currentFrame.src.includes('frente');
-    if (isFrontFrame) {
-      socket = p.facing.x < 0 ? SOCKET_FRONT_L : SOCKET_FRONT_R;
-    }
-
-    let sx = socket.x;
-    if (currentFrame.flipX) sx *= -1;
-    const sy = socket.y;
+    // Fixed offset: 10px to side, slightly behind body y-wise?
+    // Original was translate(2, -2) for back, or translate(side*10, ...) for hand
+    const wx = side * 10;
+    const wy = -1 + (isMoving ? Math.sin(time * 12) * 1.5 : 0);
 
     ctx.save();
-    if (isDual) {
-      // LEFT HAND (Mirrored from active socket)
-      const socketLX = -sx;
-      const leftAngleBase = p.facing.x >= 0 ? Math.PI * 0.7 : Math.PI * 0.3;
-      const leftAngleRun = p.facing.x >= 0 ? Math.PI * 0.9 : Math.PI * 0.1;
-      const leftAngle = isMoving ? leftAngleRun : leftAngleBase;
+    // Ethereal Hand logic (optional, keep it minimal if user wants strict original)
+    // We'll keep the hand drawing but keep the position strict
+    const pulse = 0.9 + Math.sin(time * 6) * 0.1;
+    drawEtherealHand(ctx, wx, wy, pulse, time, 0, 0);
 
-      drawEtherealHand(ctx, socketLX, sy, pulse, time, 0, 0);
-      ctx.save();
-      ctx.translate(socketLX, sy);
+    ctx.translate(wx, wy);
+    // Resting angle
+    const restAngle = p.facing.x >= 0 ? Math.PI * 0.25 : Math.PI * 0.75;
+    const moveAngle = p.facing.x >= 0 ? Math.PI * 0.45 : Math.PI * 0.55;
+    ctx.rotate(isMoving ? moveAngle : restAngle + Math.sin(time * 2) * 0.05);
 
-      // Encaixe frontal simétrico para mão esquerda
-      if (isFrontFrame) {
-        ctx.rotate(-Math.PI * 0.4); // Invertido para simetria
-      } else {
-        ctx.rotate(leftAngle + Math.sin(time * 3) * 0.05);
-      }
-
-      drawEquippedWeapon(ctx, p, 32, 0, time, true);
-      ctx.restore();
-
-      // RIGHT HAND
-      const rightAngleBase = p.facing.x >= 0 ? Math.PI * 0.3 : Math.PI * 0.7;
-      const rightAngleRun = p.facing.x >= 0 ? Math.PI * 0.1 : Math.PI * 0.9;
-      const rightAngle = isMoving ? rightAngleRun : rightAngleBase;
-
-      drawEtherealHand(ctx, sx, sy, pulse, time, 0, 0);
-      ctx.save();
-      ctx.translate(sx, sy);
-
-      // Encaixe frontal simétrico para mão direita
-      if (isFrontFrame) {
-        ctx.rotate(Math.PI * 0.4);
-      } else {
-        ctx.rotate(rightAngle + Math.cos(time * 3) * 0.05);
-      }
-
-      drawEquippedWeapon(ctx, p, 32, 0, time, true);
-      ctx.restore();
-    } else {
-      // Single weapon (Structural Socket) - Neutral Angle for perfect fit
-      const sx_calibrated = sx;
-      const sy_calibrated = sy;
-
-      drawEtherealHand(ctx, sx_calibrated, sy_calibrated, pulse, time, 0, 0);
-      ctx.save();
-      ctx.translate(sx_calibrated, sy_calibrated);
-
-      if (p.facing.x < 0) ctx.scale(-1, 1);
-
-      // Ângulo Frontal Sustentado: Se o sprite visual for o frontal, mantém o encaixe diagonal
-      const isFrontFrame = currentFrame.src.includes('frente');
-      if (isFrontFrame) {
-        ctx.rotate(Math.PI * 0.4);
-      }
-
-      const daggerLen = p.weapon === 'daggers' ? 32 : 34;
-      drawEquippedWeapon(ctx, p, daggerLen, isMoving ? 0.2 : 0, time);
-      ctx.restore();
-    }
+    drawEquippedWeapon(ctx, p, 20, 0, time);
     ctx.restore();
   }
 
   ctx.restore();
 }
 
-/**
+/** 
  * Pose 1: The Lunge (Forward Slash)
  * Body leans forward, Cloak drags back, Sword swings across.
  */
@@ -1255,9 +888,11 @@ function drawAttackPose1(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
 
   ctx.save();
   ctx.translate(bx, by);
+  ctx.rotate(lean * facing);
 
   // Draw Character Body (Original Art)
-  drawOriginalCharacterBody(ctx, p, time);
+  // Slight look forward during lunge
+  drawOriginalCharacterBody(ctx, p, time, facing * 1.5, 0, 0);
 
   ctx.restore();
 
@@ -1265,78 +900,33 @@ function drawAttackPose1(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   const angleStart = p.meleeAngle - C.MELEE_ARC / 2;
   const angleEnd = p.meleeAngle + C.MELEE_ARC / 2;
 
-  // Resolve sockets with mirror support
-  const frameOrFrames = getSpriteFrameForFacing(p);
-  const currentFrame = Array.isArray(frameOrFrames) ? frameOrFrames[0] : frameOrFrames;
-  const isFrontFrame = currentFrame.src.includes('frente');
-
-  // Resolvem-se ambos os sockets
-  const socketR = isFrontFrame ? SOCKET_FRONT_R : (currentFrame.handSocket || SOCKET_FRONT_R);
-  const socketL = isFrontFrame ? SOCKET_FRONT_L : { x: -socketR.x, y: socketR.y };
-
-  let sxR = socketR.x;
-  if (currentFrame.flipX) sxR *= -1;
-  const syR = socketR.y;
-
-  let sxL = socketL.x;
-  if (currentFrame.flipX) sxL *= -1;
-  const syL = socketL.y;
-
-  const bx_socketR = bx + sxR;
-  const by_socketR = by + syR;
-  const bx_socketL = bx + sxL;
-  const by_socketL = by + syL;
-
-  // Snap Swing Easing
+  // Snap Swing Easing (Faster snap: 0.1s windup)
   let swingT = 0;
   if (t > 0.1 && t < 0.6) {
     const st = (t - 0.1) / 0.5;
-    swingT = 1 - Math.pow(1 - st, 4);
+    swingT = 1 - Math.pow(1 - st, 4); // Sharper curve
   } else if (t >= 0.6) swingT = 1;
 
   const currentAngle = angleStart + (angleEnd - angleStart) * swingT;
 
-  if (p.weapon === 'daggers') {
-    // Dual-Hand Attack: Each dagger in its own hand
-    // Right Hand Dagger
-    ctx.save();
-    ctx.translate(bx_socketR, by_socketR);
-    if (isFrontFrame) {
-      ctx.rotate(Math.PI * 0.4 + Math.sin(time * 10) * 0.1);
-    } else {
-      ctx.rotate(currentAngle);
-    }
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
+  const handDist = 14;
+  const hx = bx + Math.cos(currentAngle) * handDist;
+  const hy = by + Math.sin(currentAngle) * handDist;
 
-    // Left Hand Dagger
-    ctx.save();
-    ctx.translate(bx_socketL, by_socketL);
-    if (isFrontFrame) {
-      ctx.rotate(-Math.PI * 0.4 + Math.cos(time * 10) * 0.1);
-    } else {
-      const backAngle = currentAngle - Math.PI * 0.2 * facing;
-      ctx.rotate(backAngle);
-    }
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
-  } else {
-    // Single weapon
-    ctx.save();
-    ctx.translate(bx_socketR, by_socketR);
-    ctx.rotate(currentAngle);
-    drawEquippedWeapon(ctx, p, 34, 1, time);
-    ctx.restore();
-  }
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(currentAngle);
+  drawEquippedWeapon(ctx, p, C.MELEE_RANGE, 1, time);
+  ctx.restore();
 
   // VFX (World Space)
   if (t > 0.2 && t < 0.7) {
-    const trailColor = p.weapon === 'daggers' ? 'azure' : 'azure'; // Standardized for now
+    const trailColor = p.weapon === 'axe' ? 'iron' : 'azure';
     drawSlashTrail(ctx, bx, by, C.MELEE_RANGE, angleStart, currentAngle, trailColor);
   }
 }
 
-/**
+/** 
  * Pose 2: The Twist (Backhand)
  * Body twists back, Sword swings Left -> Right (Reverse).
  */
@@ -1357,9 +947,11 @@ function drawAttackPose2(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
 
   ctx.save();
   ctx.translate(bx, y);
+  ctx.rotate(lean * facing);
 
   // Draw Character Body (Original Art)
-  drawOriginalCharacterBody(ctx, p, time);
+  // Look back slightly during twist
+  drawOriginalCharacterBody(ctx, p, time, -facing * 0.5, 0, 0);
 
   ctx.restore();
 
@@ -1373,70 +965,24 @@ function drawAttackPose2(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
     swingT = 1 - Math.pow(1 - st, 4);
   } else if (t >= 0.6) swingT = 1;
 
-  // Resolve sockets
-  const frameOrFrames = getSpriteFrameForFacing(p);
-  const currentFrame = Array.isArray(frameOrFrames) ? frameOrFrames[0] : frameOrFrames;
-  const isFrontFrame = currentFrame.src.includes('frente');
-
-  const socketR = isFrontFrame ? SOCKET_FRONT_R : (currentFrame.handSocket || SOCKET_FRONT_R);
-  const socketL = isFrontFrame ? SOCKET_FRONT_L : { x: -socketR.x, y: socketR.y };
-
-  let sxR = socketR.x;
-  if (currentFrame.flipX) sxR *= -1;
-  const syR = socketR.y;
-
-  let sxL = socketL.x;
-  if (currentFrame.flipX) sxL *= -1;
-  const syL = socketL.y;
-
-  const bx_socketR = bx + sxR;
-  const by_socketR = y + syR;
-  const bx_socketL = bx + sxL;
-  const by_socketL = y + syL;
-
   const currentAngle = angleStart + (angleEnd - angleStart) * swingT;
 
-  if (p.weapon === 'daggers') {
-    // Dual-Hand Twist: Each dagger in its own hand
-    // Right Hand
-    ctx.save();
-    ctx.translate(bx_socketR, by_socketR);
-    if (isFrontFrame) {
-      ctx.rotate(Math.PI * 0.4 + Math.sin(time * 8) * 0.1);
-    } else {
-      ctx.rotate(currentAngle);
-    }
-    ctx.scale(1, -1);
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
+  const hx = bx + Math.cos(currentAngle) * 12;
+  const hy = y + Math.sin(currentAngle) * 12;
 
-    // Left Hand
-    ctx.save();
-    ctx.translate(bx_socketL, by_socketL);
-    if (isFrontFrame) {
-      ctx.rotate(-Math.PI * 0.4 + Math.cos(time * 8) * 0.1);
-    } else {
-      const offAngle = currentAngle + Math.PI * 0.15 * facing;
-      ctx.rotate(offAngle);
-    }
-    ctx.scale(1, -1);
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
-  } else {
-    // Single weapon
-    ctx.save();
-    ctx.translate(bx_socketR, by_socketR);
-    ctx.rotate(currentAngle);
-    ctx.scale(1, -1);
-    drawEquippedWeapon(ctx, p, 34, 1, time);
-    ctx.restore();
-  }
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(currentAngle);
+  // Upside down sword for backhand feel?
+  ctx.scale(1, -1);
+  drawEquippedWeapon(ctx, p, C.MELEE_RANGE, 1, time);
+  ctx.restore();
 
   // VFX
   if (t > 0.2 && t < 0.7) drawSlashTrail(ctx, bx, y, C.MELEE_RANGE, angleStart, currentAngle, 'azure');
 }
 
-/**
+/** 
  * Pose 3: The Heavy Smash
  * Jump up -> Slam down. Sword Overhead.
  */
@@ -1466,7 +1012,7 @@ function drawAttackPose3(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   ctx.translate(bx, by);
 
   // Draw Character Body (Original Art)
-  drawOriginalCharacterBody(ctx, p, time);
+  drawOriginalCharacterBody(ctx, p, time, facing * 0.3, 0, 0);
 
   ctx.restore();
 
@@ -1480,116 +1026,65 @@ function drawAttackPose3(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
     swingT = st * st * st; // Fast acceleration
   } else if (t >= 0.5) swingT = 1;
 
-  // Resolve sockets
-  const frameOrFrames = getSpriteFrameForFacing(p);
-  const currentFrame = Array.isArray(frameOrFrames) ? frameOrFrames[0] : frameOrFrames;
-  const isFrontFrame = currentFrame.src.includes('frente');
-
-  const socketR = isFrontFrame ? SOCKET_FRONT_R : (currentFrame.handSocket || SOCKET_FRONT_R);
-  const socketL = isFrontFrame ? SOCKET_FRONT_L : { x: -socketR.x, y: socketR.y };
-
-  let sxR = socketR.x;
-  if (currentFrame.flipX) sxR *= -1;
-  const syR = socketR.y;
-
-  let sxL = socketL.x;
-  if (currentFrame.flipX) sxL *= -1;
-  const syL = socketL.y;
-
-  const bx_socketR = bx + sxR;
-  const by_socketR = by + syR;
-  const bx_socketL = bx + sxL;
-  const by_socketL = by + syL;
-
   const currentAngle = angleStart + (angleEnd - angleStart) * swingT;
 
-  if (p.weapon === 'daggers') {
-    // Both daggers smash bersama (Each in its hand)
-    ctx.save();
-    ctx.translate(bx_socketR, by_socketR);
-    if (isFrontFrame) {
-      ctx.rotate(Math.PI * 0.4);
-    } else {
-      ctx.rotate(currentAngle);
-    }
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
+  const hx = bx + Math.cos(currentAngle) * 10;
+  const hy = by + Math.sin(currentAngle) * 10;
 
-    ctx.save();
-    ctx.translate(bx_socketL, by_socketL);
-    if (isFrontFrame) {
-      ctx.rotate(-Math.PI * 0.4);
-    } else {
-      ctx.rotate(currentAngle);
-    }
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
-  } else {
-    ctx.save();
-    ctx.translate(bx_socketR, by_socketR);
-    ctx.rotate(currentAngle);
-    drawEquippedWeapon(ctx, p, 34, 1, time);
-    ctx.restore();
-  }
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(currentAngle);
+  drawEquippedWeapon(ctx, p, C.MELEE_RANGE * 1.1, 1, time);
+  ctx.restore();
 
   // VFX
   if (t > 0.2 && t < 0.6) drawSlashTrail(ctx, bx, by, C.MELEE_RANGE * 1.1, angleStart, currentAngle, 'azure');
 }
 
-/**
+/** 
  * Pose 4: The Vortex (Finisher)
  * 360 Spin.
  */
 function drawAttackPose4(ctx: CanvasRenderingContext2D, p: PlayerState, x: number, y: number, time: number, t: number) {
   // Spin physics
+  // t 0->1
+  // rotations: 2 full spins?
   const rotations = 2;
   const angle = t * Math.PI * 2 * rotations;
 
+  // Body "wobble" to simulate spin
+  const widthScale = Math.cos(angle);
+
   ctx.save();
   ctx.translate(x, y);
-  drawOriginalCharacterBody(ctx, p, time);
+  ctx.scale(widthScale, 1); // Flip width back and forth
+
+  // Draw Character Body (Original Art)
+  drawOriginalCharacterBody(ctx, p, time, 0, 0, 0);
+
   ctx.restore();
 
-  // Resolve socket with mirror support
-  const frameOrFrames = getSpriteFrameForFacing(p);
-  const currentFrame = Array.isArray(frameOrFrames) ? frameOrFrames[0] : frameOrFrames;
-  const socket = currentFrame.handSocket || SOCKET_FRONT_R;
-  let sx = socket.x;
-  if (currentFrame.flipX) sx *= -1;
-  const sy = socket.y;
-
+  // Weapon: Orbiting
   const swordAngle = angle + p.meleeAngle;
+  const radius = 16;
+  const sx = x + Math.cos(swordAngle) * radius;
+  const sy = y + Math.sin(swordAngle) * radius;
 
-  if (p.weapon === 'daggers') {
-    // Dual Vortex — two daggers spinning on opposite sides
-    ctx.save();
-    ctx.translate(x + sx, y + sy);
-    ctx.rotate(swordAngle + Math.PI / 2);
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
-
-    const swordAngle2 = angle + p.meleeAngle + Math.PI;
-    ctx.save();
-    ctx.translate(x - sx, y + sy); // Symmetrical hand
-    ctx.rotate(swordAngle2 + Math.PI / 2);
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
-  } else {
-    ctx.save();
-    ctx.translate(x + sx, y + sy);
-    ctx.rotate(swordAngle + Math.PI / 2); // Tangent
-    drawEquippedWeapon(ctx, p, 34, 1, time);
-    ctx.restore();
-  }
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(swordAngle + Math.PI / 2); // Tangent
+  drawEquippedWeapon(ctx, p, C.MELEE_RANGE * 1.5, 1, time);
 
   // VFX - Clean azure spin circle
   if (t > 0.05 && t < 0.95) {
     ctx.strokeStyle = `rgba(150, 230, 255, 0.4)`;
     ctx.lineWidth = 12 * (Math.sin(t * Math.PI));
     ctx.beginPath();
-    ctx.arc(x, y, C.MELEE_RANGE * 1.3, 0, Math.PI * 2);
+    ctx.arc(0, 0, C.MELEE_RANGE * 1.3, 0, Math.PI * 2);
     ctx.stroke();
   }
+
+  ctx.restore();
 }
 
 function drawSlashTrail(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, start: number, end: number, color: 'azure' | 'gold' | 'crimson' | 'iron') {
@@ -1607,6 +1102,11 @@ function drawSlashTrail(ctx: CanvasRenderingContext2D, x: number, y: number, r: 
     mainColor = 'rgba(255, 50, 50, 0.12)';
     sharpColor = 'rgba(255, 200, 200, 0.8)';
     glowColor = 'rgba(255, 50, 50, 0)';
+  } else if (color === 'iron') {
+    // Heavy, brutal, metallic trail for axe
+    mainColor = 'rgba(120, 120, 130, 0.20)';
+    sharpColor = 'rgba(200, 200, 210, 0.9)';
+    glowColor = 'rgba(80, 80, 90, 0)';
   }
 
   // Layer 1: Focused Blade Edge (The sharp part)
@@ -1621,16 +1121,16 @@ function drawSlashTrail(ctx: CanvasRenderingContext2D, x: number, y: number, r: 
   ctx.arc(x, y, r, start, end, start > end);
   ctx.fill();
 
-  // Layer 2: Ethereal Energy Tail (Subtle dissipation)
-  const auraGrad = ctx.createRadialGradient(x, y, r * 0.7, x, y, r * 1.05);
-  auraGrad.addColorStop(0, 'rgba(100, 180, 255, 0)');
+  // Layer 2: Ethereal Energy Tail (Subtle dissipation) - wider and denser for axe
+  const auraGrad = ctx.createRadialGradient(x, y, r * 0.7, x, y, r * (color === 'iron' ? 1.15 : 1.05));
+  auraGrad.addColorStop(0, color === 'iron' ? 'rgba(100, 100, 110, 0)' : 'rgba(100, 180, 255, 0)');
   auraGrad.addColorStop(0.5, mainColor);
-  auraGrad.addColorStop(1, 'rgba(100, 180, 255, 0)');
+  auraGrad.addColorStop(1, color === 'iron' ? 'rgba(80, 80, 90, 0)' : 'rgba(100, 180, 255, 0)');
 
   ctx.fillStyle = auraGrad;
   ctx.beginPath();
   ctx.moveTo(x, y);
-  ctx.arc(x, y, r * 1.05, start, end, start > end);
+  ctx.arc(x, y, r * (color === 'iron' ? 1.15 : 1.05), start, end, start > end);
   ctx.fill();
   ctx.restore();
 }
@@ -1710,179 +1210,289 @@ function drawEtherealHand(ctx: CanvasRenderingContext2D, handX: number, handY: n
   ctx.restore();
 }
 
-/** Draws the equipped weapon based on player choice.
- *  @param singleOnly If true, only draws one instance (useful for dual-wielding hand-by-hand)
- */
-function drawEquippedWeapon(ctx: CanvasRenderingContext2D, p: PlayerState, length: number, isAttacking: number, time: number, singleOnly = false) {
+/** Draws the equipped weapon based on player choice */
+function drawEquippedWeapon(ctx: CanvasRenderingContext2D, p: PlayerState, length: number, isAttacking: number, time: number) {
   switch (p.weapon) {
-    case 'daggers': drawDualDaggers(ctx, length, isAttacking, time, singleOnly); break;
+    case 'axe': drawBattleAxe(ctx, length, isAttacking, time); break;
+    case 'daggers': drawDualDaggers(ctx, length, isAttacking, time); break;
     case 'staff': drawVoidStaff(ctx, length, isAttacking, time); break;
     default: drawLongsword(ctx, length, isAttacking, time); break;
   }
 }
 
 
-/** Draws professional Dual Katanas with independent hand support */
-function drawDualDaggers(ctx: CanvasRenderingContext2D, length: number, isAttacking: number, time: number, singleOnly = false) {
-  const katLen = length * 1.1; // Aumentado fator de escala
-  const hiltLen = 12; // Cabo maior e mais visível
-  const bladeLen = katLen - hiltLen;
-  const tsubaRadius = 5; // Guarda (tsuba) mais imponente
-  const bladeWidth = 2.5; // Lâmina mais larga e "AAA"
+/** Battle Axe - STEP 1 (RESTART V7): EXACT REFERENCE SILHOUETTE */
+function drawBattleAxe(ctx: CanvasRenderingContext2D, length: number, isAttacking: number, time: number) {
+  // === DIMENSIONS (Based on Reference) ===
+  const totalH = length * 1.6;    // Total height (100%)
+  const headH = totalH * 0.45;    // Head (including spike) is 45%
+  const handleH = totalH * 0.55;  // Handle is 55%
+  const handleW = 6;              // Strong handle
 
-  const drawOne = (extraRot: number) => {
-    // Pivô Estrutural: Centro do Cabo (Hilt é 8px total)
-    // Pivô em 0 significa que o cabo vai de -4 a +4
+  // PURE BLACK SILHOUETTE
+  ctx.fillStyle = '#000000';
+
+  // 1) HANDLE & POMMEL
+  ctx.beginPath();
+  // Bottom Pommel
+  ctx.arc(-handleH, 0, handleW * 0.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Main Shaft
+  ctx.beginPath();
+  ctx.rect(-handleH, -handleW / 2, handleH, handleW);
+  ctx.fill();
+
+  // Handle Collars (Rings in reference)
+  ctx.fillRect(-handleH * 0.1, -handleW * 0.7, 4, handleW * 1.4);
+  ctx.fillRect(-handleH * 0.6, -handleW * 0.7, 4, handleW * 1.4);
+
+  // 2) HEAD (Double-Bladed Symmetrical Structure)
+  // Positioned at the neck (x=0)
+
+  // -- CENTRAL SPIKE (Lance Tip) --
+  ctx.beginPath();
+  // Need to define socketW, but it's not used in this block.
+  // The spike is drawn later. This block seems like a remnant.
+  const sW = headH * 0.15; // This sW is used for the blade connection point
+  // ctx.moveTo(-sW, 0); // This part is not used in the final spike drawing
+  // ctx.lineTo(0, -headH * 0.8); // This part is not used in the final spike drawing
+  // ctx.lineTo(sW, 0); // This part is not used in the final spike drawing
+  // ctx.fill(); // This part is not used in the final spike drawing
+
+  // -- THE BLADES --
+  // Defining one blade and mirroring it or drawing both.
+
+  const drawBladeHalf = (side: number) => {
     ctx.save();
-    ctx.rotate(extraRot);
+    ctx.scale(1, side); // Flip vertically for top/bottom blades (symmetrical)
 
-    // 1. Tsuka (Hilt) - Cabo centrado
-    ctx.fillStyle = '#111';
-    ctx.fillRect(-hiltLen / 2, -0.8, hiltLen, 1.6);
-
-    // 2. Tsuba (Circular guard) - Na junção (x = 4)
-    const tG = ctx.createRadialGradient(hiltLen / 2, 0, 0, hiltLen / 2, 0, tsubaRadius);
-    tG.addColorStop(0, '#444');
-    tG.addColorStop(1, '#000');
-    ctx.fillStyle = tG;
     ctx.beginPath();
-    ctx.arc(hiltLen / 2, 0, tsubaRadius, 0, Math.PI * 2);
+    // Socket connect
+    ctx.moveTo(sW * 0.5, 0);
+
+    // INNER CURVE (The neck of the blade)
+    ctx.quadraticCurveTo(headH * 0.2, -headH * 0.1, headH * 0.3, -headH * 0.2);
+
+    // TOP EDGE (Flares out and up)
+    ctx.quadraticCurveTo(headH * 0.5, -headH * 0.4, headH * 0.8, -headH * 0.65); // Far Tip
+
+    // THE CUTTING EDGE (Clean outer crescent)
+    // Moves back down to the center-line height
+    ctx.bezierCurveTo(headH * 1.1, -headH * 0.3, headH * 1.1, -headH * 0.1, headH * 0.8, 0);
+
     ctx.fill();
-
-    // 3. Curved Blade - Iniciando após a tsuba
-    const bGrad = ctx.createLinearGradient(hiltLen / 2, -bladeWidth, hiltLen / 2, bladeWidth);
-    bGrad.addColorStop(0, '#222');
-    bGrad.addColorStop(0.5, '#ddd');
-    bGrad.addColorStop(1, '#666');
-    ctx.fillStyle = bGrad;
-
-    const curve = 3;
-    ctx.beginPath();
-    ctx.moveTo(hiltLen / 2, -bladeWidth / 2);
-    ctx.quadraticCurveTo(hiltLen / 2 + bladeLen * 0.5, -bladeWidth / 2 - curve, hiltLen / 2 + bladeLen, -curve);
-    ctx.lineTo(hiltLen / 2 + bladeLen, -curve + 0.8);
-    ctx.quadraticCurveTo(hiltLen / 2 + bladeLen * 0.5, bladeWidth / 2 - curve + 0.8, hiltLen / 2, bladeWidth / 2);
-    ctx.closePath();
-    ctx.fill();
-
     ctx.restore();
   };
 
-  if (singleOnly) {
-    drawOne(0);
-  } else {
-    // Modo dual (apenas para fallback se não usar sockets)
-    ctx.save();
-    ctx.translate(0, -8);
-    drawOne(Math.sin(time * 3) * 0.1);
-    ctx.restore();
+  // The actual reference is symmetrical across the SHAFT axis.
+  // In our coordinates, handle is -X, spike is +X? 
+  // No, in my previous code handle was -X, spike was -Y? 
+  // Let's standardize: Handle is along negative X. Spike is top. Blades are left/right.
+  // In game: weapon is horizontal by default. Handle is back (-X), Blade is front (+X).
+  // I will draw it so it "stands up" when held vertically.
 
+  // RE-DRAWING PATH FOR SYMMETRY ACROSS THE HANDLE AXE
+  const bladeH = headH * 0.9;
+  const bladeW = headH * 0.8;
+
+  const drawModelBlade = (side: number) => {
     ctx.save();
-    ctx.translate(0, 8);
-    drawOne(Math.cos(time * 3) * 0.1);
+    ctx.scale(1, side); // side 1 or -1
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    // Inner Neck
+    ctx.quadraticCurveTo(0, -bladeH * 0.2, bladeW * 0.1, -bladeH * 0.2);
+    // Top Horn Tip
+    ctx.quadraticCurveTo(bladeW * 0.4, -bladeH * 0.4, bladeW, -bladeH * 0.8);
+    // Outer Cutting Edge
+    ctx.bezierCurveTo(bladeW * 1.3, -bladeH * 0.5, bladeW * 1.3, 0, bladeW * 0.8, 0);
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
-  }
+  };
+
+  drawModelBlade(1);
+  drawModelBlade(-1);
+
+  // Central Pole (where spike sits)
+  ctx.beginPath();
+  const poleW = handleW * 1.2;
+  ctx.rect(-2, -poleW / 2, bladeW * 0.6, poleW);
+  ctx.fill();
+
+  // Spike Tip
+  ctx.beginPath();
+  ctx.moveTo(bladeW * 0.6, -poleW / 2);
+  ctx.lineTo(bladeW * 1.1, 0); // Very long sharp spike
+  ctx.lineTo(bladeW * 0.6, poleW / 2);
+  ctx.fill();
 }
 
 
 /** Draws a professional-grade AAA longsword */
 function drawLongsword(ctx: CanvasRenderingContext2D, length: number, isAttacking: number, time: number) {
   // Increase proportions for a larger, more impactful weapon
-  // Pivô Estrutural: Centro do Cabo (Handle)
-  // O cabo tem 10px de comprimento. Centro em x=0 -> Cabo de -5 a +5.
   const hiltLen = 10;
-  const guardW = 16;
+  const guardW = 14;
   const bladeLen = length - hiltLen;
 
-  // 1. Hilt (Leather wrapped)
+  // 1. Hilt (Thick leather wrapped with gold wire)
   ctx.fillStyle = '#1a0f08';
-  ctx.fillRect(-hiltLen / 2, -2, hiltLen, 4);
+  ctx.fillRect(-hiltLen, -1.8, hiltLen, 3.6);
 
-  // Leather wraps detail - Ajustadas para o novo centro
+  // Leather wraps detail
   ctx.strokeStyle = '#3d2b1f';
   ctx.lineWidth = 0.8;
   for (let i = 0; i < 5; i++) {
-    const ox = -hiltLen / 2 + 1 + i * 1.8;
+    const ox = -hiltLen + 1 + i * 1.8;
     ctx.beginPath();
-    ctx.moveTo(ox, -2);
-    ctx.lineTo(ox + 0.8, 2);
+    ctx.moveTo(ox, -1.8);
+    ctx.lineTo(ox + 0.8, 1.8);
     ctx.stroke();
   }
 
-  // 2. Heavy Weighted Pommel - No início do cabo
-  const pommelGrad = ctx.createRadialGradient(-hiltLen / 2, 0, 0, -hiltLen / 2, 0, 3.5);
+  // 2. Heavy Weighted Pommel
+  const pommelGrad = ctx.createRadialGradient(-hiltLen, 0, 0, -hiltLen, 0, 3);
   pommelGrad.addColorStop(0, '#ffcc33');
   pommelGrad.addColorStop(1, '#aa8833');
   ctx.fillStyle = pommelGrad;
   ctx.beginPath();
-  ctx.arc(-hiltLen / 2, 0, 3.5, 0, Math.PI * 2);
+  ctx.arc(-hiltLen, 0, 3, 0, Math.PI * 2);
   ctx.fill();
 
-  // 3. Ornate Crossguard - Na junção com a lâmina (x = hiltLen/2)
-  const silverGrad = ctx.createLinearGradient(hiltLen / 2, -guardW / 2, hiltLen / 2, guardW / 2);
+  // Pommel shine
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.beginPath();
+  ctx.arc(-hiltLen - 1, -1, 1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3. Ornate Crossguard (Ornate Silver / Chrome)
+  const silverGrad = ctx.createLinearGradient(0, -guardW / 2, 0, guardW / 2);
   silverGrad.addColorStop(0, '#555555');
   silverGrad.addColorStop(0.2, '#aaaaaa');
-  silverGrad.addColorStop(0.5, '#ffffff');
+  silverGrad.addColorStop(0.5, '#ffffff'); // Center shine
+  silverGrad.addColorStop(0.8, '#aaaaaa');
   silverGrad.addColorStop(1, '#444444');
   ctx.fillStyle = silverGrad;
 
+  // Complex flared guard shape
   ctx.beginPath();
-  ctx.moveTo(hiltLen / 2, -guardW / 2);
-  ctx.bezierCurveTo(hiltLen / 2 - 4, -guardW / 4, hiltLen / 2 - 4, guardW / 4, hiltLen / 2, guardW / 2);
-  ctx.lineTo(hiltLen / 2 + 3, guardW / 3);
-  ctx.lineTo(hiltLen / 2 + 3, -guardW / 3);
+  ctx.moveTo(0, -guardW / 2);
+  ctx.bezierCurveTo(-4, -guardW / 4, -4, guardW / 4, 0, guardW / 2);
+  ctx.lineTo(3, guardW / 3);
+  ctx.lineTo(3, -guardW / 3);
   ctx.closePath();
   ctx.fill();
 
-  // 4. Central Magical Gem - No centro da guarda
+  // Guard engravings
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+
+  // 4. Central Magical Gem
   const gemPulse = 0.8 + Math.sin(time * 5) * 0.2;
-  const gemGrad = ctx.createRadialGradient(hiltLen / 2, 0, 0, hiltLen / 2, 0, 2.5);
+  const gemGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 2.5);
   gemGrad.addColorStop(0, '#ffffff');
+  gemGrad.addColorStop(0.3, '#33ccff');
   gemGrad.addColorStop(1, '#0044ff');
   ctx.fillStyle = gemGrad;
   ctx.beginPath();
-  ctx.arc(hiltLen / 2, 0, 2 * gemPulse, 0, Math.PI * 2);
+  ctx.arc(0, 0, 2 * gemPulse, 0, Math.PI * 2);
   ctx.fill();
 
-  // 5. Elite Blade - Começando após a guarda
-  const bladeWidth = 3.2;
-  const bladeGrad = ctx.createLinearGradient(hiltLen / 2 + 3, -bladeWidth, hiltLen / 2 + 3, bladeWidth);
+  // Gem glow
+  ctx.shadowBlur = 8 * gemPulse;
+  ctx.shadowColor = '#3399ff';
+
+  // 5. Elite Blade (Polished Mirror-Finish Steel)
+  const bladeWidth = 2.8;
+  const bladeGrad = ctx.createLinearGradient(0, -bladeWidth, 0, bladeWidth);
   bladeGrad.addColorStop(0, '#444444');
-  bladeGrad.addColorStop(0.5, '#e0f0ff');
+  bladeGrad.addColorStop(0.3, '#bbbbbb');
+  bladeGrad.addColorStop(0.48, '#e0f0ff'); // Blue-ish edge highlight
+  bladeGrad.addColorStop(0.52, '#e0f0ff'); // Blue-ish edge highlight
+  bladeGrad.addColorStop(0.7, '#999999');
   bladeGrad.addColorStop(1, '#333333');
 
   ctx.fillStyle = bladeGrad;
   ctx.beginPath();
-  ctx.moveTo(hiltLen / 2 + 3, -bladeWidth);
-  ctx.lineTo(hiltLen / 2 + bladeLen - 5, -bladeWidth * 0.7);
-  ctx.lineTo(hiltLen / 2 + bladeLen, 0);
-  ctx.lineTo(hiltLen / 2 + bladeLen - 5, bladeWidth * 0.7);
-  ctx.lineTo(hiltLen / 2 + 3, bladeWidth);
+  ctx.moveTo(3, -bladeWidth);
+  ctx.lineTo(bladeLen - 8, -bladeWidth * 0.8);
+  ctx.lineTo(bladeLen, 0); // Precision Point
+  ctx.lineTo(bladeLen - 8, bladeWidth * 0.8);
+  ctx.lineTo(3, bladeWidth);
   ctx.closePath();
   ctx.fill();
 
+  ctx.shadowBlur = 0; // Reset shadow for rest of blade
+
   // 6. Deep Fuller (Central Groove)
   ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-  ctx.fillRect(8, -0.8, bladeLen - 20, 1.6);
+  ctx.fillRect(6, -0.6, bladeLen - 18, 1.2);
 
   // 7. Dynamic Blade Shimmer (Glint)
   const shineSpeed = isAttacking ? 20 : 4;
   const shinePos = (Math.sin(time * shineSpeed) * 0.5 + 0.5) * (bladeLen - 10) + 10;
-  const g = ctx.createRadialGradient(shinePos, 0, 0, shinePos, 0, 6);
-  g.addColorStop(0, 'rgba(135, 206, 250, 0.5)');
+
+  const g = ctx.createRadialGradient(shinePos, 0, 0, shinePos, 0, 12);
+  g.addColorStop(0, 'rgba(135, 206, 250, 0.9)'); // Light Sky Blue
+  g.addColorStop(0.2, 'rgba(100, 180, 255, 0.5)');
   g.addColorStop(1, 'rgba(100, 200, 255, 0)');
 
+  // Glint shape
   ctx.save();
-  ctx.globalCompositeOperation = 'screen';
+  ctx.globalCompositeOperation = 'lighter';
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.arc(shinePos, 0, 3, 0, Math.PI * 2);
+  ctx.moveTo(shinePos - 15, 0);
+  ctx.lineTo(shinePos, -4);
+  ctx.lineTo(shinePos + 15, 0);
+  ctx.lineTo(shinePos, 4);
+  ctx.closePath();
   ctx.fill();
   ctx.restore();
+
+  // 8. Blade Rim Light (Energy glow)
+  ctx.strokeStyle = `rgba(150, 220, 255, ${0.1 + Math.sin(time * 2) * 0.05})`;
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
 }
 
 
 
+
+/** Draws realistic Dual Daggers */
+function drawDualDaggers(ctx: CanvasRenderingContext2D, length: number, isAttacking: number, time: number) {
+  const dagLen = length * 0.8;
+  const hiltLen = 6;
+  const bladeLen = dagLen - hiltLen;
+
+  const drawOne = (offsetY: number, angle: number) => {
+    ctx.save();
+    ctx.translate(0, offsetY);
+    ctx.rotate(angle);
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(-hiltLen, -1.2, hiltLen, 2.4);
+    ctx.fillStyle = '#999';
+    ctx.fillRect(-1, -3, 2, 6);
+    const bGrad = ctx.createLinearGradient(0, -1.5, 0, 1.5);
+    bGrad.addColorStop(0, '#333');
+    bGrad.addColorStop(0.5, '#fff');
+    bGrad.addColorStop(1, '#333');
+    ctx.fillStyle = bGrad;
+    ctx.beginPath();
+    ctx.moveTo(1, -1.5);
+    ctx.lineTo(bladeLen - 4, -1.2);
+    ctx.lineTo(bladeLen, 0);
+    ctx.lineTo(bladeLen - 4, 1.2);
+    ctx.lineTo(1, 1.5);
+    ctx.fill();
+    ctx.restore();
+  };
+  drawOne(-4, Math.sin(time * 2) * 0.1);
+  drawOne(4, Math.cos(time * 2) * 0.1);
+}
 
 /** Draws a realistic Void Staff */
 function drawVoidStaff(ctx: CanvasRenderingContext2D, length: number, isAttacking: number, time: number) {
@@ -3961,7 +3571,6 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
 
   // --- Objective text (center top, big and clear) ---
   const room = getCurrentRoom(dungeon);
-  if (!room) return; // Safety guard
   ctx.textAlign = 'center';
   const objFontSize = Math.round(isMobile ? 16 : 12);
   const objBarH = Math.round(isMobile ? 26 : 18);
@@ -4127,9 +3736,9 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
     const visited = room.visited;
 
     if (room.doors.east && dungeon.rooms.has(roomKey(room.gridX + 1, room.gridY))) {
-      const neighbor = dungeon.rooms.get(roomKey(room.gridX + 1, room.gridY));
-      const show = visited || neighbor?.visited;
-      if (show && neighbor) {
+      const neighbor = dungeon.rooms.get(roomKey(room.gridX + 1, room.gridY))!;
+      const show = visited || neighbor.visited;
+      if (show) {
         const both = visited && neighbor.visited;
         ctx.strokeStyle = both ? 'rgba(100, 110, 150, 0.8)' : 'rgba(70, 75, 100, 0.4)';
         ctx.beginPath();
@@ -4139,9 +3748,9 @@ function renderMinimap(ctx: CanvasRenderingContext2D, dungeon: DungeonMap, isMob
       }
     }
     if (room.doors.south && dungeon.rooms.has(roomKey(room.gridX, room.gridY + 1))) {
-      const neighbor = dungeon.rooms.get(roomKey(room.gridX, room.gridY + 1));
-      const show = visited || neighbor?.visited;
-      if (show && neighbor) {
+      const neighbor = dungeon.rooms.get(roomKey(room.gridX, room.gridY + 1))!;
+      const show = visited || neighbor.visited;
+      if (show) {
         const both = visited && neighbor.visited;
         ctx.strokeStyle = both ? 'rgba(100, 110, 150, 0.8)' : 'rgba(70, 75, 100, 0.4)';
         ctx.beginPath();

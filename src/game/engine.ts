@@ -101,8 +101,7 @@ export class GameEngine {
   weaponSelectionOpen = false;
   private weaponOptions: { id: WeaponType; name: string; desc: string; locked?: boolean }[] = [
     { id: 'sword', name: 'Espada', desc: 'Equilibrada & Precisa' },
-    { id: 'axe', name: 'Machado', desc: 'Pesado & Brutal' },
-    { id: 'daggers', name: 'Adagas', desc: 'Indisponível', locked: true },
+    { id: 'daggers', name: 'Catanas Duplas', desc: 'Rápidas & Mortais' },
     { id: 'staff', name: 'Cajado', desc: 'Indisponível', locked: true },
   ];
   private selectedWeaponIndex = 0;

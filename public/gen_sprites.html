@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Gerar Sprites Direcionais</title>
+<style>
+  body { font-family: monospace; background:#111; color:#eee; padding:32px; }
+  h1 { color:#40c8ff; }
+  button { padding:12px 28px; font-size:16px; background:#1a6fff; color:#fff;
+           border:none; border-radius:8px; cursor:pointer; margin-top:16px; }
+  button:hover { background:#40c8ff; }
+  #log { margin-top:16px; line-height:2; }
+  .ok  { color:#4eff91; }
+  .err { color:#ff4444; }
+  canvas { border:1px solid #333; margin:8px; image-rendering: pixelated; }
+  #previews { margin-top:20px; display:flex; flex-wrap:wrap; gap:8px; }
+  .preview-box { text-align:center; font-size:12px; }
+</style>
+</head>
+<body>
+<h1>🎮 Gerador de Sprites Direcionais</h1>
+<p>Clique em <strong>Gerar e Baixar</strong>. Os 4 PNG serão salvos na pasta Downloads.<br>
+   Depois mova-os para <code>public/</code> do projeto.</p>
+<button onclick="run()">⚡ Gerar e Baixar</button>
+<div id="log"></div>
+<div id="previews"></div>
+
+<script>
+const log = m => {
+  const d = document.getElementById('log');
+  const cls = m.includes('✅') ? 'ok' : m.includes('❌') ? 'err' : '';
+  d.innerHTML += `<div class="${cls}">${m}</div>`;
+};
+
+const transforms = [
+  { name: 'player_right.png',    angle: Math.PI / 2,  label: '→ Direita (90°)'     },
+  { name: 'player_up.png',       angle: Math.PI,       label: '↑ Cima (180°)'       },
+  { name: 'player_dn_right.png', angle: Math.PI / 4,  label: '↘ Diag Baixo (45°)'  },
+  { name: 'player_up_right.png', angle: -Math.PI / 4, label: '↗ Diag Cima (-45°)'  },
+];
+
+async function run() {
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('previews').innerHTML = '';
+  log('Carregando player_idle.png...');
+
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+
+  // Try loading from localhost first, then relative path
+  const sources = [
+    'http://localhost:8080/player_idle.png',
+    '/player_idle.png',
+  ];
+
+  let loaded = false;
+  for (const src of sources) {
+    try {
+      await new Promise((res, rej) => {
+        img.onload  = res;
+        img.onerror = rej;
+        img.src = src;
+      });
+      log(`✅ Imagem carregada de: ${src} (${img.naturalWidth}×${img.naturalHeight})`);
+      loaded = true;
+      break;
+    } catch {
+      log(`⚠️ Não carregou de ${src}, tentando próximo...`);
+    }
+  }
+
+  if (!loaded) {
+    log('❌ Não foi possível carregar player_idle.png. Abra este arquivo via http://localhost:8080/gen_sprites.html');
+    return;
+  }
+
+  const SIZE = img.naturalWidth;
+
+  for (const t of transforms) {
+    const canvas = document.createElement('canvas');
+    canvas.width  = SIZE;
+    canvas.height = SIZE;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, SIZE, SIZE);
+    ctx.save();
+    ctx.translate(SIZE / 2, SIZE / 2);
+    ctx.rotate(t.angle);
+    ctx.drawImage(img, -SIZE / 2, -SIZE / 2, SIZE, SIZE);
+    ctx.restore();
+
+    // Preview
+    const box = document.createElement('div');
+    box.className = 'preview-box';
+    const thumb = document.createElement('canvas');
+    thumb.width  = 128;
+    thumb.height = 128;
+    thumb.getContext('2d').drawImage(canvas, 0, 0, 128, 128);
+    box.appendChild(thumb);
+    box.innerHTML += `<br>${t.label}<br><small>${t.name}</small>`;
+    document.getElementById('previews').appendChild(box);
+
+    // Download
+    const a = document.createElement('a');
+    a.href     = canvas.toDataURL('image/png');
+    a.download = t.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    log(`✅ Gerado: ${t.name}`);
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  log('');
+  log('🎉 Pronto! Mova os 4 arquivos da pasta Downloads para: gleam-game-glow/public/');
+  log('Depois o jogo usará os sprites reais para cada direção.');
+}
+</script>
+</body>
+</html>

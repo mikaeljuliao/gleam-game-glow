@@ -88,10 +88,11 @@ export interface PlayerState {
   temporaryMoveSpeedMult: number;
   temporaryAttackSpeedMult: number;
   footstepTimer: number;
+  isMoving: boolean; // Flag to track actual movement for animation
   weapon: WeaponType;
 }
 
-export type WeaponType = 'sword' | 'axe' | 'daggers' | 'staff';
+export type WeaponType = 'sword' | 'daggers' | 'staff';
 
 export type EnemyType = 'chaser' | 'shooter' | 'tank' | 'boss' | 'wraith' | 'bomber' | 'swarm' | 'necromancer' | 'stalker' | 'phantom' | 'flash_hunter' | 'distortion' | 'flicker_fiend' | 'warper' | 'accelerator';
 

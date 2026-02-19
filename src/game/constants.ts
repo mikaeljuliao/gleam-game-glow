@@ -13,7 +13,7 @@ export const PLAYER_MAX_HP = 100;
 export const PLAYER_DASH_SPEED = 280;
 export const PLAYER_DASH_DURATION = 0.15;
 export const PLAYER_DASH_COOLDOWN = 0.8;
-export const MELEE_RANGE = 52;
+export const MELEE_RANGE = 62;
 export const MELEE_ARC = Math.PI / 1.6; // Slightly wider arc
 export const MELEE_DAMAGE = 40; // Increased damage for AAA feel
 export const MELEE_COOLDOWN = 0.22;
@@ -172,11 +172,11 @@ export const COLORS = {
   wall: '#1e1e30',
   wallTop: '#282845',
   wallEdge: '#0e0e1a',
-  player: '#5599ff',
-  playerDark: '#3366cc',
-  playerLight: '#88bbff',
-  playerCloak: '#2a2a55',
-  playerTrail: 'rgba(85, 153, 255, 0.3)',
+  player: '#ffffff', // Glowing white (eyes/symbol)
+  playerDark: '#151520', // Dark matte body
+  playerLight: '#ccffff', // Slight cyan tint
+  playerCloak: '#050510',
+  playerTrail: 'rgba(255, 255, 255, 0.3)',
   chaser: '#dd3333',
   chaserDark: '#aa1111',
   shooter: '#aa44dd',

@@ -74,6 +74,7 @@ export function createPlayer(): PlayerState {
     temporaryMoveSpeedMult: 1,
     temporaryAttackSpeedMult: 1,
     footstepTimer: 0,
+    isMoving: false,
     weapon: 'sword',
   };
 }
@@ -149,7 +150,9 @@ export function updatePlayer(p: PlayerState, moveDir: Vec2, dt: number) {
   p.x += moveDir.x * speed * dt;
   p.y += moveDir.y * speed * dt;
 
-  if (moveDir.x !== 0 || moveDir.y !== 0) {
+  p.isMoving = (moveDir.x !== 0 || moveDir.y !== 0);
+
+  if (p.isMoving) {
     p.facing = { x: moveDir.x, y: moveDir.y };
   }
 
@@ -173,24 +176,17 @@ export function tryDash(p: PlayerState): boolean {
 export function tryMelee(p: PlayerState, mouseX: number, mouseY: number): boolean {
   if (p.meleeCooldown > 0) return false;
 
-  // Weapon-specific attack modifiers
-  const isAxe = p.weapon === 'axe';
 
   // Melee sequence: 0.05s anticipation -> 0.1s swing -> 0.1s recovery
   const finalAttackSpeed = p.attackSpeedMult * p.temporaryAttackSpeedMult;
 
-  // Axe: Heavier, slower attacks with more weight
-  const weaponCooldownMult = isAxe ? 1.35 : 1.0; // 35% slower base attack
-  const weaponTimerMult = isAxe ? 1.25 : 1.0; // Longer animation duration
+  const weaponCooldownMult = 1.0;
+  const weaponTimerMult = 1.0;
 
   // Progression: 4th hit is slightly slower but more powerful (handled in engine/renderer)
   const isFinalHit = p.meleeComboStep === 4;
   const comboMult = isFinalHit ? 1.5 : 1.0;
 
-  // For axe: Disable combo for now (always reset to step 1)
-  if (isAxe) {
-    p.meleeComboStep = 1;
-  }
 
   const finalCooldownMult = comboMult * weaponCooldownMult;
   const finalTimerMult = comboMult * weaponTimerMult;
@@ -200,15 +196,10 @@ export function tryMelee(p: PlayerState, mouseX: number, mouseY: number): boolea
   p.meleeAngle = Math.atan2(mouseY - p.y, mouseX - p.x);
   p.meleeTimer = 0.25 * finalTimerMult;
 
-  // Update combo state (only for non-axe weapons)
-  if (!isAxe) {
-    p.meleeComboTimer = 0.8; // Window to continue (0.8s is generous for fluid feel)
-    p.activeComboStep = p.meleeComboStep;
-    p.meleeComboStep = (p.meleeComboStep % 4) + 1;
-  } else {
-    p.meleeComboTimer = 0;
-    p.activeComboStep = 1;
-  }
+  // Update combo state
+  p.meleeComboTimer = 0.8; // Window to continue (0.8s is generous for fluid feel)
+  p.activeComboStep = p.meleeComboStep;
+  p.meleeComboStep = (p.meleeComboStep % 4) + 1;
 
   return true;
 }
