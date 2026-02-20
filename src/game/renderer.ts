@@ -619,15 +619,24 @@ const SOCKET_FRONT_L = { x: -16, y: -26 };
 const SOCKET_FRONT_R = { x: 16, y: -26 };
 const SOCKET_SIDE = { x: -2, y: -26 }; // Refinamento: Mão lateral em posição ideal
 
-const SPRITE_FRAMES: Record<SpriteDir, SpriteFrame | SpriteFrame[]> = {
+const SPRITE_FRAMES: Record<SpriteDir | 'idle-cycle', SpriteFrame | SpriteFrame[]> = {
   'down': {
     src: '/player-de-frente.png',
     handSocket: SOCKET_FRONT_R // Usa a mão direita por padrão
   },
-  'up': {
-    src: '/player-de-frente.png',
-    handSocket: SOCKET_FRONT_R
-  },
+  'up': [
+    { src: '/player-de-costa-1.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-de-costa-2.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-de-costa-3.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-de-csota-4.png', handSocket: SOCKET_FRONT_R },
+  ],
+  'idle-cycle': [
+    { src: '/player-parado-1.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-parado-2.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-parado-3.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-parado-4.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-parado-5.png', handSocket: SOCKET_FRONT_R },
+  ],
   'right': [
     { src: '/player-de-lado-1.png', handSocket: SOCKET_SIDE },
     { src: '/player-de-lado-2.png', handSocket: SOCKET_SIDE },
@@ -696,13 +705,22 @@ function getSpriteFrameForFacing(p: PlayerState): SpriteFrame | SpriteFrame[] {
   const fy = p.facing.y;
   const isMoving = p.isMoving || p.isDashing;
 
-  // Prioridade de Vista Frontal: Se parado ou se estiver indo para cima/baixo (incluindo diagonais)
-  // Isso garante que se o jogador clicar W enquanto anda de lado, ele volta a ficar de frente
-  if (!isMoving || (Math.abs(fy) > 0.1)) {
+  // Se parado por mais de 3 segundos, usa o ciclo de animação parado
+  if (!isMoving && p.idleTime >= 3) {
+    return SPRITE_FRAMES['idle-cycle'];
+  }
+
+  // Vista traseira quando andando para cima
+  if (isMoving && fy < -0.1) {
+    return SPRITE_FRAMES['up'];
+  }
+
+  // Vista frontal por padrão se parado ou se estiver indo para baixo
+  if (!isMoving || fy > 0.1) {
     return SPRITE_FRAMES['down'];
   }
 
-  // Vista lateral apenas se estiver indo estritamente para os lados
+  // Vista lateral apenas se estiver indo estritamente para os lados (ou diagonais predominantes laterais)
   if (fx < 0) return SPRITE_FRAMES['left'];
   if (fx > 0) return SPRITE_FRAMES['right'];
 
@@ -719,23 +737,22 @@ export function renderPlayerSprite(ctx: CanvasRenderingContext2D, p: PlayerState
 
   // Usar a flag explícita do PlayerState
   const isMoving = p.isMoving || p.isDashing;
+  const isIdleCycle = !isMoving && p.idleTime >= 3;
 
   let frame: SpriteFrame;
   if (Array.isArray(frameOrFrames)) {
-    if (isMoving) {
-      // Ajuste de velocidade da animação (10 frames/s para um visual mais ágil)
-      const animSpeed = 10;
+    if (isMoving || isIdleCycle) {
+      // Ajuste de velocidade da animação (Idle quase estático, Run normal)
+      const animSpeed = isIdleCycle ? 0.8 : 10;
       const index = Math.floor(time * animSpeed) % frameOrFrames.length;
       frame = frameOrFrames[index];
     } else {
-      // Quando parado de lado, usa o frame 1 como Idle Lateral
       frame = frameOrFrames[0];
     }
   } else {
     frame = frameOrFrames;
   }
 
-  // Safety fallback
   if (!frame) frame = { src: '/player-de-frente.png' };
 
   const flipX = frame.flipX === true;
@@ -747,22 +764,17 @@ export function renderPlayerSprite(ctx: CanvasRenderingContext2D, p: PlayerState
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    const scale = SPRITE_SIZE / Math.max(sprite.naturalWidth, 1);
-    const h = sprite.naturalHeight * scale;
-
-    let walkBob = 0;
-    if (isMoving) {
-      // Bobbing vertical suave para dar peso aos passos
-      walkBob = Math.sin(time * 20) * 1.8;
-    }
-
-    ctx.translate(0, walkBob);
+    // Normalização por Altura Fixa (Ainda menor: 60 unidades)
+    const targetHeight = 60;
+    const scale = targetHeight / Math.max(sprite.naturalHeight, 1);
+    const w = sprite.naturalWidth * scale;
+    const h = targetHeight;
 
     if (flipX) {
       ctx.scale(-1, 1);
-      ctx.drawImage(sprite, -SPRITE_SIZE / 2, -h, SPRITE_SIZE, h);
+      ctx.drawImage(sprite, -w / 2, -h, w, h);
     } else {
-      ctx.drawImage(sprite, -SPRITE_SIZE / 2, -h, SPRITE_SIZE, h);
+      ctx.drawImage(sprite, -w / 2, -h, w, h);
     }
 
     ctx.restore();
