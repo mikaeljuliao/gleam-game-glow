@@ -526,6 +526,45 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
 
   const x = p.x + animX;
   const y = p.y + animY;
+  const isMoving = p.trail.length > 0 || p.isDashing;
+  const breathe = Math.sin(time * 2.5) * 0.5;
+  const bobY = isMoving ? Math.sin(time * 10) * 1.2 : breathe * 0.3;
+
+  // === IDLE STATE (3+ seconds idle → look around, adjust hood) ===
+  const idleTime = p.idleTime || 0;
+  const isIdle = idleTime >= 3;
+  // Idle cycle: 0-2s look left, 2-3s look right, 3-5s settle, 5-6s hood adjust, 6-8s breathe deep
+  const idleCycle = isIdle ? (idleTime - 3) % 8 : 0;
+  let idleLookX = 0;
+  let idleLookY = 0;
+  let idleHoodShift = 0;
+  let idleDeepBreathe = 0;
+  if (isIdle) {
+    if (idleCycle < 2) {
+      // Slow look left
+      const t = idleCycle / 2;
+      idleLookX = -Math.sin(t * Math.PI) * 1.2;
+      idleLookY = Math.sin(t * Math.PI * 2) * 0.3;
+    } else if (idleCycle < 3) {
+      // Quick look right
+      const t = (idleCycle - 2);
+      idleLookX = Math.sin(t * Math.PI) * 1.5;
+      idleLookY = -0.2;
+    } else if (idleCycle < 5) {
+      // Settle back to center
+      const t = (idleCycle - 3) / 2;
+      idleLookX = (1 - t) * 0.5;
+    } else if (idleCycle < 6) {
+      // Hood adjust — slight upward bob
+      const t = (idleCycle - 5);
+      idleHoodShift = Math.sin(t * Math.PI) * 1.5;
+    } else {
+      // Deep breathe
+      const t = (idleCycle - 6) / 2;
+      idleDeepBreathe = Math.sin(t * Math.PI) * 1.2;
+    }
+  }
+
   // Effects disabled — pure sprite visualisation mode
   // drawAmbientEffects(ctx, p, x, y, time);
 
@@ -568,8 +607,6 @@ interface SpriteFrame {
   src: string;
   fallback?: boolean;
   flipX?: boolean;
-  vOffset?: number; // Offset vertical específico para cada frame (correção de "pulo")
-  scaleMult?: number; // Ajuste fino de tamanho por frame
   // Ponto exato onde a mão estaria na imagem (relativo ao centro/pivô do sprite)
   handSocket?: { x: number; y: number };
 }
@@ -580,62 +617,61 @@ interface SpriteFrame {
 // Socket coordinates values (calibrados estruturalmente para as artes 80x80)
 const SOCKET_FRONT_L = { x: -16, y: -26 };
 const SOCKET_FRONT_R = { x: 16, y: -26 };
-const SOCKET_BACK_L = { x: -14, y: -30 }; // Subido para encaixe perfeito
-const SOCKET_BACK_R = { x: 14, y: -30 };
-const SOCKET_SIDE = { x: -2, y: -26 };
+const SOCKET_SIDE = { x: -2, y: -26 }; // Refinamento: Mão lateral em posição ideal
 
 const SPRITE_FRAMES: Record<SpriteDir | 'idle-cycle', SpriteFrame | SpriteFrame[]> = {
-  'down': [
-    { src: '/player-andando-de-frente1.png', handSocket: SOCKET_FRONT_R, vOffset: 0, scaleMult: 0.8 },
-    { src: '/player-andando-de-frente-2.png', handSocket: SOCKET_FRONT_R, vOffset: 0, scaleMult: 0.8 },
-  ],
+  'down': {
+    src: '/player-de-frente.png',
+    handSocket: SOCKET_FRONT_R // Usa a mão direita por padrão
+  },
   'up': [
-    { src: '/player-de-costa-1.png', handSocket: SOCKET_BACK_R, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-costa-2.png', handSocket: SOCKET_BACK_R, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-costa-3.png', handSocket: SOCKET_BACK_R, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-costa-4.png', handSocket: SOCKET_BACK_R, vOffset: 0, scaleMult: 1.0 },
+    { src: '/player-de-costa-1.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-de-costa-2.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-de-costa-3.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-de-csota-4.png', handSocket: SOCKET_FRONT_R },
   ],
   'idle-cycle': [
-    { src: '/player-parado-1.png', handSocket: SOCKET_FRONT_R, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-parado-2a.png', handSocket: SOCKET_FRONT_R, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-parado-3a.png', handSocket: SOCKET_FRONT_R, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-parado-4aa.png', handSocket: SOCKET_FRONT_R, vOffset: 0, scaleMult: 1.0 },
+    { src: '/player-parado-1.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-parado-2.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-parado-3.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-parado-4.png', handSocket: SOCKET_FRONT_R },
+    { src: '/player-parado-5.png', handSocket: SOCKET_FRONT_R },
   ],
   'right': [
-    { src: '/player-de-lado-1.png', handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-2.png', handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-3.png', handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-4.png', handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
+    { src: '/player-de-lado-1.png', handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-2.png', handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-3.png', handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-4.png', handSocket: SOCKET_SIDE },
   ],
   'left': [
-    { src: '/player-de-lado-1.png', flipX: true, handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-2.png', flipX: true, handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-3.png', flipX: true, handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-4.png', flipX: true, handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
+    { src: '/player-de-lado-1.png', flipX: true, handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-2.png', flipX: true, handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-3.png', flipX: true, handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-4.png', flipX: true, handSocket: SOCKET_SIDE },
   ],
   'down-right': [
-    { src: '/player-de-lado-1.png', handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-2.png', handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-3.png', handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-4.png', handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
+    { src: '/player-de-lado-1.png', handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-2.png', handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-3.png', handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-4.png', handSocket: SOCKET_SIDE },
   ],
   'down-left': [
-    { src: '/player-de-lado-1.png', flipX: true, handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-2.png', flipX: true, handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-3.png', flipX: true, handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-4.png', flipX: true, handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
+    { src: '/player-de-lado-1.png', flipX: true, handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-2.png', flipX: true, handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-3.png', flipX: true, handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-4.png', flipX: true, handSocket: SOCKET_SIDE },
   ],
   'up-right': [
-    { src: '/player-de-lado-1.png', handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-2.png', handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-3.png', handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-4.png', handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
+    { src: '/player-de-lado-1.png', handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-2.png', handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-3.png', handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-4.png', handSocket: SOCKET_SIDE },
   ],
   'up-left': [
-    { src: '/player-de-lado-1.png', flipX: true, handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-2.png', flipX: true, handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-3.png', flipX: true, handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
-    { src: '/player-de-lado-4.png', flipX: true, handSocket: SOCKET_SIDE, vOffset: 0, scaleMult: 1.0 },
+    { src: '/player-de-lado-1.png', flipX: true, handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-2.png', flipX: true, handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-3.png', flipX: true, handSocket: SOCKET_SIDE },
+    { src: '/player-de-lado-4.png', flipX: true, handSocket: SOCKET_SIDE },
   ],
 };
 
@@ -669,8 +705,8 @@ function getSpriteFrameForFacing(p: PlayerState): SpriteFrame | SpriteFrame[] {
   const fy = p.facing.y;
   const isMoving = p.isMoving || p.isDashing;
 
-  // Se parado, usa o ciclo de animação parado
-  if (!isMoving) {
+  // Se parado por mais de 3 segundos, usa o ciclo de animação parado
+  if (!isMoving && p.idleTime >= 3) {
     return SPRITE_FRAMES['idle-cycle'];
   }
 
@@ -701,13 +737,13 @@ export function renderPlayerSprite(ctx: CanvasRenderingContext2D, p: PlayerState
 
   // Usar a flag explícita do PlayerState
   const isMoving = p.isMoving || p.isDashing;
-  const isIdleCycle = !isMoving;
+  const isIdleCycle = !isMoving && p.idleTime >= 3;
 
   let frame: SpriteFrame;
   if (Array.isArray(frameOrFrames)) {
     if (isMoving || isIdleCycle) {
-      // Ajuste de velocidade da animação (Idle muito sutil, Run normal)
-      const animSpeed = isIdleCycle ? 1.2 : 10;
+      // Ajuste de velocidade da animação (Idle quase estático, Run normal)
+      const animSpeed = isIdleCycle ? 0.8 : 10;
       const index = Math.floor(time * animSpeed) % frameOrFrames.length;
       frame = frameOrFrames[index];
     } else {
@@ -728,23 +764,17 @@ export function renderPlayerSprite(ctx: CanvasRenderingContext2D, p: PlayerState
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // Normalização Universal: Força todos os sprites a serem pequenos e uniformes (Base 72)
-    const baseTargetHeight = 64; // Reduzido de 72 para 64 (pedido do user)
-    const frameScale = frame.scaleMult || 1.0;
-    const h = baseTargetHeight * frameScale;
-
-    // Normalização pela Altura: Mais estável para manter o tamanho da cabeça/corpo consistente
-    const scale = h / Math.max(sprite.naturalHeight, 1);
+    // Normalização por Altura Fixa (Ainda menor: 60 unidades)
+    const targetHeight = 60;
+    const scale = targetHeight / Math.max(sprite.naturalHeight, 1);
     const w = sprite.naturalWidth * scale;
-
-    // Compensação Grounded Limpa: Sem offsets individuais para evitar jumper
-    const finalYOffset = 0;
+    const h = targetHeight;
 
     if (flipX) {
       ctx.scale(-1, 1);
-      ctx.drawImage(sprite, -w / 2, -h + finalYOffset, w, h);
+      ctx.drawImage(sprite, -w / 2, -h, w, h);
     } else {
-      ctx.drawImage(sprite, -w / 2, -h + finalYOffset, w, h);
+      ctx.drawImage(sprite, -w / 2, -h, w, h);
     }
 
     ctx.restore();
@@ -1112,110 +1142,101 @@ function drawIdleRunPose(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   ctx.save();
   ctx.translate(x, y);
 
-  // Character Body
+  // Character Body - Includes bobbing and sprite frame selection
   drawOriginalCharacterBody(ctx, p, time);
 
-  // --- Weapon Attachment ---
+  // --- Weapon Attachment (Structural Sockets) ---
   if (idleTime <= 12) {
     const isDual = p.weapon === 'daggers';
     const side = p.facing.x >= 0 ? 1 : -1;
     const pulse = 0.9 + Math.sin(time * 6) * 0.1;
 
-    // Resolve current frame
+    // Resolve o frame atual para pegar o socket
     const frameOrFrames = getSpriteFrameForFacing(p);
-    const currentFrame = Array.isArray(frameOrFrames)
-      ? frameOrFrames[Math.floor(time * 10) % frameOrFrames.length]
-      : frameOrFrames;
+    let currentFrame: SpriteFrame;
+    if (Array.isArray(frameOrFrames)) {
+      const animSpeed = 10;
+      const index = Math.floor(time * animSpeed) % frameOrFrames.length;
+      currentFrame = frameOrFrames[index];
+    } else {
+      currentFrame = frameOrFrames;
+    }
 
-    // Determine active socket
+    // Calibragem estrutural do socket com base no flip do sprite
+    let socket = currentFrame.handSocket || SOCKET_FRONT_R;
+
+    // Troca dinâmica de mão na vista frontal baseada na direção
     const isFrontFrame = currentFrame.src.includes('frente');
-    const isBackFrame = currentFrame.src.includes('costa');
-
-    let socket = currentFrame.handSocket || (isBackFrame ? SOCKET_BACK_R : SOCKET_FRONT_R);
-
-    // Troca de Braço Dinâmica: Ajuste de sockets para costas e frontal
     if (isFrontFrame) {
       socket = p.facing.x < 0 ? SOCKET_FRONT_L : SOCKET_FRONT_R;
-    } else if (isBackFrame) {
-      // FIX: Sempre usa o braço direito nas costas (único visível)
-      socket = SOCKET_BACK_R;
     }
 
     let sx = socket.x;
     if (currentFrame.flipX) sx *= -1;
     const sy = socket.y;
 
+    ctx.save();
     if (isDual) {
-      // DUAL WEAPONS (Dynamic symmetry)
+      // LEFT HAND (Mirrored from active socket)
+      const socketLX = -sx;
       const leftAngleBase = p.facing.x >= 0 ? Math.PI * 0.7 : Math.PI * 0.3;
-      const rightAngleBase = p.facing.x >= 0 ? Math.PI * 0.3 : Math.PI * 0.7;
+      const leftAngleRun = p.facing.x >= 0 ? Math.PI * 0.9 : Math.PI * 0.1;
+      const leftAngle = isMoving ? leftAngleRun : leftAngleBase;
 
-      // Estabilização Idle: balanço reduzido quando parado
-      const runMag = isMoving ? 0.2 : 0.03;
-      const idleBackOff = (!isMoving && isBackFrame) ? -Math.PI * 0.1 : 0;
-
-      // Left
+      drawEtherealHand(ctx, socketLX, sy, pulse, time, 0, 0);
       ctx.save();
-      const sxL = -sx;
-      drawEtherealHand(ctx, sxL, sy, pulse, time, 0, 0);
-      ctx.translate(sxL, sy);
-      ctx.rotate(leftAngleBase + idleBackOff + Math.sin(time * 3) * runMag);
+      ctx.translate(socketLX, sy);
+
+      // Encaixe frontal simétrico para mão esquerda
+      if (isFrontFrame) {
+        ctx.rotate(-Math.PI * 0.4); // Invertido para simetria
+      } else {
+        ctx.rotate(leftAngle + Math.sin(time * 3) * 0.05);
+      }
+
       drawEquippedWeapon(ctx, p, 32, 0, time, true);
       ctx.restore();
 
-      // Right
-      ctx.save();
+      // RIGHT HAND
+      const rightAngleBase = p.facing.x >= 0 ? Math.PI * 0.3 : Math.PI * 0.7;
+      const rightAngleRun = p.facing.x >= 0 ? Math.PI * 0.1 : Math.PI * 0.9;
+      const rightAngle = isMoving ? rightAngleRun : rightAngleBase;
+
       drawEtherealHand(ctx, sx, sy, pulse, time, 0, 0);
+      ctx.save();
       ctx.translate(sx, sy);
-      ctx.rotate(rightAngleBase + idleBackOff + Math.cos(time * 3) * runMag);
+
+      // Encaixe frontal simétrico para mão direita
+      if (isFrontFrame) {
+        ctx.rotate(Math.PI * 0.4);
+      } else {
+        ctx.rotate(rightAngle + Math.cos(time * 3) * 0.05);
+      }
+
       drawEquippedWeapon(ctx, p, 32, 0, time, true);
       ctx.restore();
     } else {
-      // SINGLE WEAPON - Troca de Braço Automática
-      const finalSx = isBackFrame ? sx : (p.facing.x < 0 ? -sx : sx);
+      // Single weapon (Structural Socket) - Neutral Angle for perfect fit
+      const sx_calibrated = sx;
+      const sy_calibrated = sy;
 
-      let finalSy: number;
-      let rot: number;
-      let sway: number;
-
-      if (isMoving) {
-        // --- POSE DE CORRIDA (Animação Original) ---
-        finalSy = sy; // Usa o socket original para bater com o movimento do sprite
-        sway = Math.sin(time * 10) * 0.08; // Balanço de corrida mais forte
-
-        if (isFrontFrame) {
-          rot = Math.PI * 0.4; // Aponta para baixo/lado na corrida (Original)
-        } else if (isBackFrame) {
-          rot = -Math.PI * 0.3; // Aponta para cima/direita na corrida
-        } else {
-          rot = -Math.PI * 0.35;
-        }
-      } else {
-        // --- POSE PARADO (Calibrada para Encaixe Perfeito) ---
-        finalSy = -62; // Subido mais um pouco para tirar o cabo do pé (pedido do user)
-        sway = Math.sin(time * 2) * 0.015; // Balanço sutil de respiração
-
-        if (isFrontFrame) {
-          rot = -Math.PI * 0.55; // Aponta pra cima e para fora
-        } else if (isBackFrame) {
-          rot = -Math.PI * 0.25; // Aponta para cima/direita no idle
-        } else {
-          rot = -Math.PI * 0.6;
-        }
-      }
-
-      drawEtherealHand(ctx, finalSx, finalSy, pulse, time, 0, 0);
+      drawEtherealHand(ctx, sx_calibrated, sy_calibrated, pulse, time, 0, 0);
       ctx.save();
-      ctx.translate(finalSx, finalSy);
+      ctx.translate(sx_calibrated, sy_calibrated);
 
-      if (p.facing.x < 0 && !isBackFrame) ctx.scale(-1, 1);
+      if (p.facing.x < 0) ctx.scale(-1, 1);
 
-      ctx.rotate(rot + sway);
+      // Ângulo Frontal Sustentado: Se o sprite visual for o frontal, mantém o encaixe diagonal
+      const isFrontFrame = currentFrame.src.includes('frente');
+      if (isFrontFrame) {
+        ctx.rotate(Math.PI * 0.4);
+      }
 
       const daggerLen = p.weapon === 'daggers' ? 32 : 34;
       drawEquippedWeapon(ctx, p, daggerLen, isMoving ? 0.2 : 0, time);
       ctx.restore();
     }
+    ctx.restore();
   }
 
   ctx.restore();
