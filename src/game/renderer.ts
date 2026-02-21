@@ -247,7 +247,68 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
   }
 }
 
-export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, time: number, doorsLocked: boolean = false, dungeon?: DungeonMap) {
+/**
+ * Render a Dimensional Rift (Fenda Dimensional) Door visual
+ * This replaces the standard door sprite but maintains same logic.
+ */
+function renderDimensionalFissure(ctx: CanvasRenderingContext2D, cx: number, cy: number, time: number, isOpen: boolean, color: string, px?: number, py?: number) {
+  const dx = px !== undefined ? px - cx : 1000;
+  const dy = py !== undefined ? py - cy : 1000;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  // Proximity expansion: 1.1x scale if within 85 units
+  const proximityScale = dist < 85 ? 1.1 : 1.0;
+
+  const pulse = Math.sin(time * 3) * 0.1 + 0.95;
+  const alpha = isOpen ? 0.45 * pulse : 0.15;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(proximityScale, proximityScale);
+
+  // 1. Atmospheric Glow - Roxo Elegante (Deep Mystic Purple)
+  // Intensified for better distance reading
+  const glowGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, 30);
+  glowGrad.addColorStop(0, `rgba(${color}, ${alpha})`);
+  glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glowGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 24 * pulse, 35 * pulse, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. The Rift Void (Irregular vertical fissure)
+  // Centro preto profundo
+  ctx.fillStyle = '#010003';
+  ctx.beginPath();
+
+  const freq = time * 2.5;
+  const h = 26 * (isOpen ? pulse : 0.85);
+  const w = isOpen ? 16 : 4.5; // Wider rift to accommodate player size visually
+
+  ctx.moveTo(0, -h);
+  for (let i = -h; i <= h; i += 4) {
+    const taper = 1 - Math.pow(i / h, 2);
+    const noise = Math.sin(freq + i * 0.45) * 3;
+    ctx.lineTo((w + noise) * taper, i);
+  }
+  for (let i = h; i >= -h; i -= 4) {
+    const taper = 1 - Math.pow(i / h, 2);
+    const noise = Math.sin(freq * 1.3 - i * 0.5) * 3;
+    ctx.lineTo((-w + noise) * taper, i);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // 3. Shimmering Border (Bordas roxo escuro elegante)
+  // Thicker stroke for better visibility
+  ctx.strokeStyle = `rgba(160, 80, 255, ${isOpen ? 0.6 * pulse : 0.25})`;
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, time: number, doorsLocked: boolean = false, dungeon?: DungeonMap, px?: number, py?: number) {
   const midX = C.dims.gw / 2;
   const midY = C.dims.gh / 2;
   const dw = C.DOOR_WIDTH;
@@ -271,31 +332,15 @@ export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, ti
     const cx = x + w / 2;
     const cy = y + h / 2;
 
-    if (isOpen) {
-      const visited = isNeighborVisited(dir);
+    // Door Logic remains intact, but Visual is now a Dimensional Rift
+    const visited = isOpen ? isNeighborVisited(dir) : false;
+    const riftColor = visited ? '120, 60, 200' : '60, 0, 120'; // Slightly brighter and higher contrast
 
+    renderDimensionalFissure(ctx, cx, cy, time, isOpen, riftColor, px, py);
+
+    if (isOpen) {
       if (visited) {
-        // GREEN — already visited room
-        ctx.fillStyle = `rgba(50, 255, 100, ${0.25 * pulse})`;
-        ctx.fillRect(x - 12, y - 12, w + 24, h + 24);
-        ctx.fillStyle = `rgba(50, 255, 100, ${0.15 * pulse})`;
-        ctx.fillRect(x - 20, y - 20, w + 40, h + 40);
-        ctx.fillStyle = '#030308';
-        ctx.fillRect(x, y, w, h);
-        ctx.strokeStyle = `rgba(50, 255, 100, ${0.9 * pulse})`;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
-        // Arrow
-        ctx.fillStyle = `rgba(50, 255, 100, ${0.95 * pulse})`;
-        ctx.beginPath();
-        const arrowSize = 8;
-        if (dir === 'north') { ctx.moveTo(cx, cy - arrowSize); ctx.lineTo(cx - arrowSize, cy + arrowSize / 2); ctx.lineTo(cx + arrowSize, cy + arrowSize / 2); }
-        else if (dir === 'south') { ctx.moveTo(cx, cy + arrowSize); ctx.lineTo(cx - arrowSize, cy - arrowSize / 2); ctx.lineTo(cx + arrowSize, cy - arrowSize / 2); }
-        else if (dir === 'west') { ctx.moveTo(cx - arrowSize, cy); ctx.lineTo(cx + arrowSize / 2, cy - arrowSize); ctx.lineTo(cx + arrowSize / 2, cy + arrowSize); }
-        else { ctx.moveTo(cx + arrowSize, cy); ctx.lineTo(cx - arrowSize / 2, cy - arrowSize); ctx.lineTo(cx - arrowSize / 2, cy + arrowSize); }
-        ctx.closePath();
-        ctx.fill();
-        // Label
+        // GREEN Label — already visited room
         ctx.fillStyle = `rgba(50, 255, 100, ${0.7 * pulse})`;
         ctx.font = `500 7px ${C.HUD_FONT}`;
         ctx.textAlign = 'center';
@@ -305,27 +350,7 @@ export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, ti
         else ctx.fillText('VISITADA', x - 28, cy + 3);
         ctx.textAlign = 'left';
       } else {
-        // ORANGE — unexplored room
-        ctx.fillStyle = `rgba(255, 165, 0, ${0.3 * pulse})`;
-        ctx.fillRect(x - 12, y - 12, w + 24, h + 24);
-        ctx.fillStyle = `rgba(255, 165, 0, ${0.18 * pulse})`;
-        ctx.fillRect(x - 20, y - 20, w + 40, h + 40);
-        ctx.fillStyle = '#030308';
-        ctx.fillRect(x, y, w, h);
-        ctx.strokeStyle = `rgba(255, 180, 30, ${0.9 * pulse})`;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
-        // Arrow
-        ctx.fillStyle = `rgba(255, 180, 30, ${0.95 * pulse})`;
-        ctx.beginPath();
-        const arrowSize = 8;
-        if (dir === 'north') { ctx.moveTo(cx, cy - arrowSize); ctx.lineTo(cx - arrowSize, cy + arrowSize / 2); ctx.lineTo(cx + arrowSize, cy + arrowSize / 2); }
-        else if (dir === 'south') { ctx.moveTo(cx, cy + arrowSize); ctx.lineTo(cx - arrowSize, cy - arrowSize / 2); ctx.lineTo(cx + arrowSize, cy - arrowSize / 2); }
-        else if (dir === 'west') { ctx.moveTo(cx - arrowSize, cy); ctx.lineTo(cx + arrowSize / 2, cy - arrowSize); ctx.lineTo(cx + arrowSize / 2, cy + arrowSize); }
-        else { ctx.moveTo(cx + arrowSize, cy); ctx.lineTo(cx - arrowSize / 2, cy - arrowSize); ctx.lineTo(cx - arrowSize / 2, cy + arrowSize); }
-        ctx.closePath();
-        ctx.fill();
-        // Label
+        // ORANGE Label — unexplored room
         ctx.fillStyle = `rgba(255, 180, 30, ${0.85 * pulse})`;
         ctx.font = `500 8px ${C.HUD_FONT}`;
         ctx.textAlign = 'center';
@@ -336,20 +361,7 @@ export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, ti
         ctx.textAlign = 'left';
       }
     } else {
-      // RED — locked (in battle)
-      ctx.fillStyle = '#1a1122';
-      ctx.fillRect(x, y, w, h);
-      ctx.strokeStyle = '#442222';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x, y, w, h);
-      // Lock X
-      ctx.strokeStyle = '#663333';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(cx - 4, cy - 4); ctx.lineTo(cx + 4, cy + 4);
-      ctx.moveTo(cx + 4, cy - 4); ctx.lineTo(cx - 4, cy + 4);
-      ctx.stroke();
-      // "TRANCADA" label
+      // Locked Interaction Labels
       ctx.fillStyle = 'rgba(150, 60, 60, 0.5)';
       ctx.font = `6px ${C.HUD_FONT}`;
       ctx.textAlign = 'center';
@@ -3846,16 +3858,6 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
       ctx.fillStyle = `rgba(255, 200, 50, ${pulse})`;
       ctx.font = `500 ${objFontSize}px ${C.HUD_FONT}`;
       ctx.fillText('ANDE ATÉ O BAÚ PARA COLETAR', C.dims.gw / 2, 2 + Math.round((objBarH + 4) * 0.72));
-    } else {
-      const boxW = Math.round(320 * ms);
-      ctx.fillStyle = `rgba(0, 60, 0, ${0.8 * pulse})`;
-      ctx.fillRect(C.dims.gw / 2 - boxW / 2, 2, boxW, objBarH + 4);
-      ctx.strokeStyle = `rgba(50, 255, 100, ${0.6 * pulse})`;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(C.dims.gw / 2 - boxW / 2, 2, boxW, objBarH + 4);
-      ctx.fillStyle = `rgba(100, 255, 100, ${pulse})`;
-      ctx.font = `500 ${Math.round(objFontSize * 1.05)}px ${C.HUD_FONT}`;
-      ctx.fillText(isMobile ? '⬆ PORTA VERDE PARA AVANÇAR ⬆' : '⬆ ANDE ATÉ A PORTA VERDE PARA AVANÇAR ⬆', C.dims.gw / 2, 2 + Math.round((objBarH + 4) * 0.72));
     }
   }
   ctx.textAlign = 'left';

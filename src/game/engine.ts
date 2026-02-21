@@ -2306,7 +2306,7 @@ export class GameEngine {
     if (room.hiddenTraps) {
       renderHiddenTraps(ctx, room.hiddenTraps, this.gameTime);
     }
-    renderDoors(ctx, room, this.gameTime, getDoorsLockedTimer() > 0, this.dungeon);
+    renderDoors(ctx, room, this.gameTime, getDoorsLockedTimer() > 0, this.dungeon, this.player.x, this.player.y);
     renderObstacles(ctx, room.obstacles);
     const isCollected = room.treasureCollected || room.shrineUsed || room.trapTriggered || false;
     renderSpecialRoom(ctx, room.type, this.gameTime, isCollected, room.trapType, this.player.x, this.player.y);
