@@ -1,7 +1,7 @@
 import { EnemyState, EnemyType, PlayerState, ProjectileState, Vec2 } from './types';
 import { updateBossAI } from './bosses';
 import * as C from './constants';
-import { makeBasicProjectile } from './enemyProjectiles';
+import { makeBasicProjectile, makeNeedleProjectile, makeHeavyProjectile } from './enemyProjectiles';
 
 export function createEnemy(type: EnemyType, x: number, y: number): EnemyState {
   const configs: Record<EnemyType, { hp: number; speed: number; damage: number; size: number }> = {
@@ -51,6 +51,13 @@ function normalize(dx: number, dy: number): Vec2 {
 }
 
 export function updateEnemy(e: EnemyState, player: PlayerState, dt: number, allEnemies: EnemyState[]): { projectiles: ProjectileState[]; exploded: boolean } {
+  if (e.dyingTimer !== undefined) {
+    e.dyingTimer -= dt;
+    // Keep flashTime active during dying phase
+    e.flashTime = 0.05;
+    return { projectiles: [], exploded: false };
+  }
+
   e.flashTime = Math.max(0, e.flashTime - dt);
   e.attackCooldown = Math.max(0, e.attackCooldown - dt);
   e.stateTimer -= dt;
@@ -121,6 +128,13 @@ export function updateEnemy(e: EnemyState, player: PlayerState, dt: number, allE
       if (e.aiState === 'charge') {
         e.x += e.vx * C.TANK_CHARGE_SPEED * dt;
         e.y += e.vy * C.TANK_CHARGE_SPEED * dt;
+
+        // Leave heavy projectile trail occasionally
+        if (e.attackCooldown <= 0) {
+          e.attackCooldown = 0.3;
+          projectiles.push(makeHeavyProjectile(e.x, e.y, 0, 0, Math.floor(e.damage * 0.8), false, 1.2));
+        }
+
         if (e.stateTimer <= 0) { e.aiState = 'cooldown'; e.stateTimer = 1.2; }
       } else if (e.aiState === 'cooldown') {
         if (e.stateTimer <= 0) e.aiState = 'chase';
@@ -281,6 +295,12 @@ export function updateEnemy(e: EnemyState, player: PlayerState, dt: number, allE
           e.vy = n.y;
         }
       } else if (e.aiState === 'chase') {
+        // Fire needle on first frame of visibility
+        if (e.stateTimer > 0.13 && e.attackCooldown <= 0) {
+          const angle = Math.atan2(dy, dx);
+          projectiles.push(makeNeedleProjectile(e.x, e.y, angle, e.damage));
+          e.attackCooldown = 0.5; // Prevent firing more than once per visible phase
+        }
         // Blazing fast charge while visible
         e.x += e.vx * e.speed * dt;
         e.y += e.vy * e.speed * dt;
@@ -376,6 +396,7 @@ export function updateEnemy(e: EnemyState, player: PlayerState, dt: number, allE
 }
 
 export function damageEnemy(e: EnemyState, dmg: number, kx: number, ky: number): boolean {
+  if (e.isDying) return false;
   e.hp -= dmg;
   e.flashTime = 0.12;
   e.knockbackX += kx * 30;

@@ -1,4 +1,4 @@
-import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, GameStats, GameCallbacks, ScreenEffect, Upgrade, DungeonRoom, HorrorEvent, ShopItem, WeaponType } from './types';
+import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, GameStats, GameCallbacks, ScreenEffect, Upgrade, DungeonRoom, HorrorEvent, ShopItem, WeaponType, EssenceCore } from './types';
 import { InputManager } from './input';
 import { createPlayer, updatePlayer, tryDash, tryMelee, canRangedAttack, doRangedAttack, addXP, damagePlayer } from './player';
 import { createEnemy, updateEnemy, damageEnemy, scaleEnemyForFloor, getXPForEnemy, createBossForFloor, consumeBossAction, setBossFloor } from './enemies';
@@ -12,7 +12,8 @@ import {
   spawnImpactGlint, spawnBladeShard, spawnVacuumOrigin
 } from './particles';
 import { getRandomUpgrades, checkSynergies, getOwnedTags, SYNERGIES } from './upgrades';
-import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins, renderWeaponSelectionOverlay, spawnVacuumImpact, ProjectileOrigin, HandCastEffect, EnemyProjectileImpact, StaffChargeEffect, StaffImpactEffect } from './renderer';
+import { PortalManager } from './portals';
+import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins, renderWeaponSelectionOverlay, spawnVacuumImpact, ProjectileOrigin, HandCastEffect, EnemyProjectileImpact, StaffChargeEffect, StaffImpactEffect, renderEssenceCores, renderDimensionalRift } from './renderer';
 import { SFX, initAudio } from './audio';
 import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive, updateHPHorror, renderHPHorror, getHPLightPulse } from './horror';
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
@@ -25,6 +26,7 @@ import { MerchantNPC } from './npc/Merchant';
 import { AlchemistNPC } from './npc/Alchemist';
 import { KatanaComboController } from './katana_combo';
 import { StaffWeaponController } from './staff_controller';
+import { DimensionalDeathEffect, DeathParticles, EssenceCoreDrop, EssenceMagnetSystem } from './dimensional_death';
 
 export class GameEngine {
   player: PlayerState;
@@ -35,6 +37,8 @@ export class GameEngine {
   stats: GameStats;
   effects: ScreenEffect[] = [];
   horrorEvents: HorrorEvent[] = [];
+  essenceCores: EssenceCore[] = [];
+  portalManager: PortalManager;
 
   input: InputManager;
   gameCanvas: HTMLCanvasElement;
@@ -130,6 +134,7 @@ export class GameEngine {
     this.input = new InputManager();
     this.input.attachCanvas(displayCanvas);
     this.callbacks = callbacks;
+    this.portalManager = new PortalManager();
     this.player = createPlayer();
     this.player.trail = [];
     this.dungeon = generateDungeon(1);
@@ -594,6 +599,15 @@ export class GameEngine {
           this.updateWeaponSelection(dt);
         } else {
           this.update(effectiveDt);
+          this.essenceCores = EssenceMagnetSystem.update(this.essenceCores, this.player, this.particles, effectiveDt, (core) => {
+            const collectorBonus = getSoulCollectorBonus(this.amuletInventory);
+            const soulGain = core.souls + collectorBonus;
+            this.player.souls += soulGain;
+            this.player.xpGlowTimer = 0.5;
+            const leveledUp = addXP(this.player, Math.floor(core.xp * this.player.xpMultiplier));
+            if (leveledUp && core.type !== 'boss') this.handleLevelUp();
+            spawnDamageText(this.particles, this.player.x, this.player.y - 12, `+${soulGain}`, '#ac4dff');
+          });
 
           // Alchemist Interaction
           if (this.inVendorRoom && !this.shopOpen && !this.vendorDialogueActive) {
@@ -1077,6 +1091,14 @@ export class GameEngine {
     const deadEnemySet = new Set<EnemyState>();
 
     for (const enemy of this.enemies) {
+      if (enemy.isDying) {
+        // Decrement timer and remove immediately when expired
+        if (enemy.dyingTimer !== undefined) {
+          enemy.dyingTimer -= dt;
+        }
+        deadEnemySet.add(enemy); // Always remove dying enemies on next cycle
+        continue;
+      }
       if (deadEnemySet.has(enemy)) continue;
       const result = updateEnemy(enemy, this.player, dt, this.enemies);
 
@@ -1277,9 +1299,12 @@ export class GameEngine {
             // Removed knockback for projectiles (was 1.5, now 0) as per user request
             // "so tomar o tiro" - no physical displacement
             const dead = damageEnemy(e, dmg, 0, 0);
+            if (dead) {
+              e.lastHitAngle = p.angle || Math.atan2(p.vy, p.vx);
+            }
             this.stats.damageDealt += dmg;
             spawnDamageText(this.particles, e.x, e.y, `${dmg}`);
-            spawnBlood(this.particles, e.x, e.y, 4);
+            spawnSpark(this.particles, e.x, e.y, '#ac4dff', 4);
 
             if (p.projectileKind === 'staff_bolt') {
               StaffImpactEffect.spawn(this.particles, p.x, p.y);
@@ -1299,6 +1324,7 @@ export class GameEngine {
             if (dead) {
               this.onEnemyKilled(e);
               projDeadEnemies.add(e);
+              deadEnemySet.add(e); // also mark for removal in the central enemy set filter below
             }
 
             if (p.explosive) {
@@ -1415,6 +1441,19 @@ export class GameEngine {
       spawnFog(this.particles, this.player.x, this.player.y);
     }
 
+    // Essence Collection Logic
+    this.essenceCores = EssenceMagnetSystem.update(
+      this.essenceCores,
+      this.player,
+      this.particles,
+      dt,
+      (core) => {
+        // Award rewards from core
+        addXP(this.player, core.xp, this.callbacks);
+        this.player.souls += core.souls;
+      }
+    );
+
     // Vendor interact cooldown tick
     if (this.vendorInteractCooldown > 0) this.vendorInteractCooldown -= dt;
 
@@ -1509,7 +1548,6 @@ export class GameEngine {
       }
       room.cleared = true;
       SFX.doorOpen();
-      spawnExplosion(this.particles, C.dims.gw / 2, C.dims.gh / 2, 8);
       if (room.isBossRoom && !this.pendingNextFloor) {
         console.log(`[BOSS] Boss defeated on floor ${this.dungeon.floor}, advancing...`);
         this.pendingNextFloor = true;
@@ -1521,6 +1559,12 @@ export class GameEngine {
     // Door transition — blocked if doors are locked by trap
     if (room.cleared && !room.isBossRoom && getDoorsLockedTimer() <= 0) {
       this.checkDoorTransition(room);
+    }
+
+    // Portal Interaction
+    const nearPortal = this.portalManager.checkProximity(this.player);
+    if (nearPortal && this.input.isJustPressed('e')) {
+      this.enterPortal(nearPortal);
     }
 
     // Screen effects
@@ -1645,11 +1689,14 @@ export class GameEngine {
       const ny = dist > 0 ? dy / dist : 0;
       // Fixed: knockback is now defined in doMeleeHit scope
       const dead = damageEnemy(e, dmg, nx * knockback, ny * knockback);
+      if (dead) {
+        e.lastHitAngle = Math.atan2(ny, nx);
+      }
       this.stats.damageDealt += dmg;
       spawnDamageText(this.particles, e.x, e.y, `${dmg}`);
 
       // Elegant slice particles (vibrant energy sparks)
-      spawnBlood(this.particles, e.x, e.y, 4);
+      spawnSpark(this.particles, e.x, e.y, '#ac4dff', 5);
       // Bright white/blue energy sparks for contact feedback
       spawnSpark(this.particles, e.x, e.y, '#ffffff', 6);
       spawnSpark(this.particles, e.x, e.y, '#66ccff', 12);
@@ -1669,6 +1716,7 @@ export class GameEngine {
     }
 
     if (meleeDeadSet.size > 0) {
+      // Immediate removal for melee kills — dead enemies must vanish right away
       this.enemies = this.enemies.filter(e => !meleeDeadSet.has(e));
     }
 
@@ -1690,49 +1738,54 @@ export class GameEngine {
   }
 
   private onEnemyKilled(e: EnemyState, byMelee = false) {
-    this.stats.enemiesDefeated++;
+    const isBoss = e.type === 'boss';
+
+    // 1) HIT STOP
+    // Micro-freeze for impact satisfaction
+    this.hitStopTimer = isBoss ? 0.15 : 0.06;
+
+    // 2) Marcar como morto imediatamente — bloqueia IA, colisão e dano
+    e.isDying = true;
+    e.dyingTimer = 0; // 0 = remoção garantida no primeiro ciclo do update
+    e.hp = 0;        // Garantir HP = 0
+
+    // 3) SCREEN SHAKE
+    const shakeIntensity = isBoss ? 15 : (e.type === 'tank' || e.type === 'necromancer' ? 6 : 2.5);
+    this.addEffect('shake', shakeIntensity, isBoss ? 0.6 : 0.15);
+
+    // 4) DIMENSIONAL FRAGMENTATION (Particles)
+    const particleCount = isBoss ? 30 : 12;
+    const angle = e.lastHitAngle ?? (Math.random() * Math.PI * 2);
+    DeathParticles.spawn(this.particles, e.x, e.y, angle, particleCount, isBoss);
+
+    // 5) NÚCLEO DE ESSÊNCIA (DROP)
     const xpAmount = getXPForEnemy(e.type);
-
-    // Soul drop — elegant blue energy animation flying to player
     const soulAmount = this.getSoulsForEnemy(e.type);
-    this.player.souls += soulAmount;
-    spawnSoulCollectParticle(this.particles, e.x, e.y, this.player.x, this.player.y, soulAmount);
-    spawnDamageText(this.particles, e.x, e.y + 10, `+${soulAmount}`, '#66aaff');
-    SFX.soulCollect();
-    spawnBloodMark(e.x, e.y);
+    const core = EssenceCoreDrop.create(e.x, e.y, isBoss, xpAmount, soulAmount);
+    this.essenceCores.push(core);
 
-    if (e.type === 'boss') {
-      // BOSS KILL IMPACT — massive explosion + slow-mo
-      this.slowMoTimer = 1.2;
-      this.slowMoFactor = 0.15;
-      spawnExplosion(this.particles, e.x, e.y, 50);
-      spawnSpark(this.particles, e.x, e.y, '#ffffff', 20);
-      spawnSpark(this.particles, e.x, e.y, '#ffaa00', 15);
-      spawnEmbers(this.particles, e.x, e.y, 20);
-      for (let i = 0; i < 5; i++) {
-        const a = (i / 5) * Math.PI * 2;
-        spawnExplosion(this.particles, e.x + Math.cos(a) * 30, e.y + Math.sin(a) * 30, 15);
-      }
-      this.addEffect('shake', 15, 0.8);
-      this.addEffect('flash', 1, 0.5, 'rgb(255, 255, 255)');
-      setTimeout(() => this.addEffect('flash', 0.8, 0.3, 'rgb(255, 200, 100)'), 200);
-      setTimeout(() => this.addEffect('flash', 0.6, 0.2, 'rgb(255, 100, 50)'), 400);
+    // 6) BOSS SPECIALS
+    if (isBoss) {
+      DimensionalDeathEffect.spawnWave(this.particles, e.x, e.y);
+      this.addEffect('flash', 1, 0.4, 'rgba(100, 0, 200, 0.5)');
       SFX.bossKill(this.bossKillFloor);
+
       // Drop amulet — add to inventory directly, reveal handled by bossKillSequence
       const amuletId = getRandomBossAmuletDrop(this.amuletInventory);
       if (amuletId) {
         addAmulet(this.amuletInventory, amuletId);
         this._pendingBossAmuletId = amuletId;
       }
-      // Boss XP is granted but do NOT trigger level-up here (bossKillSequence handles it)
+
+      this.slowMoTimer = 1.2;
+      this.slowMoFactor = 0.2;
     } else {
-      if (byMelee) {
-        spawnSpark(this.particles, e.x, e.y, '#ffffff', 8);
-      } else {
-        spawnExplosion(this.particles, e.x, e.y, 10);
-      }
       SFX.enemyDeath();
+      // Legacy soul collect replaced by essence system, but keep souls for now
+      // We'll award souls when essence is picked up
     }
+
+    this.stats.enemiesDefeated++;
 
     // War Rhythm amulet — gain attack speed on kill
     if (isAmuletEquipped(this.amuletInventory, 'war_rhythm')) {
@@ -1740,30 +1793,18 @@ export class GameEngine {
       this.warRhythm.decayTimer = this.warRhythm.decayDelay;
     }
 
-    // Melee kill reward: small heal + brief speed boost
+    // Melee kill reward: small heal
     if (byMelee) {
       const healAmt = 3;
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + healAmt);
       spawnDamageText(this.particles, this.player.x, this.player.y - 14, `+${healAmt}`, C.COLORS.healText);
-      // Temporary speed burst for 0.8s
-      this.player.moveSpeedMult *= 1.15;
-      setTimeout(() => { this.player.moveSpeedMult /= 1.15; }, 800);
       // Brief slow-mo on melee kill for impact feel
       this.slowMoTimer = Math.max(this.slowMoTimer, 0.08);
       this.slowMoFactor = Math.min(this.slowMoFactor, 0.4);
     }
 
-    if (this.player.lifesteal > 0) {
-      this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.player.lifesteal);
-      spawnDamageText(this.particles, this.player.x, this.player.y - 10, `+${this.player.lifesteal}`, C.COLORS.healText);
-    }
-
-    SFX.xpPickup();
-    this.player.xpGlowTimer = 1.0;
-    const xpGain = Math.floor(xpAmount * this.player.xpMultiplier);
-    const leveledUp = addXP(this.player, xpGain);
-    // Boss level-up is handled by bossKillSequence — skip XP-based level-up for bosses
-    if (leveledUp && e.type !== 'boss') this.handleLevelUp();
+    // NOTE: Remoção real do inimigo da lista ocorre no update loop via deadEnemySet
+    // A verificação de liberação das fendas (enemies.length === 0) acontece APÓS a remoção real
   }
 
   private handleLevelUp(guaranteeLegendary = false) {
@@ -1788,10 +1829,39 @@ export class GameEngine {
     this.handleLevelUp(true); // guarantee at least 1 legendary
   }
 
-  // Start victory countdown — called after boss level-up upgrade is selected
-  startVictoryCountdown() {
-    this.victoryActive = true;
-    this.victoryCountdown = this.victoryCountdownMax;
+  // Manual Rift/Portal spawning — replaces victory timer
+  spawnExitPortal() {
+    this.pendingNextFloor = true;
+    const px = Math.floor(C.dims.gw / 2);
+    const py = Math.floor(C.dims.gh / 2);
+
+    this.portalManager.addPortal({
+      id: `exit_${this.dungeon.floor}`,
+      x: px,
+      y: py,
+      state: 'available',
+      targetFloor: this.dungeon.floor + 1
+    });
+
+    this.addEffect('flash', 1, 0.4, 'rgba(140, 60, 255, 0.4)');
+    SFX.portalSpawn?.(); // Fallback if not defined
+  }
+
+  enterPortal(portal: Portal) {
+    // 1) Logic
+    this.portalManager.markCompleted(portal.id);
+    this.addEffect('flash', 2, 0.6, 'rgba(30, 0, 80, 0.8)');
+    SFX.portalEnter?.(); // Fallback if not defined
+
+    // 2) Visual / Flow
+    if (this.callbacks.onPortalEnter) {
+      this.callbacks.onPortalEnter(portal);
+    }
+
+    // 3) Transition
+    setTimeout(() => {
+      this.nextFloor();
+    }, 600);
   }
 
   private checkDoorTransition(room: DungeonRoom) {
@@ -2381,12 +2451,17 @@ export class GameEngine {
       renderHiddenTraps(ctx, room.hiddenTraps, this.gameTime);
     }
     renderDoors(ctx, room, this.gameTime, getDoorsLockedTimer() > 0, this.dungeon, this.player.x, this.player.y);
+    this.portalManager.getPortals().forEach(p => renderDimensionalRift(ctx, p, this.gameTime, this.player.x, this.player.y));
     renderObstacles(ctx, room.obstacles);
     const isCollected = room.treasureCollected || room.shrineUsed || room.trapTriggered || false;
     renderSpecialRoom(ctx, room.type, this.gameTime, isCollected, room.trapType, this.player.x, this.player.y);
 
     for (const p of this.projectiles) renderProjectile(ctx, p, this.gameTime);
-    for (const e of this.enemies) renderEnemy(ctx, e, this.gameTime);
+    for (const e of this.enemies) {
+      if (e.isDying) continue; // skip dead enemies — should already be removed, safety guard
+      renderEnemy(ctx, e, this.gameTime);
+    }
+    renderEssenceCores(ctx, this.essenceCores, this.gameTime);
     renderPlayer(ctx, this.player, this.gameTime);
 
     // Weapon Specific Effects

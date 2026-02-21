@@ -67,9 +67,9 @@ const Index = () => {
 
   const handleUpgradeSelect = useCallback((upgrade: Upgrade) => {
     engineRef.current?.applyUpgrade(upgrade);
-    // If boss room was just cleared, start victory countdown after upgrade selection
+    // If boss room was just cleared, spawn exit portal after upgrade selection
     if (engineRef.current && (engineRef.current as any).pendingNextFloor) {
-      (engineRef.current as any).startVictoryCountdown();
+      (engineRef.current as any).spawnExitPortal();
     }
     setGameState('playing');
   }, []);
@@ -220,6 +220,11 @@ const Index = () => {
     engineRef.current?.closeSanctuary();
   }, []);
 
+  const handlePortalEnter = useCallback((portal: any) => {
+    // Add any global UI effects or narrations here if needed
+    console.log(`[INDEX] Player entered portal: ${portal.id}`);
+  }, []);
+
   const handleSanctuaryHeal = useCallback(() => {
     console.log('[INDEX] handleSanctuaryHeal triggered');
     const engine = engineRef.current;
@@ -314,6 +319,7 @@ const Index = () => {
               onOpenMap={handleOpenMap}
               onSanctuaryOpen={handleSanctuaryOpen}
               onSanctuaryClose={handleSanctuaryClose}
+              onPortalEnter={handlePortalEnter}
               engineRef={engineRef}
             />
             {gameState === 'upgrading' && upgradeChoices.length > 0 && (

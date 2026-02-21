@@ -17,6 +17,7 @@ interface GameCanvasProps {
   onOpenMap: () => void;
   onSanctuaryOpen: () => void;
   onSanctuaryClose: () => void;
+  onPortalEnter?: (portal: any) => void;
   engineRef: React.MutableRefObject<GameEngine | null>;
 }
 
@@ -24,7 +25,7 @@ const GameCanvas = ({
   onLevelUp, onGameOver, onSynergyActivated, onFloorChange,
   onShopOpen, onShopClose, onAmuletDrop, onInventoryOpen,
   onInventoryClose, onAmuletReveal, onOpenMap, onSanctuaryOpen,
-  onSanctuaryClose, engineRef
+  onSanctuaryClose, onPortalEnter, engineRef
 }: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -45,6 +46,7 @@ const GameCanvas = ({
       onAmuletReveal,
       onSanctuaryOpen,
       onSanctuaryClose,
+      onPortalEnter,
     };
 
     const engine = new GameEngine(canvas, callbacks);

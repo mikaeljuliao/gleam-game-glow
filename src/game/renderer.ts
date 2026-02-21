@@ -1,4 +1,4 @@
-﻿import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, DungeonRoom, Obstacle, ScreenEffect, Viewport, WeaponType } from './types';
+﻿import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, DungeonRoom, Obstacle, ScreenEffect, Viewport, WeaponType, ProjectileOrigin, HandCastEffect, EnemyProjectileImpact, StaffChargeEffect, StaffImpactEffect, Portal, EssenceCore } from './types';
 import { HiddenTrap } from './traps';
 import * as C from './constants';
 import { getBrightness } from './brightness';
@@ -1938,6 +1938,9 @@ export function renderWeaponSelectionOverlay(ctx: CanvasRenderingContext2D, sele
 
 
 export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: number) {
+  // Never render dead enemies — they must be removed from the list before rendering
+  if (e.isDying) return;
+
   if (e.spawnTimer > 0) {
     // Spawn animation - growing circle
     const progress = 1 - (e.spawnTimer / 0.4);
@@ -1968,7 +1971,9 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
   ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
   ctx.fillRect(x - half + 1, y + half - 1, s - 2, 2);
 
-  if (e.flashTime > 0) {
+  if (e.isDying) {
+    ctx.fillStyle = '#1a0033'; // Deep dimensional purple
+  } else if (e.flashTime > 0) {
     ctx.fillStyle = C.COLORS.white;
   } else {
     const colorMap: Record<string, string> = {
@@ -3484,8 +3489,41 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
     const by = y - half - 7;
     ctx.fillStyle = C.COLORS.hpBg;
     ctx.fillRect(bx, by, barW_hp, barH_hp);
-    ctx.fillStyle = e.hp / e.maxHp > 0.3 ? C.COLORS.hpFill : '#ff6600';
+    ctx.fillStyle = e.hp / e.maxHp > 0.3 ? C.COLORS.hpFill : '#cc2200';
     ctx.fillRect(bx, by, barW_hp * (e.hp / e.maxHp), barH_hp);
+  }
+}
+
+export function renderEssenceCores(ctx: CanvasRenderingContext2D, cores: EssenceCore[], time: number) {
+  for (const core of cores) {
+    const isBoss = core.type === 'boss';
+    const s = (isBoss ? 8 : 4) + Math.sin(time * 10) * 1;
+
+    ctx.save();
+    // Glow
+    const gradient = ctx.createRadialGradient(core.x, core.y, 0, core.x, core.y, s * 2.5);
+    gradient.addColorStop(0, 'rgba(106, 13, 173, 0.4)');
+    gradient.addColorStop(1, 'rgba(106, 13, 173, 0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(core.x, core.y, s * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pulse Core
+    const pulse = 0.8 + Math.sin(time * 8) * 0.2;
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = '#ac4dff';
+    ctx.beginPath();
+    ctx.arc(core.x, core.y, s * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Middle spark
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(core.x, core.y, s * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
   }
 }
 
@@ -4207,6 +4245,80 @@ export const EnemyProjectileImpact = {
   }
 };
 
+/**
+ * Render a Dimensional Rift (Victory/Progression Portal)
+ */
+export function renderDimensionalRift(ctx: CanvasRenderingContext2D, portal: Portal, time: number, playerX: number, playerY: number) {
+  const { x, y, state } = portal;
+  const dx = playerX - x;
+  const dy = playerY - y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  // Proximity pulsation factor
+  const isNear = dist < 70;
+  const proximityMult = isNear ? 2.5 : 1.0;
+  const pulse = Math.sin(time * 3 * proximityMult) * 0.1 + 0.95;
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  // 1. Outer Atmospheric Glow
+  const glowAlpha = (state === 'locked' ? 0.15 : state === 'completed' ? 0.1 : 0.35) * pulse;
+  const baseColor = state === 'completed' ? '80, 70, 110' : '50, 0, 100';
+
+  const glowGrad = ctx.createRadialGradient(0, 0, 10 * pulse, 0, 0, 45 * pulse);
+  glowGrad.addColorStop(0, `rgba(${baseColor}, ${glowAlpha})`);
+  glowGrad.addColorStop(0.6, `rgba(${baseColor}, ${glowAlpha * 0.4})`);
+  glowGrad.addColorStop(1, `rgba(${baseColor}, 0)`);
+
+  ctx.fillStyle = glowGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 40 * pulse, 80 * pulse, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. The Rift Void (Vertical fissure)
+  ctx.fillStyle = '#020005';
+  ctx.beginPath();
+
+  const freq = time * 2.5;
+  const h = 55 * pulse;
+  const w = state === 'locked' ? 4 : 18;
+
+  ctx.moveTo(0, -h);
+  for (let i = -h; i <= h; i += 5) {
+    const taper = 1 - Math.pow(i / h, 2);
+    const noise = (Math.sin(freq + i * 0.1) * 4 + Math.cos(freq * 0.6 + i * 0.25) * 3);
+    ctx.lineTo((w + noise) * taper, i);
+  }
+  for (let i = h; i >= -h; i -= 5) {
+    const taper = 1 - Math.pow(i / h, 2);
+    const noise = (Math.sin(freq * 1.3 - i * 0.12) * 4 + Math.sin(freq * 0.4 + i * 0.15) * 2);
+    ctx.lineTo((-w + noise) * taper, i);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // 3. Shimmering Border
+  ctx.strokeStyle = state === 'completed' ? 'rgba(120, 120, 150, 0.3)' : `rgba(160, 80, 255, ${0.4 * pulse})`;
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+
+  // 4. Suction effects
+  if (state === 'available') {
+    const particleCount = isNear ? 6 : 3;
+    for (let i = 0; i < particleCount; i++) {
+      const seed = (i * 0.5) + (portal.id.length * 0.1);
+      const pTime = (time * 0.8 + seed) % 1;
+      const pDist = (60 * (1 - pTime)) + 5;
+      const pAngle = (seed * 10) + (time * 0.5);
+      ctx.fillStyle = `rgba(180, 100, 255, ${0.6 * pTime})`;
+      ctx.fillRect(Math.cos(pAngle) * pDist, Math.sin(pAngle) * pDist, 1.5, 1.5);
+    }
+  }
+
+  ctx.restore();
+}
+
 export function renderParticles(ctx: CanvasRenderingContext2D, particles: Particle[]) {
   for (const p of particles) {
     const alpha = Math.max(0, p.life / p.maxLife);
@@ -4264,6 +4376,15 @@ export function renderParticles(ctx: CanvasRenderingContext2D, particles: Partic
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
       ctx.fill();
+      ctx.globalAlpha = 1;
+    } else if (p.type === 'dimensional_shard') {
+      ctx.globalAlpha = alpha * 0.8;
+      ctx.fillStyle = p.color;
+      // Shards have a slight glow
+      ctx.shadowBlur = 4;
+      ctx.shadowColor = p.color;
+      ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+      ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
     } else if (p.type === 'spark') {
       ctx.globalAlpha = alpha;
@@ -4497,7 +4618,16 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
     drawHudText(ctx, objText, C.dims.gw / 2, 4 + Math.round(objBarH * 0.75), objColor);
   } else if (room.cleared) {
     const pulse = Math.sin(time * 5) * 0.3 + 0.7;
-    if (room.type === 'shrine' && !room.shrineUsed) {
+    // Special objective for boss victory (portal spawned)
+    if (room.isBossRoom) {
+      const boxW = Math.round(260 * ms);
+      ctx.fillStyle = `rgba(30, 0, 50, ${0.7 * pulse})`;
+      ctx.fillRect(C.dims.gw / 2 - boxW / 2, 2, boxW, objBarH + 4);
+      ctx.fillStyle = `rgba(200, 100, 255, ${pulse})`;
+      ctx.font = `600 ${objFontSize}px ${C.HUD_FONT}`;
+      ctx.textAlign = 'center';
+      drawHudText(ctx, 'ENTRE NA FENDA DIMENSIONAL', C.dims.gw / 2, 2 + Math.round((objBarH + 4) * 0.75), `rgba(200, 100, 255, ${pulse})`, 1.2);
+    } else if (room.type === 'shrine' && !room.shrineUsed) {
       const boxW = Math.round(280 * ms);
       ctx.fillStyle = `rgba(40, 20, 60, ${0.8 * pulse})`;
       ctx.fillRect(C.dims.gw / 2 - boxW / 2, 2, boxW, objBarH + 4);

@@ -99,6 +99,16 @@ export interface PlayerState {
   staffChargeTarget: Vec2;
 }
 
+export type PortalState = 'locked' | 'available' | 'completed';
+
+export interface Portal {
+  id: string;
+  x: number;
+  y: number;
+  state: PortalState;
+  targetFloor: number;
+}
+
 export type WeaponType = 'sword' | 'daggers' | 'staff';
 
 export type EnemyType = 'chaser' | 'shooter' | 'tank' | 'boss' | 'wraith' | 'bomber' | 'swarm' | 'necromancer' | 'stalker' | 'phantom' | 'flash_hunter' | 'distortion' | 'flicker_fiend' | 'warper' | 'accelerator';
@@ -138,6 +148,23 @@ export interface EnemyState {
   // Necromancer specific
   summonTimer: number;
   lastVolleyId?: number;
+  // Death system
+  isDying?: boolean;
+  dyingTimer?: number;
+  lastHitAngle?: number;
+}
+
+export interface EssenceCore {
+  id: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  collected: boolean;
+  spawnTime: number; // For pulsing and magnetism delay
+  type: 'basic' | 'boss';
+  xp: number;
+  souls: number;
 }
 
 export interface ProjectileState {
@@ -174,7 +201,7 @@ export interface Particle {
   maxLife: number;
   size: number;
   color: string;
-  type: 'blood' | 'dust' | 'xp' | 'text' | 'explosion' | 'spark' | 'trail' | 'shockwave' | 'ember' | 'ghost' | 'fog' | 'horror' | 'soul';
+  type: 'blood' | 'dust' | 'xp' | 'text' | 'explosion' | 'spark' | 'trail' | 'shockwave' | 'ember' | 'ghost' | 'fog' | 'horror' | 'soul' | 'dimensional_shard' | 'essence_trail';
   text?: string;
   radius?: number;
 }
@@ -292,4 +319,5 @@ export interface GameCallbacks {
   onAmuletReveal: (amuletId: string) => void;
   onSanctuaryOpen: () => void;
   onSanctuaryClose: () => void;
+  onPortalEnter?: (portal: Portal) => void;
 }
