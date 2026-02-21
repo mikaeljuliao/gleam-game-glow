@@ -14,19 +14,19 @@ function generateObstacles(room: DungeonRoom): Obstacle[] {
   if (room.type === 'start') return [];
   const obstacles: Obstacle[] = [];
   const count = room.isBossRoom ? 2 : randomInt(2, 5);
-  
+
   for (let i = 0; i < count; i++) {
     const w = randomInt(1, 2) * C.TILE_SIZE;
     const h = randomInt(1, 2) * C.TILE_SIZE;
     const x = randomInt(3, C.dims.rc - 5) * C.TILE_SIZE;
     const y = randomInt(3, C.dims.rr - 5) * C.TILE_SIZE;
-    
+
     const cx = x + w / 2;
     const cy = y + h / 2;
     const midX = C.dims.gw / 2;
     const midY = C.dims.gh / 2;
     if ((Math.abs(cx - midX) < 40 && (cy < 40 || cy > C.dims.gh - 40)) ||
-        (Math.abs(cy - midY) < 40 && (cx < 40 || cx > C.dims.gw - 40))) {
+      (Math.abs(cy - midY) < 40 && (cx < 40 || cx > C.dims.gw - 40))) {
       continue;
     }
     obstacles.push({ x, y, w, h });
@@ -80,7 +80,7 @@ function generateEnemySpawns(room: DungeonRoom, floor: number): EnemySpawn[] {
   const count = randomInt(7, 12) + Math.floor(floor * 2);
   const spawns: EnemySpawn[] = [];
   const types = getEnemyTypes(floor);
-  
+
   // Sometimes spawn a swarm wave (cluster of swarm enemies)
   if (Math.random() < 0.4) {
     const swarmCount = randomInt(5, 9);
@@ -111,27 +111,27 @@ export function generateDungeon(floor: number): DungeonMap {
   const center = Math.floor(C.DUNGEON_SIZE / 2);
   const rooms = new Map<string, DungeonRoom>();
   const targetRooms = randomInt(C.MIN_ROOMS, C.MAX_ROOMS);
-  
+
   const visited = new Set<string>();
   const path: Array<{ x: number; y: number }> = [{ x: center, y: center }];
   visited.add(roomKey(center, center));
-  
+
   const dirs = [
     { dx: 0, dy: -1 }, { dx: 0, dy: 1 },
     { dx: -1, dy: 0 }, { dx: 1, dy: 0 },
   ];
-  
+
   let current = { x: center, y: center };
   let attempts = 0;
-  
+
   while (visited.size < targetRooms && attempts < 200) {
     attempts++;
     const dir = dirs[randomInt(0, 3)];
     const nx = current.x + dir.dx;
     const ny = current.y + dir.dy;
-    
+
     if (nx < 0 || nx >= C.DUNGEON_SIZE || ny < 0 || ny >= C.DUNGEON_SIZE) continue;
-    
+
     const key = roomKey(nx, ny);
     if (!visited.has(key)) {
       visited.add(key);
@@ -139,7 +139,7 @@ export function generateDungeon(floor: number): DungeonMap {
     }
     current = { x: nx, y: ny };
   }
-  
+
   let maxDist = 0;
   let bossPos = path[path.length - 1];
   for (const pos of path) {
@@ -157,27 +157,27 @@ export function generateDungeon(floor: number): DungeonMap {
   // Always add a vendor room
   specialTypes.push('vendor');
   if (path.length > 8) specialTypes.push('trap');
-  
+
   // Pick random non-start, non-boss rooms for specials
   const normalIndices = path
     .map((pos, i) => ({ pos, i }))
     .filter(({ pos }) => !(pos.x === center && pos.y === center) && !(pos.x === bossPos.x && pos.y === bossPos.y));
-  
+
   const shuffled = normalIndices.sort(() => Math.random() - 0.5);
   const specialAssign = new Map<number, 'treasure' | 'trap' | 'vendor'>();
   for (let i = 0; i < Math.min(specialTypes.length, shuffled.length); i++) {
     specialAssign.set(shuffled[i].i, specialTypes[i]);
   }
-  
+
   for (let idx = 0; idx < path.length; idx++) {
     const pos = path[idx];
     const key = roomKey(pos.x, pos.y);
     const isStart = pos.x === center && pos.y === center;
     const isBoss = pos.x === bossPos.x && pos.y === bossPos.y && !isStart;
     const specialType = specialAssign.get(idx);
-    
+
     let roomType: DungeonRoom['type'] = isStart ? 'start' : isBoss ? 'boss' : specialType || 'normal';
-    
+
     const room: DungeonRoom = {
       gridX: pos.x, gridY: pos.y,
       doors: {
@@ -195,7 +195,7 @@ export function generateDungeon(floor: number): DungeonMap {
       shrineUsed: false,
       trapType: roomType === 'trap' ? (['spikes', 'phantom_summon', 'poison_cloud', 'bear_trap'] as TrapType[])[randomInt(0, 3)] : undefined,
     };
-    
+
     room.obstacles = generateObstacles(room);
     // Generate hidden traps for trap rooms
     room.hiddenTraps = generateHiddenTraps(roomType, floor);
@@ -222,7 +222,7 @@ export function generateDungeon(floor: number): DungeonMap {
     }
     rooms.set(key, room);
   }
-  
+
   return { rooms, currentRoomKey: roomKey(center, center), floor };
 }
 

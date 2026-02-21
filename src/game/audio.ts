@@ -644,6 +644,14 @@ export const SFX = {
     playNoise(0.25, 0.1, 500);
     playFreqSweep(150, 60, 0.2, 'sawtooth', 0.08);
   },
+  portalSpawn() {
+    playFreqSweep(100, 600, 0.5, 'sine', 0.1);
+    playNoise(0.4, 0.08, 1200);
+  },
+  portalEnter() {
+    playFreqSweep(600, 100, 0.4, 'sine', 0.12);
+    playNoise(0.3, 0.1, 800);
+  },
 };
 
 // Initialize audio on first user interaction

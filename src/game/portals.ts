@@ -52,7 +52,7 @@ export class PortalManager {
             const dy = player.y - portal.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
-            if (dist < 30) {
+            if (dist < 100) {
                 return portal;
             }
         }

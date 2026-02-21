@@ -36,9 +36,9 @@ const AmuletInventoryOverlay = ({ inventory, souls, onToggleEquip, onToggleConsu
       <div
         className="relative flex flex-col rounded-xl border w-full max-w-xl"
         style={{
-          background: 'linear-gradient(180deg, rgba(20, 22, 35, 0.98) 0%, rgba(10, 12, 22, 1) 100%)',
-          borderColor: 'rgba(80, 140, 220, 0.4)',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(80, 140, 220, 0.1)',
+          background: 'linear-gradient(180deg, rgba(20, 10, 35, 0.98) 0%, rgba(10, 5, 20, 1) 100%)',
+          borderColor: 'rgba(106, 13, 173, 0.4)',
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(106, 13, 173, 0.1)',
           maxHeight: '90vh',
           display: 'grid',
           gridTemplateRows: 'auto auto 1fr auto',
@@ -47,29 +47,29 @@ const AmuletInventoryOverlay = ({ inventory, souls, onToggleEquip, onToggleConsu
         {/* Header */}
         <div
           className="flex items-center justify-between px-6 py-4"
-          style={{ borderBottom: '1px solid rgba(80, 140, 220, 0.2)' }}
+          style={{ borderBottom: '1px solid rgba(106, 13, 173, 0.2)' }}
         >
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded bg-blue-500/10 border border-blue-500/20">
+            <div className="p-2 rounded bg-purple-500/10 border border-purple-500/20">
               <span className="text-xl">🎒</span>
             </div>
             <div>
-              <h2 className="text-lg font-bold text-blue-100 uppercase tracking-widest m-0">Inventário</h2>
-              <div className="text-[9px] text-blue-400 uppercase tracking-tighter opacity-70">Recursos e Relíquias</div>
+              <h2 className="text-lg font-bold text-purple-100 uppercase tracking-widest m-0">Inventário</h2>
+              <div className="text-[9px] text-purple-400 uppercase tracking-tighter opacity-70">Recursos e Relíquias</div>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
             {/* Soul status */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-900/20 border border-blue-400/20">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-900/20 border border-purple-400/20">
               <svg width="12" height="12" viewBox="0 0 14 14">
-                <polygon points="7,1 12,7 7,13 2,7" fill="#5599dd" />
-                <polygon points="7,3 10,7 7,11 4,7" fill="#88ccff" />
+                <polygon points="7,1 12,7 7,13 2,7" fill="#6a0dad" />
+                <polygon points="7,3 10,7 7,11 4,7" fill="#ac4dff" />
               </svg>
-              <span className="text-sm font-bold text-blue-300 font-mono">{souls}</span>
+              <span className="text-sm font-bold text-purple-300 font-mono">{souls}</span>
             </div>
 
-            <button onClick={onClose} className="text-blue-400 hover:text-white transition-colors text-xl">×</button>
+            <button onClick={onClose} className="text-purple-400 hover:text-white transition-colors text-xl">×</button>
           </div>
         </div>
 
@@ -77,14 +77,14 @@ const AmuletInventoryOverlay = ({ inventory, souls, onToggleEquip, onToggleConsu
         <div className="flex px-6 pt-4 gap-4">
           <button
             onClick={() => setActiveTab('amulets')}
-            className={`pb-2 px-1 text-xs font-bold uppercase tracking-widest transition-all border-b-2 ${activeTab === 'amulets' ? 'text-blue-200 border-blue-500' : 'text-slate-500 border-transparent hover:text-slate-300'
+            className={`pb-2 px-1 text-xs font-bold uppercase tracking-widest transition-all border-b-2 ${activeTab === 'amulets' ? 'text-purple-200 border-purple-500' : 'text-slate-500 border-transparent hover:text-slate-300'
               }`}
           >
             Amuletos
           </button>
           <button
             onClick={() => setActiveTab('consumables')}
-            className={`pb-2 px-1 text-xs font-bold uppercase tracking-widest transition-all border-b-2 ${activeTab === 'consumables' ? 'text-blue-200 border-blue-500' : 'text-slate-500 border-transparent hover:text-slate-300'
+            className={`pb-2 px-1 text-xs font-bold uppercase tracking-widest transition-all border-b-2 ${activeTab === 'consumables' ? 'text-purple-200 border-purple-500' : 'text-slate-500 border-transparent hover:text-slate-300'
               }`}
           >
             Consumíveis
@@ -97,7 +97,7 @@ const AmuletInventoryOverlay = ({ inventory, souls, onToggleEquip, onToggleConsu
             <div className="space-y-6">
               {/* Equipped Slots Section */}
               <div>
-                <div className="flex items-center justify-between mb-3 text-[10px] text-blue-400/80 uppercase tracking-widest font-bold">
+                <div className="flex items-center justify-between mb-3 text-[10px] text-purple-400/80 uppercase tracking-widest font-bold">
                   <span>Equipamento Ativo</span>
                   <span className={equippedCount >= maxSlots ? 'text-orange-400' : ''}>
                     {equippedCount} / {maxSlots} USADOS
@@ -116,8 +116,8 @@ const AmuletInventoryOverlay = ({ inventory, souls, onToggleEquip, onToggleConsu
                         style={{
                           width: 48,
                           height: 48,
-                          background: amulet ? 'rgba(56, 110, 212, 0.15)' : 'rgba(15, 20, 30, 0.6)',
-                          border: `1px solid ${amulet ? 'rgba(80, 140, 220, 0.4)' : 'rgba(40, 50, 80, 0.4)'}`,
+                          background: amulet ? 'rgba(106, 13, 173, 0.15)' : 'rgba(15, 20, 30, 0.6)',
+                          border: `1px solid ${amulet ? 'rgba(172, 77, 255, 0.4)' : 'rgba(40, 50, 80, 0.4)'}`,
                         }}
                       >
                         {def ? (
@@ -157,7 +157,7 @@ const AmuletInventoryOverlay = ({ inventory, souls, onToggleEquip, onToggleConsu
                           onClick={() => handleToggle(amulet.defId)}
                           disabled={!canEquip && !isEquipped}
                           className={`w-full flex items-center gap-4 p-3 rounded-lg border transition-all text-left relative overflow-hidden group ${isEquipped
-                            ? 'bg-blue-600/10 border-blue-500/40'
+                            ? 'bg-purple-600/10 border-purple-500/40'
                             : 'bg-slate-900/40 border-slate-800 hover:border-slate-700'
                             }`}
                           style={{
@@ -166,16 +166,16 @@ const AmuletInventoryOverlay = ({ inventory, souls, onToggleEquip, onToggleConsu
                           }}
                         >
                           {/* Inner glow for equipped */}
-                          {isEquipped && <div className="absolute inset-0 bg-blue-500/5 pulse-subtle" />}
+                          {isEquipped && <div className="absolute inset-0 bg-purple-500/5 pulse-subtle" />}
 
-                          <div className={`w-10 h-10 flex items-center justify-center rounded-lg shadow-lg z-10 ${isEquipped ? 'bg-blue-600/20 border border-blue-400/30' : 'bg-slate-800/80 border border-slate-700'
+                          <div className={`w-10 h-10 flex items-center justify-center rounded-lg shadow-lg z-10 ${isEquipped ? 'bg-purple-600/20 border border-purple-400/30' : 'bg-slate-800/80 border border-slate-700'
                             }`}>
                             <span className="text-xl">{def.icon}</span>
                           </div>
 
                           <div className="flex-1 min-w-0 z-10">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <span className={`text-xs font-bold uppercase tracking-wide ${isEquipped ? 'text-blue-300' : 'text-slate-400'}`}>
+                              <span className={`text-xs font-bold uppercase tracking-wide ${isEquipped ? 'text-purple-300' : 'text-slate-400'}`}>
                                 {def.name}
                               </span>
                               {isEquipped && (
@@ -248,11 +248,11 @@ const AmuletInventoryOverlay = ({ inventory, souls, onToggleEquip, onToggleConsu
               )}
 
               {/* Utility Info */}
-              <div className="p-3 bg-blue-900/10 border border-blue-500/10 rounded-lg flex items-start gap-3 mt-4">
+              <div className="p-3 bg-purple-900/10 border border-purple-500/10 rounded-lg flex items-start gap-3 mt-4">
                 <span className="text-lg mt-0.5">💡</span>
                 <div>
-                  <div className="text-[11px] font-bold text-blue-300 uppercase mb-0.5">Dicas</div>
-                  <p className="text-[10px] text-blue-400/60 leading-tight m-0 italic">
+                  <div className="text-[11px] font-bold text-purple-300 uppercase mb-0.5">Dicas</div>
+                  <p className="text-[10px] text-purple-400/60 leading-tight m-0 italic">
                     Use <span className="text-white font-bold">Q</span> em combate para consumir o item equipado. A Alquimista vende elixires.
                   </p>
                 </div>
@@ -264,7 +264,7 @@ const AmuletInventoryOverlay = ({ inventory, souls, onToggleEquip, onToggleConsu
         {/* Footer */}
         <div
           className="px-6 py-4 flex items-center justify-between"
-          style={{ borderTop: '1px solid rgba(80, 140, 220, 0.15)', background: 'rgba(15, 20, 35, 0.4)' }}
+          style={{ borderTop: '1px solid rgba(106, 13, 173, 0.15)', background: 'rgba(15, 10, 25, 0.4)' }}
         >
           <div className="text-[9px] text-slate-500 font-mono tracking-tighter uppercase">
             Sistema de Amuletos v2.5 // Bio-Glow Engine
@@ -272,7 +272,7 @@ const AmuletInventoryOverlay = ({ inventory, souls, onToggleEquip, onToggleConsu
 
           <button
             onClick={onClose}
-            className="px-8 py-2.5 rounded-lg bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/30 hover:border-blue-500/50 transition-all font-bold text-[11px] uppercase tracking-widest shadow-lg"
+            className="px-8 py-2.5 rounded-lg bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600/30 hover:border-purple-500/50 transition-all font-bold text-[11px] uppercase tracking-widest shadow-lg"
           >
             Sair do Menu [I]
           </button>
@@ -282,8 +282,8 @@ const AmuletInventoryOverlay = ({ inventory, souls, onToggleEquip, onToggleConsu
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(80, 140, 220, 0.2); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(80, 140, 220, 0.4); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(106, 13, 173, 0.2); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(106, 13, 173, 0.4); }
         
         @keyframes pulse-subtle {
           0%, 100% { opacity: 0.05; }

@@ -66,8 +66,8 @@ export function spawnSoulCollectParticle(particles: Particle[], fromX: number, f
     const perpX = -dy / dist;
     const perpY = dx / dist;
 
-    const hue = 210 + Math.random() * 30; // blue range
-    const lightness = 55 + Math.random() * 25;
+    const hue = 270 + Math.random() * 20; // purple range
+    const lightness = 60 + Math.random() * 20;
 
     particles.push({
       x: fromX + (Math.random() - 0.5) * 8,
@@ -90,7 +90,7 @@ export function spawnSoulCollectParticle(particles: Particle[], fromX: number, f
     life: 0.3,
     maxLife: 0.3,
     size: 4,
-    color: 'hsl(220, 90%, 75%)',
+    color: 'hsl(280, 90%, 75%)',
     type: 'soul',
   });
 }

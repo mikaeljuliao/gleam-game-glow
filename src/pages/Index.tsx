@@ -118,7 +118,7 @@ const Index = () => {
     if (!engine) return;
     const success = engine.buyShopItem(index);
     if (success) {
-      setShopCoins(engine.player.souls);
+      setShopCoins(Math.floor(engine.player.souls));
       setShopItems(prev => prev.map((item, i) => i === index ? { ...item, sold: true } : item));
       // Sync inventory to show purchased amulets/potions
       syncInventoryFromEngine();
@@ -210,7 +210,7 @@ const Index = () => {
   const handleSanctuaryOpen = useCallback(() => {
     console.log('[INDEX] handleSanctuaryOpen: syncing souls and opening overlay');
     if (engineRef.current) {
-      setShopCoins(engineRef.current.player.souls);
+      setShopCoins(Math.floor(engineRef.current.player.souls));
     }
     setGameState('sanctuary');
   }, []);
@@ -235,7 +235,7 @@ const Index = () => {
     const success = engine.performSanctuaryHeal();
     if (success) {
       console.log('[INDEX] Heal ritual initiated in engine, syncing souls...');
-      setShopCoins(engine.player.souls);
+      setShopCoins(Math.floor(engine.player.souls));
     }
     return success;
   }, []);
@@ -340,7 +340,7 @@ const Index = () => {
             {gameState === 'inventory' && (
               <AmuletInventoryOverlay
                 inventory={amuletInv}
-                souls={engineRef.current?.player.souls ?? 0}
+                souls={Math.floor(engineRef.current?.player.souls ?? 0)}
                 onToggleEquip={handleToggleEquip}
                 onToggleConsumable={handleToggleConsumable}
                 onClose={handleInventoryClose}

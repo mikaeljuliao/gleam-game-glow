@@ -148,17 +148,17 @@ const ShopOverlay = ({ items, coins: souls, shopType, onBuy, onClose }: ShopOver
           <div
             className="flex items-center gap-2 px-3 py-1.5 rounded"
             style={{
-              background: 'rgba(40, 80, 160, 0.12)',
-              border: '1px solid rgba(60, 120, 200, 0.25)',
+              background: 'rgba(106, 13, 173, 0.12)',
+              border: '1px solid rgba(172, 77, 255, 0.25)',
             }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
-              <polygon points="7,1 12,7 7,13 2,7" fill="#5599dd" />
-              <polygon points="7,3 10,7 7,11 4,7" fill="#88ccff" />
+              <polygon points="7,1 12,7 7,13 2,7" fill="#6a0dad" />
+              <polygon points="7,3 10,7 7,11 4,7" fill="#ac4dff" />
             </svg>
             <span
               style={{
-                color: '#88ccff',
+                color: '#ac4dff',
                 fontFamily: "'Montserrat', sans-serif",
                 fontSize: 14,
                 fontWeight: 600,
@@ -226,10 +226,10 @@ const ShopOverlay = ({ items, coins: souls, shopType, onBuy, onClose }: ShopOver
                             ? 'rgba(220, 190, 80, 0.15)'
                             : RARITY_BG[rarity],
                       border: `1.5px solid ${isSold
-                          ? 'rgba(50, 50, 50, 0.3)'
-                          : isSelected
-                            ? RARITY_COLORS[rarity]
-                            : `${RARITY_COLORS[rarity]}40`
+                        ? 'rgba(50, 50, 50, 0.3)'
+                        : isSelected
+                          ? RARITY_COLORS[rarity]
+                          : `${RARITY_COLORS[rarity]}40`
                         }`,
                       boxShadow: isSelected && !isSold ? RARITY_GLOW[rarity] : 'none',
                       opacity: isSold ? 0.35 : canAfford ? 1 : 0.5,
@@ -295,15 +295,15 @@ const ShopOverlay = ({ items, coins: souls, shopType, onBuy, onClose }: ShopOver
                     <div
                       className="flex items-center gap-1 mt-2"
                       style={{
-                        color: isSold ? '#444' : canAfford ? '#88ccff' : '#cc5555',
+                        color: isSold ? '#444' : canAfford ? '#ac4dff' : '#cc5555',
                         fontFamily: "'Montserrat', sans-serif",
                         fontSize: 12,
                         fontWeight: 600,
                       }}
                     >
                       <svg width="10" height="10" viewBox="0 0 14 14">
-                        <polygon points="7,1 12,7 7,13 2,7" fill={isSold ? '#444' : canAfford ? '#5599dd' : '#aa4444'} />
-                        <polygon points="7,3 10,7 7,11 4,7" fill={isSold ? '#555' : canAfford ? '#88ccff' : '#cc5555'} />
+                        <polygon points="7,1 12,7 7,13 2,7" fill={isSold ? '#444' : canAfford ? '#6a0dad' : '#aa4444'} />
+                        <polygon points="7,3 10,7 7,11 4,7" fill={isSold ? '#555' : canAfford ? '#ac4dff' : '#cc5555'} />
                       </svg>
                       {isSold ? 'VENDIDO' : item.cost}
                     </div>
@@ -388,16 +388,16 @@ const ShopOverlay = ({ items, coins: souls, shopType, onBuy, onClose }: ShopOver
                   className="flex items-center justify-center gap-2 py-2 rounded"
                   style={{
                     background: 'rgba(0, 0, 0, 0.3)',
-                    border: '1px solid rgba(60, 120, 200, 0.2)',
+                    border: '1px solid rgba(106, 13, 173, 0.2)',
                   }}
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14">
-                    <polygon points="7,1 12,7 7,13 2,7" fill={selectedItem.sold ? '#555' : souls >= selectedItem.cost ? '#5599dd' : '#aa4444'} />
-                    <polygon points="7,3 10,7 7,11 4,7" fill={selectedItem.sold ? '#666' : souls >= selectedItem.cost ? '#88ccff' : '#cc5555'} />
+                    <polygon points="7,1 12,7 7,13 2,7" fill={selectedItem.sold ? '#555' : souls >= selectedItem.cost ? '#6a0dad' : '#aa4444'} />
+                    <polygon points="7,3 10,7 7,11 4,7" fill={selectedItem.sold ? '#666' : souls >= selectedItem.cost ? '#ac4dff' : '#cc5555'} />
                   </svg>
                   <span
                     style={{
-                      color: selectedItem.sold ? '#555' : souls >= selectedItem.cost ? '#88ccff' : '#cc5555',
+                      color: selectedItem.sold ? '#555' : souls >= selectedItem.cost ? '#ac4dff' : '#cc5555',
                       fontFamily: "'Montserrat', sans-serif",
                       fontSize: 16,
                       fontWeight: 700,
@@ -423,10 +423,10 @@ const ShopOverlay = ({ items, coins: souls, shopType, onBuy, onClose }: ShopOver
                         ? '#88ee88'
                         : '#cc6666',
                     border: `1px solid ${selectedItem.sold
-                        ? 'rgba(60, 60, 60, 0.3)'
-                        : souls >= selectedItem.cost
-                          ? 'rgba(80, 180, 100, 0.4)'
-                          : 'rgba(180, 60, 60, 0.3)'
+                      ? 'rgba(60, 60, 60, 0.3)'
+                      : souls >= selectedItem.cost
+                        ? 'rgba(80, 180, 100, 0.4)'
+                        : 'rgba(180, 60, 60, 0.3)'
                       }`,
                     fontFamily: "'Montserrat', sans-serif",
                     fontSize: 12,

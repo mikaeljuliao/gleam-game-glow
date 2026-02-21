@@ -138,21 +138,21 @@ export const VENDOR_LIGHT_RADIUS = 300;
 
 // Soul drops per enemy type (almas)
 export const SOUL_DROPS: Record<string, [number, number]> = {
-  swarm: [1, 2],
-  chaser: [2, 4],
-  shooter: [2, 4],
-  wraith: [3, 5],
-  bomber: [3, 5],
-  tank: [4, 6],
-  necromancer: [5, 8],
-  stalker: [4, 7],
-  flash_hunter: [3, 5],
-  distortion: [5, 8],
-  flicker_fiend: [3, 5],
-  warper: [3, 6],
-  accelerator: [4, 6],
-  phantom: [2, 3],
-  boss: [20, 35],
+  swarm: [1, 1],
+  chaser: [1, 2],
+  shooter: [1, 2],
+  wraith: [2, 3],
+  bomber: [2, 3],
+  tank: [3, 4],
+  necromancer: [3, 5],
+  stalker: [3, 5],
+  flash_hunter: [2, 3],
+  distortion: [4, 6],
+  flicker_fiend: [2, 3],
+  warper: [2, 4],
+  accelerator: [3, 4],
+  phantom: [1, 2],
+  boss: [10, 15],
 };
 
 // Shop prices by rarity (in souls)

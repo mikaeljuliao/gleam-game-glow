@@ -1,4 +1,4 @@
-﻿import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, DungeonRoom, Obstacle, ScreenEffect, Viewport, WeaponType, ProjectileOrigin, HandCastEffect, EnemyProjectileImpact, StaffChargeEffect, StaffImpactEffect, Portal, EssenceCore } from './types';
+﻿import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, DungeonRoom, Obstacle, ScreenEffect, Viewport, WeaponType, Portal, EssenceCore } from './types';
 import { HiddenTrap } from './traps';
 import * as C from './constants';
 import { getBrightness } from './brightness';
@@ -4262,61 +4262,96 @@ export function renderDimensionalRift(ctx: CanvasRenderingContext2D, portal: Por
   ctx.save();
   ctx.translate(x, y);
 
-  // 1. Outer Atmospheric Glow
-  const glowAlpha = (state === 'locked' ? 0.15 : state === 'completed' ? 0.1 : 0.35) * pulse;
-  const baseColor = state === 'completed' ? '80, 70, 110' : '50, 0, 100';
-
-  const glowGrad = ctx.createRadialGradient(0, 0, 10 * pulse, 0, 0, 45 * pulse);
+  // 1. Extreme Ambient Glow
+  const glowAlpha = (state === 'locked' ? 0.2 : state === 'completed' ? 0.1 : 0.5) * pulse;
+  const baseColor = state === 'completed' ? '120, 100, 180' : '100, 40, 255';
+  const glowGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, 80 * pulse);
   glowGrad.addColorStop(0, `rgba(${baseColor}, ${glowAlpha})`);
-  glowGrad.addColorStop(0.6, `rgba(${baseColor}, ${glowAlpha * 0.4})`);
+  glowGrad.addColorStop(0.4, `rgba(${baseColor}, ${glowAlpha * 0.5})`);
   glowGrad.addColorStop(1, `rgba(${baseColor}, 0)`);
-
   ctx.fillStyle = glowGrad;
   ctx.beginPath();
-  ctx.ellipse(0, 0, 40 * pulse, 80 * pulse, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, 50 * pulse, 100 * pulse, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2. The Rift Void (Vertical fissure)
-  ctx.fillStyle = '#020005';
+  // 2. The Void Core (Smooth Ellipse)
+  ctx.fillStyle = '#010003';
   ctx.beginPath();
-
-  const freq = time * 2.5;
-  const h = 55 * pulse;
-  const w = state === 'locked' ? 4 : 18;
-
-  ctx.moveTo(0, -h);
-  for (let i = -h; i <= h; i += 5) {
-    const taper = 1 - Math.pow(i / h, 2);
-    const noise = (Math.sin(freq + i * 0.1) * 4 + Math.cos(freq * 0.6 + i * 0.25) * 3);
-    ctx.lineTo((w + noise) * taper, i);
-  }
-  for (let i = h; i >= -h; i -= 5) {
-    const taper = 1 - Math.pow(i / h, 2);
-    const noise = (Math.sin(freq * 1.3 - i * 0.12) * 4 + Math.sin(freq * 0.4 + i * 0.15) * 2);
-    ctx.lineTo((-w + noise) * taper, i);
-  }
-  ctx.closePath();
+  ctx.ellipse(0, 0, 18 * pulse, 62 * pulse, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 3. Shimmering Border
-  ctx.strokeStyle = state === 'completed' ? 'rgba(120, 120, 150, 0.3)' : `rgba(160, 80, 255, ${0.4 * pulse})`;
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
+  // 3. Dimensional Energy Layers (Jagged shimmering edges)
+  const layerCount = 2;
+  for (let l = 0; l < layerCount; l++) {
+    const lPulse = Math.sin(time * 4 + l) * 0.1 + 1.0;
+    ctx.strokeStyle = l === 0 ? `rgba(180, 100, 255, ${0.4 * pulse})` : `rgba(220, 180, 255, ${0.2 * pulse})`;
+    ctx.lineWidth = l === 0 ? 2 : 1;
+    ctx.beginPath();
+    const h = (65 + l * 5) * pulse;
+    const w = (22 + l * 4) * pulse;
+    ctx.moveTo(0, -h);
+    for (let i = -h; i <= h; i += 8) {
+      const taper = 1 - Math.pow(i / h, 2);
+      const noise = Math.sin(time * 5 + i * 0.3) * 4;
+      ctx.lineTo((w + noise) * taper, i);
+    }
+    for (let i = h; i >= -h; i -= 8) {
+      const taper = 1 - Math.pow(i / h, 2);
+      const noise = Math.cos(time * 4 - i * 0.25) * 4;
+      ctx.lineTo((-w + noise) * taper, i);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
 
-  // 4. Suction effects
+  // 4. Vortex Suction Particles (Vibrant energy spiraling in)
   if (state === 'available') {
-    const particleCount = isNear ? 6 : 3;
+    const particleCount = isNear ? 20 : 10;
     for (let i = 0; i < particleCount; i++) {
-      const seed = (i * 0.5) + (portal.id.length * 0.1);
-      const pTime = (time * 0.8 + seed) % 1;
-      const pDist = (60 * (1 - pTime)) + 5;
-      const pAngle = (seed * 10) + (time * 0.5);
-      ctx.fillStyle = `rgba(180, 100, 255, ${0.6 * pTime})`;
-      ctx.fillRect(Math.cos(pAngle) * pDist, Math.sin(pAngle) * pDist, 1.5, 1.5);
+      const seed = (i * Math.E) + (portal.id.length * 0.7);
+      const pTime = (time * 0.6 + seed) % 1;
+      const pDist = (100 * (1 - pTime)) + 4;
+      // Spiral motion: angle increases as it gets closer
+      const spiralSpeed = 8;
+      const pAngle = (seed * 15) + (pTime * spiralSpeed);
+
+      const px = Math.cos(pAngle) * pDist;
+      const py = Math.sin(pAngle) * pDist;
+
+      const size = 1.2 + pTime * 1.5;
+      ctx.fillStyle = `rgba(180, 140, 255, ${0.4 + pTime * 0.6})`;
+      ctx.fillRect(px, py, size, size);
+
+      // Secondary trailing glow for particles
+      if (isNear) {
+        ctx.fillStyle = `rgba(100, 50, 255, ${0.4 * pTime})`;
+        ctx.fillRect(px - 1, py - 1, size + 2, size + 2);
+      }
     }
   }
 
   ctx.restore();
+
+  // 5. Majestic Prompt (Exactly as requested)
+  if (state !== 'locked' && state !== 'completed' && dist < 100) {
+    ctx.save();
+    ctx.textAlign = 'center';
+
+    const floatY = Math.sin(time * 4) * 4;
+    const alpha = 0.7 + Math.sin(time * 3) * 0.25;
+
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = 'black';
+
+    ctx.fillStyle = `rgba(210, 190, 255, ${alpha})`;
+    ctx.font = `700 11px ${C.HUD_FONT}`;
+    ctx.fillText('AVANÇAR PARA PRÓXIMO ANDAR', x, y - 82 + floatY);
+
+    ctx.font = `600 9px ${C.HUD_FONT}`;
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.fillText('APROXIME-SE OU PRESSIONE [E]', x, y - 68 + floatY);
+    ctx.restore();
+  }
 }
 
 export function renderParticles(ctx: CanvasRenderingContext2D, particles: Particle[]) {
@@ -4544,7 +4579,7 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   const scx = lvlX + 10;
   const scy = hpY + soulH / 2;
   const scSize = Math.round(4 * ms);
-  ctx.fillStyle = '#5599dd';
+  ctx.fillStyle = '#6a0dad'; // Dimensional Glow Purple
   ctx.beginPath();
   ctx.moveTo(scx, scy - scSize);
   ctx.lineTo(scx + scSize * 0.7, scy);
@@ -4553,7 +4588,7 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   ctx.closePath();
   ctx.fill();
   // Inner bright core
-  ctx.fillStyle = '#88ccff';
+  ctx.fillStyle = '#ac4dff'; // Glow Light
   ctx.beginPath();
   ctx.moveTo(scx, scy - scSize * 0.5);
   ctx.lineTo(scx + scSize * 0.35, scy);
@@ -4564,7 +4599,7 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   // Soul count
   ctx.font = `600 ${Math.round(10 * ms)}px ${C.HUD_FONT}`;
   ctx.textAlign = 'left';
-  drawHudText(ctx, `${player.souls}`, scx + scSize + 4, hpY + Math.round(soulH * 0.7), '#88ccff');
+  drawHudText(ctx, `${Math.floor(player.souls)}`, scx + scSize + 4, hpY + Math.round(soulH * 0.7), '#ac4dff');
 
   // --- Level Badge ---
   const lvlBadgeX = lvlX + soulW + 4;
@@ -4572,12 +4607,12 @@ export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, du
   const lvlH = Math.round(20 * ms);
   ctx.fillStyle = 'rgba(20, 20, 60, 0.85)';
   ctx.fillRect(lvlBadgeX, hpY, lvlW, lvlH);
-  ctx.strokeStyle = '#5599ff';
+  ctx.strokeStyle = '#ac4dff';
   ctx.lineWidth = 1;
   ctx.strokeRect(lvlBadgeX, hpY, lvlW, lvlH);
   ctx.font = `500 ${Math.round(11 * ms)}px ${C.HUD_FONT}`;
   ctx.textAlign = 'left';
-  drawHudText(ctx, `Nv.${player.level}`, lvlBadgeX + 4, hpY + Math.round(lvlH * 0.7), '#aaccff');
+  drawHudText(ctx, `Nv.${player.level}`, lvlBadgeX + 4, hpY + Math.round(lvlH * 0.7), '#ccaaee');
 
   // --- Floor indicator (top-right) ---
   const floorW = Math.round(84 * ms);

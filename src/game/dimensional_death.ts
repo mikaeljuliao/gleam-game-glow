@@ -145,6 +145,47 @@ export const DimensionalDeathEffect = {
             radius: 5,
         });
     },
+
+    // ─── BOSS DRAMATIC DEATH ───────────────────────────────────────────────────
+    spawnBossDeathSequence(particles: Particle[], x: number, y: number) {
+        // 1. Triple massive shockwaves
+        for (let i = 0; i < 3; i++) {
+            particles.push({
+                x, y, vx: 0, vy: 0,
+                life: 0.8 + i * 0.2, maxLife: 1.0 + i * 0.2,
+                size: 0,
+                color: i === 0 ? DIMENSIONAL_COLORS.white : DIMENSIONAL_COLORS.bossGlow,
+                type: 'shockwave',
+                radius: 12 + i * 15,
+            });
+        }
+
+        // 2. Fragment storm (all directions)
+        for (let i = 0; i < 40; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 120 + Math.random() * 200;
+            const life = 0.6 + Math.random() * 0.8;
+            particles.push({
+                x, y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life, maxLife: life,
+                size: 3 + Math.random() * 4,
+                color: Math.random() < 0.5 ? DIMENSIONAL_COLORS.white : DIMENSIONAL_COLORS.bossGlow,
+                type: 'dimensional_shard',
+                angle: Math.random() * Math.PI * 2,
+                spin: (Math.random() - 0.5) * 20,
+            });
+        }
+
+        // 3. Central void implosion flash
+        particles.push({
+            x, y, vx: 0, vy: 0,
+            life: 0.4, maxLife: 0.4,
+            size: 80, color: 'rgba(255, 255, 255, 0.9)',
+            type: 'explosion'
+        });
+    }
 };
 
 // ─── ESSENCE MAGNET SYSTEM ────────────────────────────────────────────────────

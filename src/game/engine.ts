@@ -1,4 +1,4 @@
-import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, GameStats, GameCallbacks, ScreenEffect, Upgrade, DungeonRoom, HorrorEvent, ShopItem, WeaponType, EssenceCore } from './types';
+import { PlayerState, EnemyState, ProjectileState, Particle, DungeonMap, GameStats, GameCallbacks, ScreenEffect, Upgrade, DungeonRoom, HorrorEvent, ShopItem, WeaponType, EssenceCore, Portal } from './types';
 import { InputManager } from './input';
 import { createPlayer, updatePlayer, tryDash, tryMelee, canRangedAttack, doRangedAttack, addXP, damagePlayer } from './player';
 import { createEnemy, updateEnemy, damageEnemy, scaleEnemyForFloor, getXPForEnemy, createBossForFloor, consumeBossAction, setBossFloor } from './enemies';
@@ -99,11 +99,16 @@ export class GameEngine {
   cruelRepTimer = 0;
   cruelRepIsMelee = false;
   cruelRepTarget = { x: 0, y: 0 };
-  _pendingBossAmuletId: string | null = null;
+  private _pendingBossAmuletId: string | null = null;
   hitStopTimer = 0;
+  _baseAttackSpeedMult = 1;
+  _baseMoveSpeedMult = 1;
+  private slomoNotif: string | null = null;
+  private isTransitioning = false;
+  private bossWasSpawned = false;
+  private lastBossKillPos: { x: number, y: number } | null = null;
   _hitTriggeredThisSwing = false;
   bossIntroPlayed = false;
-  bossWasSpawned = false;
   pendingNextFloor = false;
   victoryActive = false;
   sanctuaryPortal: { x: number, y: number } | null = null;
@@ -296,10 +301,9 @@ export class GameEngine {
           });
         }
       }
-      // Persist to room
       room.merchantShopItems = this.shopItems;
     }
-    this.callbacks.onShopOpen(this.shopItems, this.player.souls, 'normal');
+    this.callbacks.onShopOpen(this.shopItems, Math.floor(this.player.souls), 'normal');
   }
 
   openPotionShop() {
@@ -423,7 +427,7 @@ export class GameEngine {
       room.alchemistShopItems = this.shopItems;
     }
 
-    this.callbacks.onShopOpen(this.shopItems, this.player.souls, 'potion');
+    this.callbacks.onShopOpen(this.shopItems, Math.floor(this.player.souls), 'potion');
   }
 
   closeShop() {
@@ -511,7 +515,7 @@ export class GameEngine {
       }
 
       console.log(`[SHOP] Consumable purchased: ${item.upgrade.id}. Cost: ${item.cost}`);
-      this.player.souls -= item.cost;
+      this.player.souls = Math.floor(this.player.souls - item.cost);
 
       // Increment purchase counter
       if (item.purchasesThisFloor !== undefined) {
@@ -534,7 +538,7 @@ export class GameEngine {
       return true;
     }
 
-    this.player.souls -= item.cost;
+    this.player.souls = Math.floor(this.player.souls - item.cost);
     item.sold = true;
 
     // Amulet purchase
@@ -613,7 +617,7 @@ export class GameEngine {
 
           this.update(effectiveDt);
           this.essenceCores = EssenceMagnetSystem.update(this.essenceCores, this.player, this.particles, effectiveDt, (core) => {
-            const collectorBonus = getSoulCollectorBonus(this.amuletInventory);
+            const collectorBonus = getSoulCollectorBonus(this.player.souls);
             const soulGain = core.souls + collectorBonus;
             this.player.souls += soulGain;
             this.player.xpGlowTimer = 0.5;
@@ -863,19 +867,25 @@ export class GameEngine {
       updatePlayer(this.player, moveDir, dt);
       this.particles = updateParticles(this.particles, dt);
       this.effects = this.effects.filter(fx => { fx.timer -= dt; return fx.timer > 0; });
+
+      // Allow portal interaction even during victory countdown
+      const nearPortal = this.portalManager.checkProximity(this.player);
+      if (nearPortal) {
+        this.handlePortalInput(nearPortal);
+      }
       return;
     }
 
     // Tutorial timer
     if (this.tutorialTimer > 0) {
       this.tutorialTimer -= dt;
-      // Dismiss tutorial on any key press or mouse click
-      if (this.input.getMoveDir().x !== 0 || this.input.getMoveDir().y !== 0 ||
-        this.input.isMouseJustPressed(0) || this.input.isMouseJustPressed(2) ||
-        this.input.wantsDash()) {
+      // Dismiss tutorial on any movement or action
+      const moveDir = this.input.getMoveDir();
+      if (moveDir.x !== 0 || moveDir.y !== 0 || this.input.isMouseDown(0) || this.input.isMouseDown(2) || this.input.wantsDash()) {
         this.tutorialTimer = 0;
       }
     }
+
     // Player movement
     const moveDir = this.input.getMoveDir();
     updatePlayer(this.player, moveDir, dt);
@@ -1462,8 +1472,11 @@ export class GameEngine {
       dt,
       (core) => {
         // Award rewards from core
-        addXP(this.player, core.xp, this.callbacks);
-        this.player.souls += core.souls;
+        const collectorBonus = getSoulCollectorBonus(this.player.souls);
+        const soulGain = Math.floor(core.souls * (1 + collectorBonus));
+        const leveledUp = addXP(this.player, core.xp);
+        this.player.souls += Math.max(1, soulGain);
+        if (leveledUp) this.handleLevelUp();
       }
     );
 
@@ -1576,8 +1589,8 @@ export class GameEngine {
 
     // Portal Interaction
     const nearPortal = this.portalManager.checkProximity(this.player);
-    if (nearPortal && this.input.isJustPressed('e')) {
-      this.enterPortal(nearPortal);
+    if (nearPortal) {
+      this.handlePortalInput(nearPortal);
     }
 
     // Screen effects
@@ -1805,7 +1818,8 @@ export class GameEngine {
 
     // === BOSS ESPECIAIS ===
     if (isBoss) {
-      DimensionalDeathEffect.spawnWave(this.particles, e.x, e.y, true); // segunda onda
+      this.lastBossKillPos = { x: e.x, y: e.y };
+      DimensionalDeathEffect.spawnBossDeathSequence(this.particles, e.x, e.y);
       this.addEffect('flash', 1, 0.4, 'rgba(100, 0, 200, 0.5)');
       SFX.bossKill(this.bossKillFloor);
 
@@ -1880,14 +1894,30 @@ export class GameEngine {
     });
 
     this.addEffect('flash', 1, 0.4, 'rgba(140, 60, 255, 0.4)');
-    SFX.portalSpawn?.(); // Fallback if not defined
+    SFX.portalSpawn();
+  }
+
+  private handlePortalInput(portal: Portal) {
+    if (this.isTransitioning) return;
+
+    const dx = this.player.x - portal.x;
+    const dy = this.player.y - portal.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    // Auto-enter if very close, or manual enter if nearby
+    if (dist < 35 || this.input.isJustPressed('e')) {
+      this.enterPortal(portal);
+    }
   }
 
   enterPortal(portal: Portal) {
+    if (this.isTransitioning) return;
+    this.isTransitioning = true;
+
     // 1) Logic
     this.portalManager.markCompleted(portal.id);
     this.addEffect('flash', 2, 0.6, 'rgba(30, 0, 80, 0.8)');
-    SFX.portalEnter?.(); // Fallback if not defined
+    SFX.portalEnter();
 
     // 2) Visual / Flow
     if (this.callbacks.onPortalEnter) {
@@ -1896,6 +1926,7 @@ export class GameEngine {
 
     // 3) Transition
     setTimeout(() => {
+      this.isTransitioning = false;
       this.nextFloor();
     }, 600);
   }
@@ -1955,6 +1986,7 @@ export class GameEngine {
     this.stats.floor = newFloor;
     this.callbacks.onFloorChange(newFloor);
     SFX.floorChange();
+    this.portalManager.clearFloorPortals();
     // Save on floor change
     saveGame(this.player, this.dungeon, this.stats);
   }
@@ -2109,27 +2141,37 @@ export class GameEngine {
 
   private bossKillSequence() {
     // Kill impact effects
-    this.slowMoTimer = 0.8;
-    this.slowMoFactor = 0.2;
-    this.addEffect('flash', 1, 0.5, 'rgb(255, 255, 200)');
-    this.addEffect('shake', 12, 0.6);
-    spawnExplosion(this.particles, C.dims.gw / 2, C.dims.gh / 2, 30);
+    this.slowMoTimer = 1.0;
+    this.slowMoFactor = 0.15;
+    this.addEffect('flash', 1, 0.6, 'rgb(255, 255, 255)');
+    this.addEffect('shake', 15, 0.8);
 
-    // Sequential flow: amulet reveal → level-up → victory countdown
-    // Victory countdown starts AFTER level-up completes
+    const bx = this.lastBossKillPos?.x || C.dims.gw / 2;
+    const by = this.lastBossKillPos?.y || C.dims.gh / 2;
+    spawnExplosion(this.particles, bx, by, 45);
+    DimensionalDeathEffect.spawnBossDeathSequence(this.particles, bx, by);
+
+    // Sequential flow: amulet reveal → level-up
     if (this._pendingBossAmuletId) {
       const amuletId = this._pendingBossAmuletId;
       this._pendingBossAmuletId = null;
-      // Brief delay then show reveal overlay (only ONE presentation)
       setTimeout(() => {
         this.pause();
         this.callbacks.onAmuletReveal(amuletId);
-        // handleBossLevelUp is called by onAmuletRevealComplete in Index.tsx
       }, 600);
     } else {
-      // No amulet — just do level-up after brief delay
       this.handleBossLevelUp();
     }
+
+    // Boss Kill Message & Portal
+    this.victoryActive = true;
+    this.victoryCountdown = 7.0;
+    this.victoryCountdownMax = 7.0;
+
+    // Wait a bit before spawning the portal for dramatic effect
+    setTimeout(() => {
+      this.spawnExitPortal();
+    }, 1500);
   }
 
   private updateVictoryCountdown(dt: number) {
@@ -2137,8 +2179,7 @@ export class GameEngine {
     this.victoryCountdown -= dt;
     if (this.victoryCountdown <= 0) {
       this.victoryActive = false;
-      this.pendingNextFloor = false;
-      this.nextFloor();
+      // Do NOT call nextFloor() automatically — player must enter the portal
     }
   }
 
@@ -2302,7 +2343,7 @@ export class GameEngine {
     }
 
     // Instant deduction and heal
-    p.souls -= healCost;
+    p.souls = Math.floor(p.souls - healCost);
     const healAmt = Math.floor(p.maxHp * 0.25);
     p.hp = Math.min(p.maxHp, p.hp + healAmt);
 
@@ -2341,29 +2382,53 @@ export class GameEngine {
   }
 
   private renderVictoryOverlay(ctx: CanvasRenderingContext2D) {
-    // Soft green/gold tint for calm atmosphere
-    const alpha = Math.min(0.15, (this.victoryCountdownMax - this.victoryCountdown) * 0.05);
-    ctx.fillStyle = `rgba(50, 100, 30, ${alpha})`;
+    // Elegant dimensional purple/indigo tint
+    const alpha = Math.min(0.25, (this.victoryCountdownMax - this.victoryCountdown) * 0.08);
+    ctx.fillStyle = `rgba(30, 0, 60, ${alpha})`;
     ctx.fillRect(-this.gameOffsetX, -this.gameOffsetY, this.renderWidth, this.renderHeight);
 
     ctx.textAlign = 'center';
 
-    // "Boss defeated" message
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(C.dims.gw / 2 - 160, C.dims.gh / 2 - 35, 320, 70);
-    ctx.strokeStyle = 'rgba(200, 180, 80, 0.6)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(C.dims.gw / 2 - 160, C.dims.gh / 2 - 35, 320, 70);
+    // Main Box
+    const bw = 320, bh = 80;
+    const bx = C.dims.gw / 2 - bw / 2;
+    const by = C.dims.gh / 2 - bh / 2;
 
-    ctx.fillStyle = '#ffcc44';
-    ctx.font = `500 16px ${C.HUD_FONT}`;
-    ctx.fillText('Parabéns, você derrotou o boss!', C.dims.gw / 2, C.dims.gh / 2 - 10);
+    ctx.fillStyle = 'rgba(5, 0, 15, 0.85)';
+    ctx.fillRect(bx, by, bw, bh);
 
-    // Countdown
+    // Glowing Borders
+    ctx.strokeStyle = '#6a0dad';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bx, by, bw, bh);
+    ctx.strokeStyle = '#ac4dff';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(bx + 2, by + 2, bw - 4, bh - 4);
+
+    // Primary Text
+    ctx.fillStyle = '#ac4dff';
+    ctx.font = `700 20px ${C.HUD_FONT}`;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'rgba(172, 77, 255, 0.6)';
+    ctx.fillText('BOSS DERROTADO', C.dims.gw / 2, C.dims.gh / 2 - 12);
+    ctx.shadowBlur = 0;
+
+    // Subtext
+    ctx.fillStyle = '#ccaaee';
+    ctx.font = `600 10px ${C.HUD_FONT}`;
+    ctx.letterSpacing = '0.1em';
+    ctx.fillText('FENDA DIMENSIONAL ESTABILIZADA', C.dims.gw / 2, C.dims.gh / 2 + 8);
+
+    // Prompt
     const secs = Math.ceil(Math.max(0, this.victoryCountdown));
-    ctx.fillStyle = '#aaccaa';
-    ctx.font = `12px ${C.HUD_FONT}`;
-    ctx.fillText(`Indo para o próximo andar em ${secs}...`, C.dims.gw / 2, C.dims.gh / 2 + 15);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.font = `500 9px ${C.HUD_FONT}`;
+    ctx.letterSpacing = '0';
+    if (secs > 0) {
+      ctx.fillText(`A fenda fecha em ${secs}...`, C.dims.gw / 2, C.dims.gh / 2 + 28);
+    } else {
+      ctx.fillText('ENTRE NO PORTAL PARA CONTINUAR', C.dims.gw / 2, C.dims.gh / 2 + 28);
+    }
 
     ctx.textAlign = 'left';
   }
