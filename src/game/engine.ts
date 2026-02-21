@@ -22,6 +22,7 @@ import { applyBrightness } from './brightness';
 import * as C from './constants';
 import { MerchantNPC } from './npc/Merchant';
 import { AlchemistNPC } from './npc/Alchemist';
+import { KatanaComboController } from './katana_combo';
 
 export class GameEngine {
   player: PlayerState;
@@ -101,10 +102,11 @@ export class GameEngine {
   weaponSelectionOpen = false;
   weaponOptions: { id: WeaponType; name: string; desc: string; locked?: boolean }[] = [
     { id: 'sword', name: 'Espada', desc: 'Equilibrada & Precisa' },
-    { id: 'daggers', name: 'Catanas Duplas', desc: 'Rápidas & Mortais' },
+    { id: 'daggers', name: 'Catana Dupla', desc: 'Rápida & Técnica' },
     { id: 'staff', name: 'Cajado', desc: 'Indisponível', locked: true },
   ];
   selectedWeaponIndex = 0;
+  katanaController: KatanaComboController;
 
   constructor(displayCanvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     this.displayCanvas = displayCanvas;
@@ -138,6 +140,7 @@ export class GameEngine {
     initAudio();
     startBackgroundMusic();
     initArenaFX();
+    this.katanaController = new KatanaComboController(this.player);
   }
 
   loadFromSave(): boolean {
@@ -936,17 +939,45 @@ export class GameEngine {
     // Combat - melee
     if (this.input.isMouseJustPressed(0)) {
       const mouse = this.input.getMousePos();
-      if (tryMelee(this.player, mouse.x, mouse.y)) {
-        this.lastAttackWasMelee = true;
-        this._hitTriggeredThisSwing = false; // Reset for new swing
+      if (this.player.weapon === 'daggers') {
+        if (this.katanaController.tryAttack(mouse.x, mouse.y)) {
+          this.lastAttackWasMelee = true;
+          this._hitTriggeredThisSwing = false;
+        }
+      } else {
+        if (tryMelee(this.player, mouse.x, mouse.y)) {
+          this.lastAttackWasMelee = true;
+          this._hitTriggeredThisSwing = false;
+        }
       }
     }
 
-    // Trigger melee impact on the "active" frame (0.2s remaining of 0.25s)
-    if (this.player.meleeAttacking && this.player.meleeTimer <= 0.2 && !this._hitTriggeredThisSwing) {
-      this._hitTriggeredThisSwing = true;
-      this.doMeleeHit();
-      SFX.meleeSwing();
+    // Update weapon-specific logic
+    if (this.player.weapon === 'daggers') {
+      this.katanaController.update(dt);
+    }
+
+    // Trigger melee impact
+    if (this.player.meleeAttacking && !this._hitTriggeredThisSwing) {
+      const isKatana = this.player.weapon === 'daggers';
+      if (isKatana) {
+        const strike = this.katanaController.getCurrentStrike();
+        const attackSpeed = this.player.attackSpeedMult * this.player.temporaryAttackSpeedMult;
+        const progress = 1 - (this.player.meleeTimer / (strike.duration / attackSpeed));
+
+        if (progress >= strike.activeWindow[0]) {
+          this._hitTriggeredThisSwing = true;
+          this.doMeleeHit();
+          (SFX as any)[strike.sfx]();
+        }
+      } else {
+        // Longsword timing (legacy style)
+        if (this.player.meleeTimer <= 0.2) {
+          this._hitTriggeredThisSwing = true;
+          this.doMeleeHit();
+          SFX.meleeSwing();
+        }
+      }
     }
 
     // Combat - ranged
@@ -1471,10 +1502,43 @@ export class GameEngine {
   }
 
   private doMeleeHit() {
-    const range = C.MELEE_RANGE * this.player.areaMultiplier;
-    const angle = this.player.meleeAngle;
+    const isKatana = this.player.weapon === 'daggers';
     const isFinisher = this.player.activeComboStep === 4;
-    // Shake removed for sword
+
+    let rangeBase = C.MELEE_RANGE * this.player.areaMultiplier;
+    let arcMult = 1.0;
+    let dmgMult = 1.0;
+    let knockback = 4;
+
+    if (isKatana) {
+      const strike = this.katanaController.getCurrentStrike();
+      rangeBase *= 0.85; // Natural katana short range
+      rangeBase *= strike.rangeMult;
+      arcMult = strike.arcMult;
+      dmgMult = strike.damageMult;
+      knockback = strike.knockback;
+
+      // Katana movement mechanics
+      if (strike.lunge > 0) {
+        this.player.x += Math.cos(this.player.meleeAngle) * strike.lunge;
+        this.player.y += Math.sin(this.player.meleeAngle) * strike.lunge;
+      }
+    } else {
+      // Legacy Sword logic
+      if (isFinisher) {
+        rangeBase *= 1.8;
+        arcMult = 2.2;
+        dmgMult = 1.6;
+      } else if (this.player.activeComboStep === 3) {
+        rangeBase *= 1.4;
+        arcMult = 1.4;
+        dmgMult = 1.3;
+      }
+    }
+
+    const range = rangeBase;
+    const angle = this.player.meleeAngle;
+
     let hitAny = false;
     const meleeDeadSet = new Set<EnemyState>();
 
@@ -1490,16 +1554,12 @@ export class GameEngine {
       while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
-      // Dynamic Arc based on combo step
-      const arcMult = this.player.activeComboStep === 4 ? 2.2 : (this.player.activeComboStep === 3 ? 1.4 : 1.0);
       const currentArc = C.MELEE_ARC * arcMult;
 
       if (Math.abs(angleDiff) > currentArc / 2) continue;
 
       const strengthMult = this.player.strengthBuffTimer > 0 ? 1.5 : 1.0;
-      const comboDmgMult = this.player.activeComboStep === 4 ? 1.6 : (this.player.activeComboStep === 3 ? 1.3 : 1.0);
-
-      let dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier * this.getAmuletDamageMult() * strengthMult * comboDmgMult);
+      let dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier * this.getAmuletDamageMult() * strengthMult * (isKatana ? dmgMult : (isFinisher ? 1.6 : (this.player.activeComboStep === 3 ? 1.3 : 1.0))));
       // Berserker
       if (this.player.berserker && this.player.hp / this.player.maxHp < 0.3) {
         dmg = Math.floor(dmg * 1.8);
@@ -1512,8 +1572,8 @@ export class GameEngine {
       }
       const nx = dist > 0 ? dx / dist : 0;
       const ny = dist > 0 ? dy / dist : 0;
-      // Light knockback for slice feel
-      const dead = damageEnemy(e, dmg, nx * 4, ny * 4);
+      // Fixed: knockback is now defined in doMeleeHit scope
+      const dead = damageEnemy(e, dmg, nx * knockback, ny * knockback);
       this.stats.damageDealt += dmg;
       spawnDamageText(this.particles, e.x, e.y, `${dmg}`);
 
@@ -1545,8 +1605,13 @@ export class GameEngine {
       SFX.meleeHit();
       const isFinisher = this.player.activeComboStep === 4;
       // Ultra-snappy hit-stop for katana feel (0.04s is just right)
-      this.hitStopTimer = isFinisher ? 0.06 : 0.04;
-      // Screen shake REMOVED for sword slice
+      const hitStopBase = isKatana ? (isFinisher ? 0.08 : 0.04) : (isFinisher ? 0.12 : 0.06);
+      this.hitStopTimer = hitStopBase;
+
+      // Screen shake only for sword or katana finisher
+      if (!isKatana || isFinisher) {
+        this.addEffect('shake', isFinisher ? 6 : 2, 0.1);
+      }
       this.player.dashCooldown = Math.max(0, this.player.dashCooldown - 0.25);
     } else {
       SFX.meleeWhiff();

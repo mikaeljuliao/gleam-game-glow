@@ -667,28 +667,24 @@ getSprite(initialSrc);
 function getSpriteFrameForFacing(p: PlayerState): SpriteFrame | SpriteFrame[] {
   const fx = p.facing.x;
   const fy = p.facing.y;
-  const isMoving = p.isMoving || p.isDashing;
+  const isMoving = p.isMoving || p.isDashing || p.meleeAttacking;
 
-  // Se parado, usa o ciclo de animação parado
+  // Se parado e NÃO estiver atacando, usa o ciclo de animação parado
   if (!isMoving) {
     return SPRITE_FRAMES['idle-cycle'];
   }
 
-  // Vista traseira quando andando para cima
-  if (isMoving && fy < -0.1) {
-    return SPRITE_FRAMES['up'];
+  // Prioridade Vertical (Costas/Frente)
+  if (Math.abs(fy) > Math.abs(fx) * 1.5) {
+    if (fy < 0) return SPRITE_FRAMES['up'];
+    if (fy > 0) return SPRITE_FRAMES['down'];
   }
 
-  // Vista frontal por padrão se parado ou se estiver indo para baixo
-  if (!isMoving || fy > 0.1) {
-    return SPRITE_FRAMES['down'];
-  }
-
-  // Vista lateral apenas se estiver indo estritamente para os lados (ou diagonais predominantes laterais)
+  // Diagonais e Lados
   if (fx < 0) return SPRITE_FRAMES['left'];
   if (fx > 0) return SPRITE_FRAMES['right'];
 
-  return SPRITE_FRAMES['down'];
+  return SPRITE_FRAMES['down']; // Fallback
 }
 
 // ── Main Draw Function ────────────────────────────────────────
@@ -1128,7 +1124,7 @@ function drawIdleRunPose(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
       : frameOrFrames;
 
     // Determine active socket
-    const isFrontFrame = currentFrame.src.includes('frente');
+    const isFrontFrame = currentFrame.src.includes('frente') || currentFrame.src.includes('parado');
     const isBackFrame = currentFrame.src.includes('costa');
 
     let socket = currentFrame.handSocket || (isBackFrame ? SOCKET_BACK_R : SOCKET_FRONT_R);
@@ -1226,104 +1222,41 @@ function drawIdleRunPose(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
  * Body leans forward, Cloak drags back, Sword swings across.
  */
 function drawAttackPose1(ctx: CanvasRenderingContext2D, p: PlayerState, x: number, y: number, time: number, t: number) {
+  const isKatana = p.weapon === 'daggers';
   const facing = p.facing.x;
 
-  // Body Lunge
-  let lunge = 0;
-  let lean = 0;
-  if (t < 0.2) { lunge = -4 * (t / 0.2); lean = -0.2; } // Windup
-  else { lunge = 8; lean = 0.4; } // Strike
-
-  // Smooth return
-  if (t > 0.6) {
-    const rt = (t - 0.6) / 0.4;
-    lunge *= (1 - rt);
-    lean *= (1 - rt);
-  }
-
-  const bx = x + facing * lunge;
-  const by = y;
+  // Lunge: Small advance
+  const lunge = isKatana ? 8 * (t < 0.2 ? 0 : (t - 0.2) / 0.8) : 0;
+  const bx = x + Math.cos(p.meleeAngle) * lunge;
+  const by = y + Math.sin(p.meleeAngle) * lunge;
 
   ctx.save();
   ctx.translate(bx, by);
-
-  // Draw Character Body (Original Art)
   drawOriginalCharacterBody(ctx, p, time);
-
   ctx.restore();
 
-  // Weapon: Right -> Left Slash
+  // Attack 1: Swift Horizontal (R -> L)
   const angleStart = p.meleeAngle - C.MELEE_ARC / 2;
   const angleEnd = p.meleeAngle + C.MELEE_ARC / 2;
 
-  // Resolve sockets with mirror support
-  const frameOrFrames = getSpriteFrameForFacing(p);
-  const currentFrame = Array.isArray(frameOrFrames) ? frameOrFrames[0] : frameOrFrames;
-  const isFrontFrame = currentFrame.src.includes('frente');
-
-  // Resolvem-se ambos os sockets
-  const socketR = isFrontFrame ? SOCKET_FRONT_R : (currentFrame.handSocket || SOCKET_FRONT_R);
-  const socketL = isFrontFrame ? SOCKET_FRONT_L : { x: -socketR.x, y: socketR.y };
-
-  let sxR = socketR.x;
-  if (currentFrame.flipX) sxR *= -1;
-  const syR = socketR.y;
-
-  let sxL = socketL.x;
-  if (currentFrame.flipX) sxL *= -1;
-  const syL = socketL.y;
-
-  const bx_socketR = bx + sxR;
-  const by_socketR = by + syR;
-  const bx_socketL = bx + sxL;
-  const by_socketL = by + syL;
-
-  // Snap Swing Easing
-  let swingT = 0;
-  if (t > 0.1 && t < 0.6) {
-    const st = (t - 0.1) / 0.5;
-    swingT = 1 - Math.pow(1 - st, 4);
-  } else if (t >= 0.6) swingT = 1;
-
+  let swingT = t < 0.1 ? 0 : Math.min(1, (t - 0.1) / 0.5);
+  swingT = 1 - Math.pow(1 - swingT, 4);
   const currentAngle = angleStart + (angleEnd - angleStart) * swingT;
 
-  if (p.weapon === 'daggers') {
-    // Dual-Hand Attack: Each dagger in its own hand
-    // Right Hand Dagger
-    ctx.save();
-    ctx.translate(bx_socketR, by_socketR);
-    if (isFrontFrame) {
-      ctx.rotate(Math.PI * 0.4 + Math.sin(time * 10) * 0.1);
-    } else {
-      ctx.rotate(currentAngle);
-    }
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
+  const frameOrFrames = getSpriteFrameForFacing(p);
+  const currentFrame = Array.isArray(frameOrFrames) ? frameOrFrames[0] : frameOrFrames;
+  const isFront = currentFrame.src.includes('parado') || currentFrame.src.includes('frente');
+  const socketR = isFront ? SOCKET_FRONT_R : (currentFrame.handSocket || SOCKET_FRONT_R);
+  const sx = socketR.x * (currentFrame.flipX ? -1 : 1);
 
-    // Left Hand Dagger
-    ctx.save();
-    ctx.translate(bx_socketL, by_socketL);
-    if (isFrontFrame) {
-      ctx.rotate(-Math.PI * 0.4 + Math.cos(time * 10) * 0.1);
-    } else {
-      const backAngle = currentAngle - Math.PI * 0.2 * facing;
-      ctx.rotate(backAngle);
-    }
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
-  } else {
-    // Single weapon
-    ctx.save();
-    ctx.translate(bx_socketR, by_socketR);
-    ctx.rotate(currentAngle);
-    drawEquippedWeapon(ctx, p, 34, 1, time);
-    ctx.restore();
-  }
+  ctx.save();
+  ctx.translate(bx + sx, y + socketR.y);
+  ctx.rotate(currentAngle);
+  drawEquippedWeapon(ctx, p, 38, 1, time, true);
+  ctx.restore();
 
-  // VFX (World Space)
-  if (t > 0.2 && t < 0.7) {
-    const trailColor = p.weapon === 'daggers' ? 'azure' : 'azure'; // Standardized for now
-    drawSlashTrail(ctx, bx, by, C.MELEE_RANGE, angleStart, currentAngle, trailColor);
+  if (t > 0.1 && t < 0.6) {
+    drawSlashTrail(ctx, bx, by, C.MELEE_RANGE * 0.85, angleStart, currentAngle, 'azure');
   }
 }
 
@@ -1332,99 +1265,42 @@ function drawAttackPose1(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
  * Body twists back, Sword swings Left -> Right (Reverse).
  */
 function drawAttackPose2(ctx: CanvasRenderingContext2D, p: PlayerState, x: number, y: number, time: number, t: number) {
-  const facing = p.facing.x; // e.g. 1
+  const isKatana = p.weapon === 'daggers';
+  const facing = p.facing.x;
 
-  // Body Twist (step forward but lean back)
-  let offset = 4;
-  let lean = -0.3; // Leaning away from slash direction
-
-  if (t > 0.6) {
-    const rt = (t - 0.6) / 0.4;
-    offset *= (1 - rt);
-    lean *= (1 - rt);
-  }
-
-  const bx = x + facing * offset;
+  // Attack 2: Inverted Horizontal - 360 Lunge
+  const lunge = isKatana ? 12 * (t < 0.1 ? 0 : (t - 0.1) / 0.9) : 0;
+  const bx = x + Math.cos(p.meleeAngle) * lunge;
+  const by = y + Math.sin(p.meleeAngle) * lunge;
 
   ctx.save();
-  ctx.translate(bx, y);
-
-  // Draw Character Body (Original Art)
+  ctx.translate(bx, by);
   drawOriginalCharacterBody(ctx, p, time);
-
   ctx.restore();
 
-  // Weapon: Left -> Right (REVERSE)
-  const angleStart = p.meleeAngle + C.MELEE_ARC / 2; // Start from end
-  const angleEnd = p.meleeAngle - C.MELEE_ARC / 2;   // Go to start
+  const angleStart = p.meleeAngle + C.MELEE_ARC / 2;
+  const angleEnd = p.meleeAngle - C.MELEE_ARC / 2;
 
-  let swingT = 0;
-  if (t > 0.1 && t < 0.6) {
-    const st = (t - 0.1) / 0.5;
-    swingT = 1 - Math.pow(1 - st, 4);
-  } else if (t >= 0.6) swingT = 1;
-
-  // Resolve sockets
-  const frameOrFrames = getSpriteFrameForFacing(p);
-  const currentFrame = Array.isArray(frameOrFrames) ? frameOrFrames[0] : frameOrFrames;
-  const isFrontFrame = currentFrame.src.includes('frente');
-
-  const socketR = isFrontFrame ? SOCKET_FRONT_R : (currentFrame.handSocket || SOCKET_FRONT_R);
-  const socketL = isFrontFrame ? SOCKET_FRONT_L : { x: -socketR.x, y: socketR.y };
-
-  let sxR = socketR.x;
-  if (currentFrame.flipX) sxR *= -1;
-  const syR = socketR.y;
-
-  let sxL = socketL.x;
-  if (currentFrame.flipX) sxL *= -1;
-  const syL = socketL.y;
-
-  const bx_socketR = bx + sxR;
-  const by_socketR = y + syR;
-  const bx_socketL = bx + sxL;
-  const by_socketL = y + syL;
-
+  let swingT = t < 0.05 ? 0 : Math.min(1, (t - 0.05) / 0.4);
+  swingT = 1 - Math.pow(1 - swingT, 5);
   const currentAngle = angleStart + (angleEnd - angleStart) * swingT;
 
-  if (p.weapon === 'daggers') {
-    // Dual-Hand Twist: Each dagger in its own hand
-    // Right Hand
-    ctx.save();
-    ctx.translate(bx_socketR, by_socketR);
-    if (isFrontFrame) {
-      ctx.rotate(Math.PI * 0.4 + Math.sin(time * 8) * 0.1);
-    } else {
-      ctx.rotate(currentAngle);
-    }
-    ctx.scale(1, -1);
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
+  const frameOrFrames = getSpriteFrameForFacing(p);
+  const currentFrame = Array.isArray(frameOrFrames) ? frameOrFrames[0] : frameOrFrames;
+  const isFront = currentFrame.src.includes('parado') || currentFrame.src.includes('frente');
+  const socketR = isFront ? SOCKET_FRONT_R : (currentFrame.handSocket || SOCKET_FRONT_R);
+  const sx = socketR.x * (currentFrame.flipX ? -1 : 1);
 
-    // Left Hand
-    ctx.save();
-    ctx.translate(bx_socketL, by_socketL);
-    if (isFrontFrame) {
-      ctx.rotate(-Math.PI * 0.4 + Math.cos(time * 8) * 0.1);
-    } else {
-      const offAngle = currentAngle + Math.PI * 0.15 * facing;
-      ctx.rotate(offAngle);
-    }
-    ctx.scale(1, -1);
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
-  } else {
-    // Single weapon
-    ctx.save();
-    ctx.translate(bx_socketR, by_socketR);
-    ctx.rotate(currentAngle);
-    ctx.scale(1, -1);
-    drawEquippedWeapon(ctx, p, 34, 1, time);
-    ctx.restore();
+  ctx.save();
+  ctx.translate(bx + sx, y + socketR.y);
+  ctx.rotate(currentAngle);
+  ctx.scale(1, -1); // Visual trick for reverse cut
+  drawEquippedWeapon(ctx, p, 38, 1, time, true);
+  ctx.restore();
+
+  if (t > 0.05 && t < 0.5) {
+    drawSlashTrail(ctx, bx, by, C.MELEE_RANGE * 0.85, angleStart, currentAngle, 'azure');
   }
-
-  // VFX
-  if (t > 0.2 && t < 0.7) drawSlashTrail(ctx, bx, y, C.MELEE_RANGE, angleStart, currentAngle, 'azure');
 }
 
 /**
@@ -1432,99 +1308,43 @@ function drawAttackPose2(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
  * Jump up -> Slam down. Sword Overhead.
  */
 function drawAttackPose3(ctx: CanvasRenderingContext2D, p: PlayerState, x: number, y: number, time: number, t: number) {
+  const isKatana = p.weapon === 'daggers';
   const facing = p.facing.x;
 
-  let jumpY = 0;
-  let lunge = 0;
-
-  // Jump phase (Faster: 0.2s windup)
-  if (t < 0.2) {
-    jumpY = -4 * (t / 0.2);
-    lunge = -1;
-  } else if (t < 0.5) {
-    // Quick Downward Slash
-    jumpY = 2;
-    lunge = 8;
-  } else {
-    // Fast Recovery
-    lunge = 8 * (1 - (t - 0.5) / 0.5);
-  }
-
-  const bx = x + facing * lunge;
-  const by = y + jumpY;
+  // LIFT: Body moves slightly up during diagonal upslash + small lunge
+  const liftY = isKatana ? Math.sin(t * Math.PI) * -6 : 0;
+  const lunge = isKatana ? 5 : 0;
+  const bx = x + Math.cos(p.meleeAngle) * lunge;
+  const by = y + Math.sin(p.meleeAngle) * lunge;
 
   ctx.save();
-  ctx.translate(bx, by);
-
-  // Draw Character Body (Original Art)
+  ctx.translate(bx, by + liftY);
   drawOriginalCharacterBody(ctx, p, time);
-
   ctx.restore();
 
-  // Weapon: Overhead Arc (Snappier)
-  const angleStart = p.meleeAngle - 0.4;
-  const angleEnd = p.meleeAngle + 0.4;
+  // Weapon: Diagonal Upward Slash
+  const angleStart = p.meleeAngle + Math.PI * 0.4;
+  const angleEnd = p.meleeAngle - Math.PI * 0.4;
 
-  let swingT = 0;
-  if (t > 0.2 && t < 0.5) {
-    const st = (t - 0.2) / 0.3;
-    swingT = st * st * st; // Fast acceleration
-  } else if (t >= 0.5) swingT = 1;
-
-  // Resolve sockets
-  const frameOrFrames = getSpriteFrameForFacing(p);
-  const currentFrame = Array.isArray(frameOrFrames) ? frameOrFrames[0] : frameOrFrames;
-  const isFrontFrame = currentFrame.src.includes('frente');
-
-  const socketR = isFrontFrame ? SOCKET_FRONT_R : (currentFrame.handSocket || SOCKET_FRONT_R);
-  const socketL = isFrontFrame ? SOCKET_FRONT_L : { x: -socketR.x, y: socketR.y };
-
-  let sxR = socketR.x;
-  if (currentFrame.flipX) sxR *= -1;
-  const syR = socketR.y;
-
-  let sxL = socketL.x;
-  if (currentFrame.flipX) sxL *= -1;
-  const syL = socketL.y;
-
-  const bx_socketR = bx + sxR;
-  const by_socketR = by + syR;
-  const bx_socketL = bx + sxL;
-  const by_socketL = by + syL;
-
+  let swingT = t < 0.1 ? 0 : Math.min(1, (t - 0.1) / 0.4);
+  swingT = Math.pow(swingT, 2);
   const currentAngle = angleStart + (angleEnd - angleStart) * swingT;
 
-  if (p.weapon === 'daggers') {
-    // Both daggers smash bersama (Each in its hand)
-    ctx.save();
-    ctx.translate(bx_socketR, by_socketR);
-    if (isFrontFrame) {
-      ctx.rotate(Math.PI * 0.4);
-    } else {
-      ctx.rotate(currentAngle);
-    }
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
+  const frameOrFrames = getSpriteFrameForFacing(p);
+  const currentFrame = Array.isArray(frameOrFrames) ? frameOrFrames[0] : frameOrFrames;
+  const isFront = currentFrame.src.includes('parado') || currentFrame.src.includes('frente');
+  const socketR = isFront ? SOCKET_FRONT_R : (currentFrame.handSocket || SOCKET_FRONT_R);
+  const sx = socketR.x * (currentFrame.flipX ? -1 : 1);
 
-    ctx.save();
-    ctx.translate(bx_socketL, by_socketL);
-    if (isFrontFrame) {
-      ctx.rotate(-Math.PI * 0.4);
-    } else {
-      ctx.rotate(currentAngle);
-    }
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
-  } else {
-    ctx.save();
-    ctx.translate(bx_socketR, by_socketR);
-    ctx.rotate(currentAngle);
-    drawEquippedWeapon(ctx, p, 34, 1, time);
-    ctx.restore();
+  ctx.save();
+  ctx.translate(bx + sx, y + liftY + socketR.y);
+  ctx.rotate(currentAngle);
+  drawEquippedWeapon(ctx, p, 42, 1, time, true);
+  ctx.restore();
+
+  if (t > 0.1 && t < 0.6) {
+    drawSlashTrail(ctx, bx, by + liftY, C.MELEE_RANGE * 1.0, angleStart, currentAngle, 'iron');
   }
-
-  // VFX
-  if (t > 0.2 && t < 0.6) drawSlashTrail(ctx, bx, by, C.MELEE_RANGE * 1.1, angleStart, currentAngle, 'azure');
 }
 
 /**
@@ -1532,54 +1352,56 @@ function drawAttackPose3(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
  * 360 Spin.
  */
 function drawAttackPose4(ctx: CanvasRenderingContext2D, p: PlayerState, x: number, y: number, time: number, t: number) {
-  // Spin physics
-  const rotations = 2;
-  const angle = t * Math.PI * 2 * rotations;
+  const isKatana = p.weapon === 'daggers';
+  const facing = p.facing.x;
+
+  // IAIJUTSU DASH: High speed advance in 360 degrees
+  const dashDist = isKatana ? 45 * Math.min(1, t / 0.4) : 0;
+  const bx = x + Math.cos(p.meleeAngle) * dashDist;
+  const by = y + Math.sin(p.meleeAngle) * dashDist;
 
   ctx.save();
-  ctx.translate(x, y);
+  ctx.translate(bx, by);
   drawOriginalCharacterBody(ctx, p, time);
   ctx.restore();
 
-  // Resolve socket with mirror support
+  // DOUBLE CROSS SLASH (X)
+  const angleStart = p.meleeAngle - C.MELEE_ARC / 1.2;
+  const angleEnd = p.meleeAngle + C.MELEE_ARC / 1.2;
+
+  let swingT = t < 0.3 ? 0 : Math.min(1, (t - 0.3) / 0.5);
+  swingT = 1 - Math.pow(1 - swingT, 4);
+  const currentAngle = angleStart + (angleEnd - angleStart) * swingT;
+
   const frameOrFrames = getSpriteFrameForFacing(p);
   const currentFrame = Array.isArray(frameOrFrames) ? frameOrFrames[0] : frameOrFrames;
-  const socket = currentFrame.handSocket || SOCKET_FRONT_R;
-  let sx = socket.x;
-  if (currentFrame.flipX) sx *= -1;
-  const sy = socket.y;
+  const isFront = currentFrame.src.includes('parado') || currentFrame.src.includes('frente');
+  const socketR = isFront ? SOCKET_FRONT_R : (currentFrame.handSocket || SOCKET_FRONT_R);
+  const socketL = isFront ? SOCKET_FRONT_L : { x: -socketR.x, y: socketR.y };
 
-  const swordAngle = angle + p.meleeAngle;
+  const sxR = socketR.x * (currentFrame.flipX ? -1 : 1);
+  const sxL = socketL.x * (currentFrame.flipX ? -1 : 1);
 
-  if (p.weapon === 'daggers') {
-    // Dual Vortex — two daggers spinning on opposite sides
-    ctx.save();
-    ctx.translate(x + sx, y + sy);
-    ctx.rotate(swordAngle + Math.PI / 2);
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
+  // Draw two katanas in an X pattern
+  ctx.save();
+  ctx.translate(bx + sxR, y + socketR.y);
+  ctx.rotate(currentAngle);
+  drawEquippedWeapon(ctx, p, 44, 1, time, true);
+  ctx.restore();
 
-    const swordAngle2 = angle + p.meleeAngle + Math.PI;
-    ctx.save();
-    ctx.translate(x - sx, y + sy); // Symmetrical hand
-    ctx.rotate(swordAngle2 + Math.PI / 2);
-    drawEquippedWeapon(ctx, p, 32, 1, time, true);
-    ctx.restore();
-  } else {
-    ctx.save();
-    ctx.translate(x + sx, y + sy);
-    ctx.rotate(swordAngle + Math.PI / 2); // Tangent
-    drawEquippedWeapon(ctx, p, 34, 1, time);
-    ctx.restore();
-  }
+  const angleStartL = p.meleeAngle + C.MELEE_ARC / 1.2;
+  const angleEndL = p.meleeAngle - C.MELEE_ARC / 1.2;
+  const currentAngleL = angleStartL + (angleEndL - angleStartL) * swingT;
 
-  // VFX - Clean azure spin circle
-  if (t > 0.05 && t < 0.95) {
-    ctx.strokeStyle = `rgba(150, 230, 255, 0.4)`;
-    ctx.lineWidth = 12 * (Math.sin(t * Math.PI));
-    ctx.beginPath();
-    ctx.arc(x, y, C.MELEE_RANGE * 1.3, 0, Math.PI * 2);
-    ctx.stroke();
+  ctx.save();
+  ctx.translate(bx + sxL, y + socketL.y);
+  ctx.rotate(currentAngleL);
+  drawEquippedWeapon(ctx, p, 44, 1, time, true);
+  ctx.restore();
+
+  if (t > 0.3 && t < 0.8) {
+    drawSlashTrail(ctx, bx, by, C.MELEE_RANGE * 1.4, angleStart, currentAngle, 'azure');
+    drawSlashTrail(ctx, bx, by, C.MELEE_RANGE * 1.4, angleStartL, currentAngleL, 'azure');
   }
 }
 
@@ -1728,33 +1550,53 @@ function drawDualDaggers(ctx: CanvasRenderingContext2D, length: number, isAttack
     ctx.rotate(extraRot);
 
     // 1. Tsuka (Hilt) - Cabo centrado
-    ctx.fillStyle = '#111';
-    ctx.fillRect(-hiltLen / 2, -0.8, hiltLen, 1.6);
+    // 1. Tsuka (Hilt) - Cabo centrado (Cores Matte e Bronze)
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(-hiltLen / 2, -1.2, hiltLen, 2.4);
 
-    // 2. Tsuba (Circular guard) - Na junção (x = 4)
+    // Tsuka-ito (Diamonds)
+    ctx.fillStyle = '#222';
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.arc(-hiltLen / 2 + 3 + i * 3, 0, 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 2. Tsuba (Circular guard) - Na junção
     const tG = ctx.createRadialGradient(hiltLen / 2, 0, 0, hiltLen / 2, 0, tsubaRadius);
-    tG.addColorStop(0, '#444');
-    tG.addColorStop(1, '#000');
+    tG.addColorStop(0, '#886622'); // Bronze/Gold
+    tG.addColorStop(1, '#221100');
     ctx.fillStyle = tG;
     ctx.beginPath();
     ctx.arc(hiltLen / 2, 0, tsubaRadius, 0, Math.PI * 2);
     ctx.fill();
 
-    // 3. Curved Blade - Iniciando após a tsuba
+    // 3. Curved Blade - High Contrast AAA
     const bGrad = ctx.createLinearGradient(hiltLen / 2, -bladeWidth, hiltLen / 2, bladeWidth);
-    bGrad.addColorStop(0, '#222');
-    bGrad.addColorStop(0.5, '#ddd');
-    bGrad.addColorStop(1, '#666');
+    bGrad.addColorStop(0, '#0a0a0a');
+    bGrad.addColorStop(0.3, '#ffffff'); // Hamon line feel
+    bGrad.addColorStop(0.5, '#cccccc');
+    bGrad.addColorStop(1, '#111111');
     ctx.fillStyle = bGrad;
 
-    const curve = 3;
+    const curve = isAttacking ? 5 : 3;
     ctx.beginPath();
     ctx.moveTo(hiltLen / 2, -bladeWidth / 2);
     ctx.quadraticCurveTo(hiltLen / 2 + bladeLen * 0.5, -bladeWidth / 2 - curve, hiltLen / 2 + bladeLen, -curve);
-    ctx.lineTo(hiltLen / 2 + bladeLen, -curve + 0.8);
-    ctx.quadraticCurveTo(hiltLen / 2 + bladeLen * 0.5, bladeWidth / 2 - curve + 0.8, hiltLen / 2, bladeWidth / 2);
+    ctx.lineTo(hiltLen / 2 + bladeLen, -curve + 1.2);
+    ctx.quadraticCurveTo(hiltLen / 2 + bladeLen * 0.5, bladeWidth / 2 - curve + 1.2, hiltLen / 2, bladeWidth / 2);
     ctx.closePath();
     ctx.fill();
+
+    // Blade Edge Shimmer
+    if (isAttacking) {
+      ctx.strokeStyle = 'rgba(200, 255, 255, 0.4)';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(hiltLen / 2, -bladeWidth / 4);
+      ctx.quadraticCurveTo(hiltLen / 2 + bladeLen * 0.5, -bladeWidth / 4 - curve, hiltLen / 2 + bladeLen, -curve);
+      ctx.stroke();
+    }
 
     ctx.restore();
   };
