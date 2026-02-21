@@ -245,6 +245,29 @@ export function spawnBomberExplosion(particles: Particle[], x: number, y: number
   });
 }
 
+// Origin of Vacuum Slash: A concentrated bright flash at weapon/hand
+export function spawnVacuumOrigin(particles: Particle[], x: number, y: number) {
+  // Core flash
+  particles.push({
+    x, y, vx: 0, vy: 0,
+    life: 0.1, maxLife: 0.1,
+    size: 16, color: '#ffffff',
+    type: 'explosion'
+  });
+  // Energy wisps
+  for (let i = 0; i < 4; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * 30,
+      vy: Math.sin(angle) * 30,
+      life: 0.2, maxLife: 0.2,
+      size: 2, color: 'rgba(160, 80, 255, 0.6)',
+      type: 'spark'
+    });
+  }
+}
+
 export function updateParticles(particles: Particle[], dt: number): Particle[] {
   for (const p of particles) {
     p.x += p.vx * dt;

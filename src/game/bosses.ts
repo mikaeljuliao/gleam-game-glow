@@ -2,6 +2,14 @@
 import { EnemyState, EnemyType, PlayerState, ProjectileState, Vec2 } from './types';
 import * as C from './constants';
 import { createEnemy } from './enemies';
+import {
+  makeBossArcProjectile,
+  makeNeedleProjectile,
+  makeBossOrbProjectile,
+  makeBossFragProjectile,
+  makeHeavyProjectile,
+  makeBossVoidProjectile,
+} from './enemyProjectiles';
 
 // ============ BOSS DATA ============
 
@@ -90,16 +98,9 @@ function updateBoss1(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
     e.attackCooldown = 0.7;
     const angle = Math.atan2(dy, dx);
     const count = 8;
-    const speed = C.SHOOTER_PROJ_SPEED * 0.7;
     for (let i = 0; i < count; i++) {
       const a = angle + (i / count) * Math.PI * 2 + e.wobble * 0.5;
-      projectiles.push({
-        x: e.x, y: e.y,
-        vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
-        size: 4, damage: e.damage, isPlayerOwned: false, lifetime: 3,
-        piercing: false, explosive: false, trail: [],
-        hitTargets: [], volleyId: 0,
-      });
+      projectiles.push(makeBossArcProjectile(e.x, e.y, a, e.damage));
     }
   }
 
@@ -154,14 +155,7 @@ function updateBoss2(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
       e.attackCooldown = 0.2;
       const angle = Math.atan2(dy, dx);
       for (let i = -1; i <= 1; i++) {
-        projectiles.push({
-          x: e.x, y: e.y,
-          vx: Math.cos(angle + i * 0.3) * C.SHOOTER_PROJ_SPEED * 1.2,
-          vy: Math.sin(angle + i * 0.3) * C.SHOOTER_PROJ_SPEED * 1.2,
-          size: 4, damage: e.damage, isPlayerOwned: false, lifetime: 2.5,
-          piercing: false, explosive: false, trail: [],
-          hitTargets: [], volleyId: 0,
-        });
+        projectiles.push(makeNeedleProjectile(e.x, e.y, angle + i * 0.3, e.damage));
       }
     }
   }
@@ -232,14 +226,7 @@ function updateBoss3(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
     const count = 10;
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2 + e.wobble;
-      projectiles.push({
-        x: e.x, y: e.y,
-        vx: Math.cos(a) * C.SHOOTER_PROJ_SPEED * 0.5,
-        vy: Math.sin(a) * C.SHOOTER_PROJ_SPEED * 0.5,
-        size: 3, damage: e.damage, isPlayerOwned: false, lifetime: 3,
-        piercing: false, explosive: false, trail: [],
-        hitTargets: [], volleyId: 0,
-      });
+      projectiles.push(makeBossOrbProjectile(e.x, e.y, a, e.damage, C.SHOOTER_PROJ_SPEED * 0.5));
     }
   }
 
@@ -297,14 +284,7 @@ function updateBoss4(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
     if (e.attackCooldown <= 0) {
       e.attackCooldown = 0.15;
       const angle = Math.atan2(dy, dx);
-      projectiles.push({
-        x: e.x, y: e.y,
-        vx: Math.cos(angle) * C.SHOOTER_PROJ_SPEED * 1.4,
-        vy: Math.sin(angle) * C.SHOOTER_PROJ_SPEED * 1.4,
-        size: 5, damage: e.damage, isPlayerOwned: false, lifetime: 3,
-        piercing: false, explosive: false, trail: [],
-        hitTargets: [], volleyId: 0,
-      });
+      projectiles.push(makeBossFragProjectile(e.x, e.y, angle, e.damage));
     }
     e.phaseAlpha = 0.8;
   }
@@ -359,13 +339,11 @@ function updateBoss5(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
     // Leave explosive trail
     if (e.attackCooldown <= 0) {
       e.attackCooldown = 0.1;
-      projectiles.push({
-        x: e.x - e.vx * 10, y: e.y - e.vy * 10,
-        vx: 0, vy: 0,
-        size: 6, damage: Math.floor(e.damage * 0.7), isPlayerOwned: false, lifetime: 1.5,
-        piercing: false, explosive: true, trail: [],
-        hitTargets: [], volleyId: 0,
-      });
+      projectiles.push(makeHeavyProjectile(
+        e.x - e.vx * 10, e.y - e.vy * 10,
+        0, 0, Math.floor(e.damage * 0.7),
+        true, 1.5
+      ));
     }
   } else if (e.aiState === 'attack') {
     // Ground slam — projectile wall in all directions
@@ -374,19 +352,17 @@ function updateBoss5(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
       const count = 16;
       for (let i = 0; i < count; i++) {
         const a = (i / count) * Math.PI * 2 + e.wobble;
-        projectiles.push({
-          x: e.x, y: e.y,
-          vx: Math.cos(a) * C.SHOOTER_PROJ_SPEED * 0.8,
-          vy: Math.sin(a) * C.SHOOTER_PROJ_SPEED * 0.8,
-          size: 6, damage: e.damage, isPlayerOwned: false, lifetime: 3,
-          piercing: false, explosive: i % 4 === 0, trail: [],
-          hitTargets: [], volleyId: 0,
-        });
+        const explo = i % 4 === 0;
+        projectiles.push(makeHeavyProjectile(
+          e.x, e.y,
+          Math.cos(a) * C.SHOOTER_PROJ_SPEED * 0.8,
+          Math.sin(a) * C.SHOOTER_PROJ_SPEED * 0.8,
+          e.damage, explo
+        ));
       }
       emitBossAction({ screenShake: 6 });
     }
   }
-
   const hpPct = e.hp / e.maxHp;
   // Enrage at 50% — faster, stronger
   if (hpPct < 0.5 && e.fuseTimer < 1) {
@@ -446,42 +422,28 @@ function updateBoss6(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
       e.attackCooldown = 0.3;
       const angle = Math.atan2(dy, dx);
       for (let i = -2; i <= 2; i++) {
-        projectiles.push({
-          x: e.x, y: e.y,
-          vx: Math.cos(angle + i * 0.25) * C.SHOOTER_PROJ_SPEED * 1.5,
-          vy: Math.sin(angle + i * 0.25) * C.SHOOTER_PROJ_SPEED * 1.5,
-          size: 5, damage: e.damage, isPlayerOwned: false, lifetime: 3,
-          piercing: i === 0, explosive: false, trail: [],
-          hitTargets: [], volleyId: 0,
-        });
+        const isPiercing = i === 0;
+        if (isPiercing) {
+          projectiles.push(makeBossVoidProjectile(e.x, e.y, angle + i * 0.25, e.damage));
+        } else {
+          projectiles.push(makeBossOrbProjectile(e.x, e.y, angle + i * 0.25, e.damage, C.SHOOTER_PROJ_SPEED * 1.5));
+        }
       }
     }
   } else if (e.aiState === 'attack') {
     if (e.attackCooldown <= 0) {
       e.attackCooldown = 0.35;
-      // Spiral + aimed combo
+      // Spiral boss_orbs + aimed void beam
       const count = 12;
       const angle = Math.atan2(dy, dx);
       for (let i = 0; i < count; i++) {
         const a = (i / count) * Math.PI * 2 + e.wobble * 2;
-        projectiles.push({
-          x: e.x, y: e.y,
-          vx: Math.cos(a) * C.SHOOTER_PROJ_SPEED * 0.9,
-          vy: Math.sin(a) * C.SHOOTER_PROJ_SPEED * 0.9,
-          size: 5, damage: e.damage, isPlayerOwned: false, lifetime: 4,
-          piercing: false, explosive: i % 3 === 0, trail: [],
-          hitTargets: [], volleyId: 0,
-        });
+        const explo = i % 3 === 0;
+        projectiles.push(makeBossOrbProjectile(e.x, e.y, a, e.damage, C.SHOOTER_PROJ_SPEED * 0.9, 4));
+        if (explo) (projectiles[projectiles.length - 1] as any).explosive = true;
       }
-      // Aimed piercing shot
-      projectiles.push({
-        x: e.x, y: e.y,
-        vx: Math.cos(angle) * C.SHOOTER_PROJ_SPEED * 2,
-        vy: Math.sin(angle) * C.SHOOTER_PROJ_SPEED * 2,
-        size: 7, damage: Math.floor(e.damage * 1.5), isPlayerOwned: false, lifetime: 4,
-        piercing: true, explosive: false, trail: [],
-        hitTargets: [], volleyId: 0,
-      });
+      // Aimed piercing void shot
+      projectiles.push(makeBossVoidProjectile(e.x, e.y, angle, Math.floor(e.damage * 1.5)));
     }
   }
 

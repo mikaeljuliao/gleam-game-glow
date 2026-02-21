@@ -129,8 +129,10 @@ export const SFX = {
   },
 
   rangedShoot() {
-    playFreqSweep(800, 1200, 0.1, 'sine', 0.08);
-    playTone(600, 0.05, 'square', 0.04);
+    // CORTE ENERGÉTICO SECO - Short high-pass noise + quick sharp sweep
+    playNoise(0.05, 0.09, 4500, 'highpass');
+    playFreqSweep(1800, 1400, 0.06, 'sawtooth', 0.07);
+    playTone(500, 0.04, 'sine', 0.05);
   },
 
   enemyHit() {
@@ -606,6 +608,23 @@ export const SFX = {
     playFreqSweep(1800, 400, 0.1, 'sawtooth', 0.12);
     playNoise(0.12, 0.15, 3000, 'lowpass');
     playTone(300, 0.08, 'square', 0.08);
+  },
+  staffCharge() {
+    // Som grave crescente
+    playFreqSweep(40, 220, 0.26, 'sine', 0.12);
+    playNoise(0.26, 0.04, 800, 'lowpass');
+  },
+  staffFire() {
+    // Som poderoso / Flash vocal feel
+    playFreqSweep(600, 40, 0.15, 'sawtooth', 0.15);
+    playNoise(0.2, 0.12, 1500, 'lowpass');
+    playTone(50, 0.3, 'sine', 0.18);
+  },
+  staffImpact() {
+    // Explosão energética controlada
+    playTone(40, 0.4, 'sine', 0.2);
+    playNoise(0.25, 0.1, 500);
+    playFreqSweep(150, 60, 0.2, 'sawtooth', 0.08);
   },
 };
 

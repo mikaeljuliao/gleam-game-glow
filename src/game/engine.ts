@@ -3,15 +3,16 @@ import { InputManager } from './input';
 import { createPlayer, updatePlayer, tryDash, tryMelee, canRangedAttack, doRangedAttack, addXP, damagePlayer } from './player';
 import { createEnemy, updateEnemy, damageEnemy, scaleEnemyForFloor, getXPForEnemy, createBossForFloor, consumeBossAction, setBossFloor } from './enemies';
 import { createPlayerProjectile, updateProjectile } from './projectiles';
+import { tryFragSplit } from './enemyProjectiles';
 import { generateDungeon, getCurrentRoom, moveToRoom } from './dungeon';
 import {
   createParticles, updateParticles, spawnBlood, spawnDamageText, spawnXPParticle,
   spawnExplosion, spawnSpark, spawnDust, spawnTrail, spawnEmbers,
   spawnGhostParticle, spawnBomberExplosion, spawnSoulCollectParticle,
-  spawnImpactGlint, spawnBladeShard
+  spawnImpactGlint, spawnBladeShard, spawnVacuumOrigin
 } from './particles';
 import { getRandomUpgrades, checkSynergies, getOwnedTags, SYNERGIES } from './upgrades';
-import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins, renderWeaponSelectionOverlay } from './renderer';
+import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins, renderWeaponSelectionOverlay, spawnVacuumImpact, ProjectileOrigin, HandCastEffect, EnemyProjectileImpact, StaffChargeEffect, StaffImpactEffect } from './renderer';
 import { SFX, initAudio } from './audio';
 import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive, updateHPHorror, renderHPHorror, getHPLightPulse } from './horror';
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
@@ -23,6 +24,7 @@ import * as C from './constants';
 import { MerchantNPC } from './npc/Merchant';
 import { AlchemistNPC } from './npc/Alchemist';
 import { KatanaComboController } from './katana_combo';
+import { StaffWeaponController } from './staff_controller';
 
 export class GameEngine {
   player: PlayerState;
@@ -103,10 +105,11 @@ export class GameEngine {
   weaponOptions: { id: WeaponType; name: string; desc: string; locked?: boolean }[] = [
     { id: 'sword', name: 'Espada', desc: 'Equilibrada & Precisa' },
     { id: 'daggers', name: 'Catana Dupla', desc: 'Rápida & Técnica' },
-    { id: 'staff', name: 'Cajado', desc: 'Indisponível', locked: true },
+    { id: 'staff', name: 'Cajado', desc: 'Poder Dimensional (Ranged)' },
   ];
   selectedWeaponIndex = 0;
   katanaController: KatanaComboController;
+  staffController: StaffWeaponController;
 
   constructor(displayCanvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     this.displayCanvas = displayCanvas;
@@ -141,6 +144,7 @@ export class GameEngine {
     startBackgroundMusic();
     initArenaFX();
     this.katanaController = new KatanaComboController(this.player);
+    this.staffController = new StaffWeaponController(this.player);
   }
 
   loadFromSave(): boolean {
@@ -939,7 +943,13 @@ export class GameEngine {
     // Combat - melee
     if (this.input.isMouseJustPressed(0)) {
       const mouse = this.input.getMousePos();
-      if (this.player.weapon === 'daggers') {
+      if (this.player.weapon === 'staff') {
+        if (this.staffController.startCharge(mouse.x, mouse.y)) {
+          this.lastAttackWasMelee = false;
+          SFX.staffCharge(); // Need to ensure this exists or use a tone
+          this.addEffect('shake', 1.5, 0.2);
+        }
+      } else if (this.player.weapon === 'daggers') {
         if (this.katanaController.tryAttack(mouse.x, mouse.y)) {
           this.lastAttackWasMelee = true;
           this._hitTriggeredThisSwing = false;
@@ -955,10 +965,19 @@ export class GameEngine {
     // Update weapon-specific logic
     if (this.player.weapon === 'daggers') {
       this.katanaController.update(dt);
+    } else if (this.player.weapon === 'staff') {
+      this.staffController.update(dt, this.gameTime);
+      const bolts = this.staffController.tryFireIfCharged();
+      if (bolts.length > 0) {
+        this.projectiles.push(...bolts);
+        this.addEffect('shake', 4, 0.15);
+        SFX.staffFire();
+      }
     }
 
     // Trigger melee impact
     if (this.player.meleeAttacking && !this._hitTriggeredThisSwing) {
+      // ... (katana/sword logic remains same)
       const isKatana = this.player.weapon === 'daggers';
       if (isKatana) {
         const strike = this.katanaController.getCurrentStrike();
@@ -970,7 +989,7 @@ export class GameEngine {
           this.doMeleeHit();
           (SFX as any)[strike.sfx]();
         }
-      } else {
+      } else if (this.player.weapon === 'sword') {
         // Longsword timing (legacy style)
         if (this.player.meleeTimer <= 0.2) {
           this._hitTriggeredThisSwing = true;
@@ -980,21 +999,43 @@ export class GameEngine {
       }
     }
 
-    // Combat - ranged
+    // Combat - ranged (hand discharge)
     if (this.input.isMouseJustPressed(2) || this.input.isDown('e')) {
-      if (canRangedAttack(this.player)) {
-        this.lastAttackWasMelee = false;
-        doRangedAttack(this.player);
-        const mouse = this.input.getMousePos();
-        const projs = createPlayerProjectile(this.player, mouse.x, mouse.y);
-        this.projectiles.push(...projs);
-        SFX.rangedShoot();
-        // Cruel Repetition — 30% chance to auto-repeat
-        if (isAmuletEquipped(this.amuletInventory, 'cruel_repetition') && Math.random() < 0.3) {
-          this.cruelRepTimer = 0.15;
-          this.cruelRepIsMelee = false;
-          this.cruelRepTarget = { ...mouse };
+      if (this.player.weapon !== 'staff') {
+        if (canRangedAttack(this.player) && !this.player.isRangedCharging) {
+          this.lastAttackWasMelee = false;
+          const mouse = this.input.getMousePos();
+          doRangedAttack(this.player, mouse.x, mouse.y);
         }
+      } else {
+        // Staff can use right click to charge too
+        const mouse = this.input.getMousePos();
+        if (this.staffController.startCharge(mouse.x, mouse.y)) {
+          this.lastAttackWasMelee = false;
+          SFX.staffCharge();
+        }
+      }
+    }
+
+    // Handle firing after charge (HandCast System - only if NOT staff)
+    if (this.player.weapon !== 'staff' && this.player.isRangedCharging && this.player.rangedChargeTimer <= 0) {
+      this.player.isRangedCharging = false;
+      const target = this.player.rangedChargeTarget;
+      const socket = ProjectileOrigin.getHandSocket(this.player, this.gameTime);
+      const originX = this.player.x + socket.x;
+      const originY = this.player.y + socket.y;
+
+      const projs = createPlayerProjectile(this.player, target.x, target.y, originX, originY);
+      this.projectiles.push(...projs);
+
+      HandCastEffect.renderFlash(this.particles, originX, originY);
+      SFX.rangedShoot();
+
+      // Cruel Repetition — 30% chance to auto-repeat
+      if (isAmuletEquipped(this.amuletInventory, 'cruel_repetition') && Math.random() < 0.3) {
+        this.cruelRepTimer = 0.15;
+        this.cruelRepIsMelee = false;
+        this.cruelRepTarget = { ...target };
       }
     }
 
@@ -1008,13 +1049,22 @@ export class GameEngine {
             this._hitTriggeredThisSwing = false; // Reset for repeatable swing
             spawnDamageText(this.particles, this.player.x, this.player.y - 16, '🔁', '#aa88ff');
           }
+        } else if (this.player.weapon === 'staff') {
+          const bolts = this.staffController.fireDirect(this.cruelRepTarget);
+          this.projectiles.push(...bolts);
+          SFX.staffFire();
+          spawnDamageText(this.particles, this.player.x, this.player.y - 16, '🔁', '#aa88ff');
         } else {
           this.player.rangedCooldown = 0;
-          doRangedAttack(this.player);
-          const projs = createPlayerProjectile(this.player, this.cruelRepTarget.x, this.cruelRepTarget.y);
+          const socket = ProjectileOrigin.getHandSocket(this.player, this.gameTime);
+          const ox = this.player.x + socket.x;
+          const oy = this.player.y + socket.y;
+
+          const projs = createPlayerProjectile(this.player, this.cruelRepTarget.x, this.cruelRepTarget.y, ox, oy);
           this.projectiles.push(...projs);
           SFX.rangedShoot();
           spawnDamageText(this.particles, this.player.x, this.player.y - 16, '🔁', '#aa88ff');
+          HandCastEffect.renderFlash(this.particles, ox, oy);
         }
       }
     }
@@ -1177,6 +1227,10 @@ export class GameEngine {
       const alive = updateProjectile(p, dt);
       if (!alive) return false;
 
+      // boss_frag split mechanic — spawn two child orbs at 40% lifetime
+      const splits = tryFragSplit(p);
+      if (splits.length > 0) this.projectiles.push(...splits);
+
       if (p.isPlayerOwned) {
         for (const e of this.enemies) {
           if (projDeadEnemies.has(e)) continue;
@@ -1203,8 +1257,11 @@ export class GameEngine {
             e.lastVolleyId = p.volleyId;
 
             const strengthMult = this.player.strengthBuffTimer > 0 ? 1.5 : 1.0;
-            let dmg = Math.floor(p.damage * this.player.damageMultiplier * this.getAmuletDamageMult() * strengthMult);
-            // Berserker
+            // Projectile damage already contains permanent damageMultiplier. 
+            // We only apply temporary/dynamic multipliers here.
+            let dmg = Math.floor(p.damage * this.getAmuletDamageMult() * strengthMult);
+
+            // Berserker bonus (Dynamic based on current HP)
             if (this.player.berserker && this.player.hp / this.player.maxHp < 0.3) {
               dmg = Math.floor(dmg * 1.8);
             }
@@ -1223,6 +1280,14 @@ export class GameEngine {
             this.stats.damageDealt += dmg;
             spawnDamageText(this.particles, e.x, e.y, `${dmg}`);
             spawnBlood(this.particles, e.x, e.y, 4);
+
+            if (p.projectileKind === 'staff_bolt') {
+              StaffImpactEffect.spawn(this.particles, p.x, p.y);
+              SFX.staffImpact();
+            } else {
+              spawnVacuumImpact(this.particles, p.x, p.y);
+            }
+
             SFX.enemyHit();
 
 
@@ -1237,13 +1302,14 @@ export class GameEngine {
             }
 
             if (p.explosive) {
-              spawnExplosion(this.particles, p.x, p.y, 20);
+              const explosionRadius = 35 * this.player.areaMultiplier;
+              spawnExplosion(this.particles, p.x, p.y, Math.floor(15 * this.player.areaMultiplier));
               this.addEffect('shake', 5, 0.2);
               SFX.explosion();
               // AOE damage
               for (const ae of this.enemies) {
                 if (projDeadEnemies.has(ae)) continue;
-                if (this.circleCollide(p.x, p.y, 30, ae.x, ae.y, ae.width / 2)) {
+                if (this.circleCollide(p.x, p.y, explosionRadius, ae.x, ae.y, ae.width / 2)) {
                   const aeDmg = Math.floor(dmg * 0.5);
                   const adead = damageEnemy(ae, aeDmg, 0, 0);
                   if (adead) {
@@ -1260,9 +1326,14 @@ export class GameEngine {
         if (this.circleCollide(p.x, p.y, p.size, this.player.x, this.player.y, this.player.width / 2)) {
           const result = this.applyDamageToPlayer(p.damage);
           if (result.damaged) {
-            this.addEffect('shake', 3, 0.1);
-            this.addEffect('flash', 1, 0.1, 'rgb(255, 0, 0)');
+            let shake = 3, flash = 0.1, color = 'rgb(255, 0, 0)';
+            if (p.projectileKind === 'heavy') { shake = 8; flash = 0.25; }
+            if (p.projectileKind?.startsWith('boss')) { shake = 6; flash = 0.2; }
+
+            this.addEffect('shake', shake, 0.15);
+            this.addEffect('flash', 1, flash, color);
             spawnDamageText(this.particles, this.player.x, this.player.y, `-${result.actualDmg}`, C.COLORS.damageText);
+            EnemyProjectileImpact.spawn(this.particles, p);
             SFX.playerHit();
           }
           if (result.died) { this.gameOver(); return false; }
@@ -1900,11 +1971,14 @@ export class GameEngine {
           const cos = Math.cos(spread), sin = Math.sin(spread);
           const vx = (nx * cos - ny * sin) * 180;
           const vy = (nx * sin + ny * cos) * 180;
+          const angle = Math.atan2(vy, vx);
           this.projectiles.push({
             x: p.discipleX, y: p.discipleY,
             vx, vy, size: 3, damage: baseDmg,
             isPlayerOwned: true, lifetime: 0.8,
+            maxLifetime: 0.8,
             piercing: false, explosive: false, trail: [], hitTargets: [], volleyId,
+            angle, animationTimer: 0,
           });
         }
         spawnSpark(this.particles, p.discipleX, p.discipleY, '#66cc88', 3);
@@ -2314,6 +2388,12 @@ export class GameEngine {
     for (const p of this.projectiles) renderProjectile(ctx, p, this.gameTime);
     for (const e of this.enemies) renderEnemy(ctx, e, this.gameTime);
     renderPlayer(ctx, this.player, this.gameTime);
+
+    // Weapon Specific Effects
+    if (this.player.weapon === 'staff') {
+      StaffChargeEffect.render(ctx, this.player, this.gameTime);
+    }
+
     // Disciple / shadow clone render
     if (this.player.hasDisciple || this.player.shadowClone) {
       const hasAmulet = isAmuletEquipped(this.amuletInventory, 'disciple');

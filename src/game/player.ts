@@ -76,6 +76,12 @@ export function createPlayer(): PlayerState {
     footstepTimer: 0,
     isMoving: false,
     weapon: 'sword',
+    rangedChargeTimer: 0,
+    isRangedCharging: false,
+    rangedChargeTarget: { x: 0, y: 0 },
+    isStaffCharging: false,
+    staffChargeTimer: 0,
+    staffChargeTarget: { x: 0, y: 0 },
   };
 }
 
@@ -84,6 +90,11 @@ export function updatePlayer(p: PlayerState, moveDir: Vec2, dt: number) {
   if (p.meleeCooldown > 0) p.meleeCooldown -= dt;
   if (p.rangedCooldown > 0) p.rangedCooldown -= dt;
   if (p.invincibleTime > 0) p.invincibleTime -= dt;
+
+  if (p.isRangedCharging) {
+    p.rangedChargeTimer -= dt;
+  }
+
   if (p.meleeTimer > 0) {
     p.meleeTimer -= dt;
     if (p.meleeTimer <= 0) p.meleeAttacking = false;
@@ -121,6 +132,11 @@ export function updatePlayer(p: PlayerState, moveDir: Vec2, dt: number) {
 
   // Combine multipliers: Permanent (upgrades) * Buffs * Temporary (amulets)
   let speedMult = p.moveSpeedMult * buffSpeed * p.temporaryMoveSpeedMult;
+
+  if (p.isRangedCharging) {
+    // Movement speed reduction during charging (0.15-0.2s duration)
+    speedMult *= 0.55;
+  }
 
   // Apply Diminishing Returns: Scaled reduction after 1.5x speed
   if (speedMult > 1.5) {
@@ -208,9 +224,14 @@ export function canRangedAttack(p: PlayerState): boolean {
   return p.rangedCooldown <= 0;
 }
 
-export function doRangedAttack(p: PlayerState) {
+export function doRangedAttack(p: PlayerState, targetX: number, targetY: number) {
   const finalAttackSpeed = p.attackSpeedMult * p.temporaryAttackSpeedMult;
   p.rangedCooldown = C.RANGED_COOLDOWN / finalAttackSpeed;
+
+  // Start the 0.17s pre-fire charging effect (hand energy)
+  p.isRangedCharging = true;
+  p.rangedChargeTimer = 0.17;
+  p.rangedChargeTarget = { x: targetX, y: targetY };
 }
 
 export function addXP(p: PlayerState, amount: number): boolean {

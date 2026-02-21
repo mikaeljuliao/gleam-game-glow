@@ -90,6 +90,13 @@ export interface PlayerState {
   footstepTimer: number;
   isMoving: boolean; // Flag to track actual movement for animation
   weapon: WeaponType;
+  rangedChargeTimer: number;
+  isRangedCharging: boolean;
+  rangedChargeTarget: Vec2;
+  // Staff weapon state
+  isStaffCharging: boolean;
+  staffChargeTimer: number;
+  staffChargeTarget: Vec2;
 }
 
 export type WeaponType = 'sword' | 'daggers' | 'staff';
@@ -150,6 +157,12 @@ export interface ProjectileState {
   hitTargets: EnemyState[];
   // ID shared by all projectiles in a single shot
   volleyId: number;
+  // New fields for visual overhaul
+  angle: number;
+  animationTimer: number;
+  maxLifetime: number;
+  // Enemy projectile visual identity
+  projectileKind?: 'basic' | 'needle' | 'heavy' | 'boss_orb' | 'boss_arc' | 'boss_void' | 'boss_frag' | 'staff_bolt';
 }
 
 export interface Particle {

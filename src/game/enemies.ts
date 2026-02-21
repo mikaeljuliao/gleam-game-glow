@@ -1,6 +1,7 @@
 import { EnemyState, EnemyType, PlayerState, ProjectileState, Vec2 } from './types';
 import { updateBossAI } from './bosses';
 import * as C from './constants';
+import { makeBasicProjectile } from './enemyProjectiles';
 
 export function createEnemy(type: EnemyType, x: number, y: number): EnemyState {
   const configs: Record<EnemyType, { hp: number; speed: number; damage: number; size: number }> = {
@@ -111,12 +112,7 @@ export function updateEnemy(e: EnemyState, player: PlayerState, dt: number, allE
       }
       if (e.attackCooldown <= 0 && dist < C.SHOOTER_RANGE * 1.3) {
         e.attackCooldown = C.SHOOTER_FIRE_RATE;
-        projectiles.push({
-          x: e.x, y: e.y,
-          vx: n.x * C.SHOOTER_PROJ_SPEED, vy: n.y * C.SHOOTER_PROJ_SPEED,
-          size: 3, damage: e.damage, isPlayerOwned: false, lifetime: 3,
-          piercing: false, explosive: false, trail: [], hitTargets: [], volleyId: Date.now() + Math.random(),
-        });
+        projectiles.push(makeBasicProjectile(e.x, e.y, player.x, player.y, e.damage));
       }
       break;
     }

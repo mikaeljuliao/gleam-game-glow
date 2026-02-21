@@ -541,6 +541,9 @@ export function renderPlayer(ctx: CanvasRenderingContext2D, p: PlayerState, time
   // Effects disabled — pure sprite visualisation mode
   // drawAmbientEffects(ctx, p, x, y, time);
 
+  // Magic channeling effect (Free hand)
+  HandCastEffect.render(ctx, p, time);
+
   // 2. Pose Selection
   if (p.meleeAttacking) {
     const step = p.activeComboStep || 1;
@@ -1139,15 +1142,9 @@ function drawIdleRunPose(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
     const isFrontFrame = currentFrame.src.includes('frente') || currentFrame.src.includes('parado');
     const isBackFrame = currentFrame.src.includes('costa');
 
+    // Determine active socket - Sprite flip already handles the side change
     let socket = currentFrame.handSocket || (isBackFrame ? SOCKET_BACK_R : SOCKET_FRONT_R);
 
-    // Troca de Braço Dinâmica: Ajuste de sockets para costas e frontal
-    if (isFrontFrame) {
-      socket = p.facing.x < 0 ? SOCKET_FRONT_L : SOCKET_FRONT_R;
-    } else if (isBackFrame) {
-      // FIX: Sempre usa o braço direito nas costas (único visível)
-      socket = SOCKET_BACK_R;
-    }
 
     let sx = socket.x;
     if (currentFrame.flipX) sx *= -1;
@@ -1179,8 +1176,8 @@ function drawIdleRunPose(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
       drawEquippedWeapon(ctx, p, 32, 0, time, true);
       ctx.restore();
     } else {
-      // SINGLE WEAPON - Troca de Braço Automática
-      const finalSx = isBackFrame ? sx : (p.facing.x < 0 ? -sx : sx);
+      // SINGLE WEAPON - Use the frame-calculated socket and scale mirroring
+      const finalSx = sx;
 
       let finalSy: number;
       let rot: number;
@@ -1212,16 +1209,19 @@ function drawIdleRunPose(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
         }
       }
 
-      drawEtherealHand(ctx, finalSx, finalSy, pulse, time, 0, 0);
       ctx.save();
       ctx.translate(finalSx, finalSy);
 
-      if (p.facing.x < 0 && !isBackFrame) ctx.scale(-1, 1);
-
-      ctx.rotate(rot + sway);
-
-      const daggerLen = p.weapon === 'daggers' ? 32 : 34;
-      drawEquippedWeapon(ctx, p, daggerLen, isMoving ? 0.2 : 0, time);
+      if (p.weapon === 'staff') {
+        // STAFF POSITIONING: High presence, vertical, no flip scaling
+        drawVerticalStaff(ctx, 42, 0, time, p.facing.x);
+      } else {
+        if (p.facing.x < 0 && !isBackFrame) ctx.scale(-1, 1);
+        ctx.rotate(rot + sway);
+        // Corrected: p.weapon can only be 'sword' (or 'daggers' if logic allowed, but it's in the else of 'isDual')
+        const weaponLen = 34;
+        drawEquippedWeapon(ctx, p, weaponLen, isMoving ? 0.2 : 0, time);
+      }
       ctx.restore();
     }
   }
@@ -1729,35 +1729,107 @@ function drawLongsword(ctx: CanvasRenderingContext2D, length: number, isAttackin
 
 
 
-/** Draws a realistic Void Staff */
+/** Draws a professional-grade AAA Void Staff */
 function drawVoidStaff(ctx: CanvasRenderingContext2D, length: number, isAttacking: number, time: number) {
-  const staffLen = length * 1.2;
+  const staffLen = length * 1.35;
+  const shaftWidth = 3.5;
+
+  // 1. Dark Ebonwood Shaft
   const shaftGrad = ctx.createLinearGradient(-staffLen + 10, 0, 0, 0);
-  shaftGrad.addColorStop(0, '#050505');
-  shaftGrad.addColorStop(0.5, '#1a100a');
-  shaftGrad.addColorStop(1, '#050505');
+  shaftGrad.addColorStop(0, '#020204'); // Deep midnight
+  shaftGrad.addColorStop(0.4, '#0a0815'); // Dark violet wood
+  shaftGrad.addColorStop(0.6, '#080510');
+  shaftGrad.addColorStop(1, '#020204');
+
   ctx.fillStyle = shaftGrad;
   ctx.beginPath();
-  ctx.moveTo(-staffLen + 10, -2);
-  ctx.lineTo(0, -3);
-  ctx.lineTo(0, 3);
-  ctx.lineTo(-staffLen + 10, 2);
+  // Tapered design
+  ctx.moveTo(-staffLen + 10, -shaftWidth * 0.4);
+  ctx.lineTo(0, -shaftWidth * 0.5);
+  ctx.lineTo(2, 0); // Point
+  ctx.lineTo(0, shaftWidth * 0.5);
+  ctx.lineTo(-staffLen + 10, shaftWidth * 0.4);
+  ctx.closePath();
   ctx.fill();
 
+  // Ornate bindings
+  ctx.fillStyle = '#2a283a';
+  for (let i = 0; i < 3; i++) {
+    ctx.fillRect(-staffLen + 15 + i * (staffLen / 4), -shaftWidth * 0.6, 2, shaftWidth * 1.2);
+  }
+
+  // 2. The Void Head (Crescent structure)
   ctx.save();
-  ctx.translate(8, 0);
-  const orbPulse = 0.9 + Math.sin(time * 3) * 0.1;
-  const orbGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 6);
-  orbGrad.addColorStop(0, '#ffffff');
-  orbGrad.addColorStop(0.2, '#cc88ff');
-  orbGrad.addColorStop(0.5, '#330066');
+  ctx.translate(14, 0);
+
+  // Dark metallic structure
+  ctx.fillStyle = '#0a0a0f';
+  ctx.beginPath();
+  ctx.arc(0, 0, 10, -Math.PI * 0.7, Math.PI * 0.7);
+  ctx.lineTo(0, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // 3. Floating Ethereal Core
+  const corePulse = 0.95 + Math.sin(time * 4) * 0.05;
+  const coreSize = 7 * corePulse;
+
+  // Outer Glow
+  const glowG = ctx.createRadialGradient(0, 0, 0, 0, 0, 15);
+  glowG.addColorStop(0, 'rgba(160, 50, 255, 0.3)');
+  glowG.addColorStop(1, 'rgba(80, 0, 120, 0)');
+  ctx.fillStyle = glowG;
+  ctx.beginPath();
+  ctx.arc(0, 0, 15, 0, Math.PI * 2);
+  ctx.fill();
+
+  // The Core
+  const orbGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, coreSize);
+  orbGrad.addColorStop(0, '#ffffff'); // Heart
+  orbGrad.addColorStop(0.2, '#aa66ff'); // Inner violet
+  orbGrad.addColorStop(0.6, '#4b0082'); // Deep indigo
   orbGrad.addColorStop(1, '#050010');
   ctx.fillStyle = orbGrad;
   ctx.beginPath();
-  ctx.arc(0, 0, 5 * orbPulse, 0, Math.PI * 2);
+  ctx.arc(0, 0, coreSize, 0, Math.PI * 2);
   ctx.fill();
+
+  // 4. Orbiting Shards
+  for (let i = 0; i < 3; i++) {
+    const orbitAngle = time * 2.5 + (i * Math.PI * 2 / 3);
+    const orbitDist = 12 + Math.sin(time * 3 + i) * 2;
+    const ox = Math.cos(orbitAngle) * orbitDist;
+    const oy = Math.sin(orbitAngle) * orbitDist * 0.5;
+
+    ctx.fillStyle = '#110022';
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.rotate(orbitAngle * 2);
+    ctx.beginPath();
+    ctx.moveTo(0, -2); ctx.lineTo(1.5, 0); ctx.lineTo(0, 2); ctx.lineTo(-1.5, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
   ctx.restore();
 }
+
+/** Draws the staff in its "Vertical" state for the player */
+function drawVerticalStaff(ctx: CanvasRenderingContext2D, length: number, isAttacking: number, time: number, facingX: number) {
+  ctx.save();
+  // Fixed vertical rotation: always straight up with a tiny rhythmic sway
+  const sway = Math.sin(time * 2.5) * 0.03;
+  ctx.rotate(-Math.PI / 2 + sway);
+
+  // Pivot Adjustment: Hand grasps about 1/3 up from the bottom
+  // Move the staff UP so the head is higher and the tail also sits above the floor
+  ctx.translate(28, 0);
+
+  drawVoidStaff(ctx, length, isAttacking, time);
+  ctx.restore();
+}
+
 
 /** ═══ WEAPON SELECTION OVERLAY ═══ */
 export function renderWeaponSelectionOverlay(ctx: CanvasRenderingContext2D, selectedIndex: number, options: { id: WeaponType; name: string; desc: string; locked?: boolean }[], time: number, vp: Viewport) {
@@ -3542,34 +3614,598 @@ export function renderAlchemist(ctx: CanvasRenderingContext2D, x: number, y: num
   }
 }
 
-export function renderProjectile(ctx: CanvasRenderingContext2D, p: ProjectileState, time: number) {
-  // Trail
-  for (let i = 0; i < p.trail.length; i++) {
-    const t = p.trail[i];
-    const alpha = (i / p.trail.length) * 0.4;
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = p.isPlayerOwned ? C.COLORS.projPlayer : C.COLORS.projEnemy;
-    const s = p.size * (i / p.trail.length);
-    ctx.fillRect(Math.floor(t.x - s / 2), Math.floor(t.y - s / 2), Math.ceil(s), Math.ceil(s));
-  }
-  ctx.globalAlpha = 1;
+/**
+ * ProjectileOrigin: Identifies the free hand socket for channeled attacks
+ */
+export const ProjectileOrigin = {
+  getHandSocket(p: PlayerState, time: number): { x: number, y: number } {
+    const frameOrFrames = getSpriteFrameForFacing(p);
+    const moves = p.isMoving || p.isDashing || p.meleeAttacking;
+    const currentFrame = Array.isArray(frameOrFrames)
+      ? frameOrFrames[Math.floor(time * (moves ? 10 : 1.2)) % frameOrFrames.length]
+      : frameOrFrames;
 
-  // Main projectile
-  ctx.fillStyle = p.isPlayerOwned ? C.COLORS.projPlayer : C.COLORS.projEnemy;
-  ctx.fillRect(
-    Math.floor(p.x - p.size / 2),
-    Math.floor(p.y - p.size / 2),
-    p.size, p.size
-  );
-  // Glow
-  ctx.fillStyle = p.isPlayerOwned ? 'rgba(102, 204, 255, 0.25)' : 'rgba(255, 85, 85, 0.25)';
-  const glowSize = p.size + 2 + Math.sin(time * 10) * 1;
-  ctx.fillRect(
-    Math.floor(p.x - glowSize / 2),
-    Math.floor(p.y - glowSize / 2),
-    Math.ceil(glowSize), Math.ceil(glowSize)
-  );
+    const isBackFrame = currentFrame.src.includes('costa');
+
+    // Auto-identify free hand: 
+    // Sword/Staff uses Right Hand for weapon, so Left Hand is free.
+    // Daggers uses both, we pick Left Hand as the ritual/cast hand.
+    const useLeftHand = true;
+
+    const socket = useLeftHand
+      ? (isBackFrame ? SOCKET_BACK_L : SOCKET_FRONT_L)
+      : (isBackFrame ? SOCKET_BACK_R : SOCKET_FRONT_R);
+
+    let sx = socket.x;
+    if (currentFrame.flipX) sx *= -1;
+
+    return { x: sx, y: socket.y };
+  }
+};
+
+/**
+ * StaffPositioning: Specific sockets and logic for the Void Staff
+ */
+export const StaffPositioning = {
+  getHandSocket(p: PlayerState, time: number): { x: number, y: number } {
+    const frameOrFrames = getSpriteFrameForFacing(p);
+    const moves = p.isMoving || p.isDashing || p.meleeAttacking;
+    const currentFrame = Array.isArray(frameOrFrames)
+      ? frameOrFrames[Math.floor(time * (moves ? 10 : 1.2)) % frameOrFrames.length]
+      : frameOrFrames;
+
+    const isBackFrame = currentFrame.src.includes('costa');
+    // Staff always in primary hand (usually Right Hand)
+    const socket = currentFrame.handSocket || (isBackFrame ? SOCKET_BACK_R : SOCKET_FRONT_R);
+
+    let sx = socket.x;
+    if (currentFrame.flipX) sx *= -1;
+
+    return { x: sx, y: socket.y };
+  },
+
+  getTipSocketWorld(p: PlayerState, time: number): { x: number, y: number } {
+    const hand = this.getHandSocket(p, time);
+    // Tip is 48px above hand in vertical pose
+    return { x: p.x + hand.x, y: p.y + hand.y - 48 };
+  }
+};
+
+/**
+ * HandCastEffect: Visual feedback on the hand before firing
+ */
+export const HandCastEffect = {
+  render(ctx: CanvasRenderingContext2D, p: PlayerState, time: number) {
+    if (!p.isRangedCharging) return;
+
+    const socket = ProjectileOrigin.getHandSocket(p, time);
+    const hx = p.x + socket.x;
+    const hy = p.y + socket.y;
+
+    // 0.2s charge duration
+    const progress = Math.max(0, 1 - p.rangedChargeTimer / 0.17);
+
+    ctx.save();
+
+    // Core Glow (Roxo Escuro Elegante)
+    const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, 8 * progress);
+    g.addColorStop(0, 'rgba(200, 160, 255, 0.9)'); // Bright core
+    g.addColorStop(0.5, 'rgba(100, 30, 220, 0.4)'); // Purple energy
+    g.addColorStop(1, 'rgba(40, 0, 80, 0)');
+
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(hx, hy, 12 * progress, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pulse effect
+    const pulse = 1 + Math.sin(time * 25) * 0.2;
+    ctx.strokeStyle = 'rgba(180, 100, 255, 0.6)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(hx, hy, (6 + Math.sin(time * 15) * 2) * progress, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Swirling particles
+    for (let i = 0; i < 3; i++) {
+      const ang = time * 8 + i * (Math.PI * 2 / 3);
+      const dist = 6 + Math.sin(time * 10 + i) * 2;
+      ctx.fillStyle = 'rgba(220, 180, 255, 0.8)';
+      ctx.beginPath();
+      ctx.arc(hx + Math.cos(ang) * dist, hy + Math.sin(ang) * dist, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  },
+
+  renderFlash(particles: Particle[], x: number, y: number) {
+    // Quick flash at hand on fire
+    particles.push({
+      x, y, vx: 0, vy: 0,
+      life: 0.08, maxLife: 0.08,
+      size: 18, color: '#ffffff',
+      type: 'explosion'
+    });
+  }
+};
+
+/**
+ * EnemyProjectileVisual
+ * Dispatches to the correct per-kind renderer based on projectileKind tag.
+ */
+export const EnemyProjectileVisual = {
+  render(ctx: CanvasRenderingContext2D, p: ProjectileState, time: number) {
+    const alpha = Math.max(0, p.lifetime / (p.maxLifetime || 1));
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    switch (p.projectileKind) {
+      case 'needle': this._drawNeedle(ctx, p, time); break;
+      case 'heavy': this._drawHeavy(ctx, p, time); break;
+      case 'boss_orb': this._drawBossOrb(ctx, p, time); break;
+      case 'boss_arc': this._drawBossArc(ctx, p, time); break;
+      case 'boss_void': this._drawBossVoid(ctx, p, time); break;
+      case 'boss_frag': this._drawBossFrag(ctx, p, time); break;
+      default: this._drawBasic(ctx, p, time); break;
+    }
+    ctx.restore();
+  },
+
+  _drawBasic(ctx: CanvasRenderingContext2D, p: ProjectileState, _time: number) {
+    const r = p.size;
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 1.8);
+    g.addColorStop(0, 'rgba(255, 80, 80, 0.95)');
+    g.addColorStop(0.5, 'rgba(160, 20, 20, 0.7)');
+    g.addColorStop(1, 'rgba(80, 0, 0, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 200, 200, 0.9)';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  },
+
+  _drawNeedle(ctx: CanvasRenderingContext2D, p: ProjectileState, _time: number) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+    const len = p.size * 5.5;
+    const w = p.size * 0.45;
+    const g = ctx.createLinearGradient(-len / 2, 0, len / 2, 0);
+    g.addColorStop(0, 'rgba(255, 140, 0, 0)');
+    g.addColorStop(0.35, 'rgba(255, 200, 80, 0.9)');
+    g.addColorStop(0.75, 'rgba(255, 255, 160, 1)');
+    g.addColorStop(1, 'rgba(255, 100, 0, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, len / 2, w, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(len * 0.35, 0, w * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  },
+
+  _drawHeavy(ctx: CanvasRenderingContext2D, p: ProjectileState, time: number) {
+    const r = p.size;
+    const pulse = 1 + Math.sin(time * 8 + p.x) * 0.18;
+    const rp = r * pulse;
+    const aura = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rp * 2.8);
+    aura.addColorStop(0, 'rgba(255, 60, 0, 0.3)');
+    aura.addColorStop(1, 'rgba(180, 0, 0, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, rp * 2.8, 0, Math.PI * 2);
+    ctx.fill();
+    const core = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rp);
+    core.addColorStop(0, '#ffcc44');
+    core.addColorStop(0.4, '#ff5500');
+    core.addColorStop(1, '#220000');
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, rp, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255, 120, 0, ${0.5 + Math.sin(time * 10) * 0.3})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, rp * 1.5, 0, Math.PI * 2);
+    ctx.stroke();
+  },
+
+  _drawBossOrb(ctx: CanvasRenderingContext2D, p: ProjectileState, time: number) {
+    const r = p.size;
+    const pulse = 1 + Math.sin(time * 12) * 0.12;
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * pulse * 2.2);
+    g.addColorStop(0, 'rgba(220, 180, 255, 1)');
+    g.addColorStop(0.3, 'rgba(120, 40, 220, 0.9)');
+    g.addColorStop(0.7, 'rgba(50, 0, 120, 0.6)');
+    g.addColorStop(1, 'rgba(20, 0, 60, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r * pulse * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r * 0.4 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+  },
+
+  _drawBossArc(ctx: CanvasRenderingContext2D, p: ProjectileState, time: number) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+    const w = p.size * 2.4;
+    const h = p.size * 0.65;
+    const wobble = Math.sin(time * 20) * 0.8;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'rgba(0, 40, 200, 0.8)';
+    ctx.fillStyle = 'rgba(20, 20, 200, 0.9)';
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, wobble);
+    ctx.quadraticCurveTo(0, -h + wobble, w / 2, wobble);
+    ctx.quadraticCurveTo(0, h + wobble, -w / 2, wobble);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    const cg = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
+    cg.addColorStop(0, 'rgba(100, 180, 255, 0)');
+    cg.addColorStop(0.5, 'rgba(180, 220, 255, 0.9)');
+    cg.addColorStop(1, 'rgba(100, 180, 255, 0)');
+    ctx.fillStyle = cg;
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, wobble);
+    ctx.quadraticCurveTo(0, -h * 0.4 + wobble, w / 2, wobble);
+    ctx.quadraticCurveTo(0, h * 0.4 + wobble, -w / 2, wobble);
+    ctx.fill();
+    ctx.restore();
+  },
+
+  _drawBossVoid(ctx: CanvasRenderingContext2D, p: ProjectileState, _time: number) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+    const len = p.size * 5;
+    const w = p.size * 0.6;
+    const tg = ctx.createLinearGradient(-len * 0.8, 0, 0, 0);
+    tg.addColorStop(0, 'rgba(0, 255, 220, 0)');
+    tg.addColorStop(1, 'rgba(0, 200, 180, 0.2)');
+    ctx.fillStyle = tg;
+    ctx.fillRect(-len * 0.8, -w * 2, len * 0.8, w * 4);
+    const bg = ctx.createLinearGradient(0, -w, 0, w);
+    bg.addColorStop(0, 'rgba(100, 255, 240, 0)');
+    bg.addColorStop(0.4, 'rgba(220, 255, 255, 0.95)');
+    bg.addColorStop(0.6, 'rgba(220, 255, 255, 0.95)');
+    bg.addColorStop(1, 'rgba(100, 255, 240, 0)');
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, len * 0.5, w, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(len * 0.42, 0, w * 0.65, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  },
+
+  _drawBossFrag(ctx: CanvasRenderingContext2D, p: ProjectileState, time: number) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(time * 6 + p.x * 0.1);
+    const s = p.size;
+    const aura = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 2.8);
+    aura.addColorStop(0, 'rgba(255, 80, 200, 0.4)');
+    aura.addColorStop(1, 'rgba(100, 0, 200, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 2.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(200, 120, 255, 0.92)';
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 1.6);
+    ctx.lineTo(s * 1.1, -s * 0.4);
+    ctx.lineTo(s * 0.7, s * 1.2);
+    ctx.lineTo(-s * 0.5, s * 0.9);
+    ctx.lineTo(-s * 1.2, -s * 0.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#ffe0ff';
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  },
+};
+
+/**
+ * ProjectileVisual: Logic for drawing the "Corte de Vácuo Energizado"
+ */
+export const ProjectileVisual = {
+  render(ctx: CanvasRenderingContext2D, p: ProjectileState, time: number) {
+    if (!p.isPlayerOwned) {
+      EnemyProjectileVisual.render(ctx, p, time);
+      return;
+    }
+
+    const lifeRatio = Math.max(0, p.lifetime / p.maxLifetime);
+
+    if (p.projectileKind === 'staff_bolt') {
+      this._renderStaffBolt(ctx, p, time, lifeRatio);
+      return;
+    }
+
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+
+    ctx.globalAlpha = Math.min(1, lifeRatio * 1.5);
+
+    // 1. Light Trail (Rastro leve)
+    const trailLen = 22;
+    const trailAlpha = 0.12 * lifeRatio;
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(160, 80, 255, ${trailAlpha})`;
+    ctx.lineWidth = p.size * 0.4;
+    ctx.lineCap = 'round';
+    ctx.moveTo(-trailLen, 0);
+    ctx.quadraticCurveTo(-trailLen / 2, 2, 0, 0);
+    ctx.stroke();
+
+    // 2. High Presence Slash Shape (Presença clara e marcante)
+    const w = p.size * 1.5; // Wider for presence
+    const h = p.size * 0.45; // Thicker
+
+    // Elegant Dark Purple Borders
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'rgba(60, 0, 120, 0.9)';
+
+    const wobble = Math.sin(time * 30) * 1.2;
+
+    // Outer Border (Dark Purple with center fade)
+    const bGrad = ctx.createLinearGradient(0, -h, 0, h);
+    bGrad.addColorStop(0, 'rgba(80, 0, 150, 0)');
+    bGrad.addColorStop(0.5, 'rgba(100, 30, 220, 0.95)');
+    bGrad.addColorStop(1, 'rgba(80, 0, 150, 0)');
+
+    ctx.fillStyle = 'rgba(60, 0, 140, 0.95)';
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, 0 + wobble);
+    ctx.quadraticCurveTo(0, -h + wobble, w / 2, 0 + wobble);
+    ctx.quadraticCurveTo(0, h + wobble, -w / 2, 0 + wobble);
+    ctx.fill();
+
+    // Core (Lighter center / White core)
+    const coreH = h * 0.5;
+    const coreW = w * 0.75;
+    const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, coreW / 2);
+    coreGrad.addColorStop(0, '#ffffff');
+    coreGrad.addColorStop(1, 'rgba(200, 150, 255, 0.5)');
+
+    ctx.fillStyle = coreGrad;
+    ctx.beginPath();
+    ctx.moveTo(-coreW / 2, 0 + wobble);
+    ctx.quadraticCurveTo(0, -coreH + wobble, coreW / 2, 0 + wobble);
+    ctx.quadraticCurveTo(0, coreH + wobble, -coreW / 2, 0 + wobble);
+    ctx.fill();
+
+    // 3. Air Distortion 
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, -2);
+    ctx.lineTo(-w / 2 - 5, -8);
+    ctx.stroke();
+
+    ctx.restore();
+  },
+
+  _renderStaffBolt(ctx: CanvasRenderingContext2D, p: ProjectileState, time: number, lifeRatio: number) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+
+    // Scaling and alpha based on life
+    const scale = 0.8 + (1 - lifeRatio) * 0.4;
+    ctx.scale(scale, scale);
+    ctx.globalAlpha = Math.min(1, lifeRatio * 2);
+
+    // 1. Elegant Trail (Ethereal ribbon)
+    const trailLen = 30;
+    const trailG = ctx.createLinearGradient(-trailLen, 0, 0, 0);
+    trailG.addColorStop(0, 'rgba(100, 0, 200, 0)');
+    trailG.addColorStop(0.5, 'rgba(150, 50, 255, 0.2)');
+    trailG.addColorStop(1, 'rgba(200, 150, 255, 0.5)');
+
+    ctx.fillStyle = trailG;
+    ctx.beginPath();
+    ctx.moveTo(0, -p.size);
+    ctx.quadraticCurveTo(-trailLen / 2, -p.size * 1.5, -trailLen, 0);
+    ctx.quadraticCurveTo(-trailLen / 2, p.size * 1.5, 0, p.size);
+    ctx.fill();
+
+    // 2. Air Distortion Bloom (Refraction effect)
+    ctx.save();
+    ctx.globalAlpha *= 0.3;
+    ctx.fillStyle = 'rgba(200, 220, 255, 0.2)';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, p.size * 2.2, p.size * 1.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // 3. Dimensional Nucleus (The crystal)
+    const auraG = ctx.createRadialGradient(0, 0, 0, 0, 0, p.size * 1.5);
+    auraG.addColorStop(0, 'rgba(180, 100, 255, 0.6)');
+    auraG.addColorStop(1, 'rgba(80, 0, 150, 0)');
+    ctx.fillStyle = auraG;
+    ctx.beginPath();
+    ctx.arc(0, 0, p.size * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = '#8844ff';
+
+    ctx.beginPath();
+    const cw = p.size * 1.2;
+    const ch = p.size * 0.6;
+    ctx.moveTo(cw, 0); ctx.lineTo(0, -ch); ctx.lineTo(-cw, 0); ctx.lineTo(0, ch);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  },
+};
+
+/**
+ * StaffChargeEffect: Visual accumulation on staff tip
+ */
+export const StaffChargeEffect = {
+  render(ctx: CanvasRenderingContext2D, p: PlayerState, time: number) {
+    if (!p.isStaffCharging) return;
+    const tip = StaffPositioning.getTipSocketWorld(p, time);
+
+    ctx.save();
+    ctx.translate(tip.x, tip.y);
+    const progress = 1 - (p.staffChargeTimer / 0.26);
+    const pulse = 1 + Math.sin(time * 30) * 0.2;
+    const size = 15 * progress * pulse;
+
+    const bloom = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
+    bloom.addColorStop(0, '#ffffff');
+    bloom.addColorStop(0.4, 'rgba(150, 50, 255, 0.9)');
+    bloom.addColorStop(1, 'rgba(80, 0, 120, 0)');
+    ctx.fillStyle = bloom;
+    ctx.beginPath(); ctx.arc(0, 0, size, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+  }
+};
+
+/**
+ * StaffImpactEffect: AAA dimensional explosion
+ */
+export const StaffImpactEffect = {
+  spawn(particles: Particle[], x: number, y: number) {
+    particles.push({
+      x, y, vx: 0, vy: 0, life: 0.2, maxLife: 0.2, size: 45, color: '#ffffff', type: 'explosion'
+    });
+    for (let i = 0; i < 12; i++) {
+      const a = Math.random() * Math.PI * 2, s = 150 + Math.random() * 150;
+      particles.push({
+        x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        life: 0.4 + Math.random() * 0.3, maxLife: 0.7, size: 2 + Math.random() * 4,
+        color: i % 2 === 0 ? '#aa66ff' : '#00ffff', type: 'spark'
+      });
+    }
+  }
+};
+
+export function renderProjectile(ctx: CanvasRenderingContext2D, p: ProjectileState, time: number) {
+  ProjectileVisual.render(ctx, p, time);
 }
+
+/**
+ * ImpactEffect: Visual feedback for Vacuum Slash hitting a target
+ */
+export const ImpactEffect = {
+  spawn(particles: Particle[], x: number, y: number) {
+    // Flash at impact point
+    particles.push({
+      x, y, vx: 0, vy: 0,
+      life: 0.15, maxLife: 0.15,
+      size: 20, color: 'rgba(255, 255, 255, 0.82)',
+      type: 'explosion'
+    });
+
+    // Cutting particles dispersing
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 40 + Math.random() * 60;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 0.3 + Math.random() * 0.2,
+        maxLife: 0.5,
+        size: 1 + Math.random() * 2,
+        color: Math.random() > 0.4 ? '#ffffff' : '#8844ff',
+        type: 'spark'
+      });
+    }
+  }
+};
+
+export function spawnVacuumImpact(particles: Particle[], x: number, y: number) {
+  ImpactEffect.spawn(particles, x, y);
+}
+
+/**
+ * EnemyProjectileImpact
+ * Dispatches unique visual feedback based on projectileKind.
+ */
+export const EnemyProjectileImpact = {
+  spawn(particles: Particle[], p: ProjectileState) {
+    const x = p.x, y = p.y;
+    switch (p.projectileKind) {
+      case 'needle':
+        // Sharp orange spark
+        for (let i = 0; i < 4; i++) {
+          const a = p.angle + Math.PI + (Math.random() - 0.5) * 1.5;
+          const s = 100 + Math.random() * 80;
+          particles.push({
+            x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+            life: 0.2, maxLife: 0.2, size: 1.5, color: '#ffcc00', type: 'spark'
+          });
+        }
+        break;
+      case 'heavy':
+        // Dark crimson explosion
+        for (let i = 0; i < 12; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const s = 40 + Math.random() * 60;
+          particles.push({
+            x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+            life: 0.4, maxLife: 0.4, size: 3, color: '#aa0000', type: 'spark'
+          });
+        }
+        break;
+      case 'boss_void':
+        // Purple void dispersion
+        for (let i = 0; i < 10; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const s = 20 + Math.random() * 40;
+          particles.push({
+            x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+            life: 0.6, maxLife: 0.6, size: 4, color: '#4400aa', type: 'ghost'
+          });
+        }
+        break;
+      case 'boss_orb':
+      case 'boss_arc':
+      case 'boss_frag':
+        // Azure/Cyan mystical explosion
+        for (let i = 0; i < 15; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const s = 50 + Math.random() * 70;
+          particles.push({
+            x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+            life: 0.5, maxLife: 0.5, size: 2.5, color: '#00ffff', type: 'spark'
+          });
+        }
+        particles.push({
+          x, y, vx: 0, vy: 0, life: 0.2, maxLife: 0.2, size: 30, color: 'rgba(0, 255, 255, 0.4)', type: 'explosion'
+        });
+        break;
+      default:
+        // Standard red impact
+        particles.push({
+          x, y, vx: 0, vy: 0, life: 0.1, maxLife: 0.1, size: 15, color: '#ff4444', type: 'explosion'
+        });
+        break;
+    }
+  }
+};
 
 export function renderParticles(ctx: CanvasRenderingContext2D, particles: Particle[]) {
   for (const p of particles) {
@@ -3619,10 +4255,27 @@ export function renderParticles(ctx: CanvasRenderingContext2D, particles: Partic
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
+    } else if (p.type === 'explosion') {
+      ctx.globalAlpha = alpha * 0.5;
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+      g.addColorStop(0, p.color);
+      g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    } else if (p.type === 'spark') {
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
     } else {
       ctx.globalAlpha = alpha;
       ctx.fillStyle = p.color;
-      ctx.fillRect(Math.floor(p.x), Math.floor(p.y), Math.ceil(p.size), Math.ceil(p.size));
+      ctx.fillRect(Math.floor(p.x - p.size / 2), Math.floor(p.y - p.size / 2), Math.ceil(p.size), Math.ceil(p.size));
       ctx.globalAlpha = 1;
     }
   }
@@ -4155,8 +4808,25 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 export function applyScreenEffects(ctx: CanvasRenderingContext2D, effects: ScreenEffect[], vp: Viewport) {
   for (const fx of effects) {
     if (fx.type === 'flash' && fx.color) {
-      const alpha = (fx.timer / fx.duration) * 0.35;
-      ctx.fillStyle = fx.color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+      // Intensity should multiply the peak alpha
+      const peakAlpha = 0.35 * fx.intensity;
+      const alpha = (fx.timer / fx.duration) * peakAlpha;
+
+      // Robust replace: only replace the first occurrence of rgb/rgba to avoid errors
+      let color = fx.color;
+      if (!color.includes('rgba')) {
+        color = color.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
+      } else {
+        // If already rgba, we must be careful. For simplicity, we use globalAlpha for the whole operation
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = fx.color;
+        ctx.fillRect(-vp.gox, -vp.goy, vp.rw, vp.rh);
+        ctx.restore();
+        continue;
+      }
+
+      ctx.fillStyle = color;
       ctx.fillRect(-vp.gox, -vp.goy, vp.rw, vp.rh);
     }
   }
