@@ -4380,10 +4380,24 @@ export function renderParticles(ctx: CanvasRenderingContext2D, particles: Partic
     } else if (p.type === 'dimensional_shard') {
       ctx.globalAlpha = alpha * 0.8;
       ctx.fillStyle = p.color;
-      // Shards have a slight glow
       ctx.shadowBlur = 4;
       ctx.shadowColor = p.color;
-      ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+
+      const size = p.size * (0.8 + alpha * 0.4); // slightly shrink
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      if (p.angle !== undefined) ctx.rotate(p.angle);
+
+      // Draw a sharp diamond/shard shape
+      ctx.beginPath();
+      ctx.moveTo(0, -size * 1.5);
+      ctx.lineTo(size, 0);
+      ctx.lineTo(0, size * 1.5);
+      ctx.lineTo(-size, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
       ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
     } else if (p.type === 'spark') {

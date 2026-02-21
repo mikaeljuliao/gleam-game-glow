@@ -40,6 +40,10 @@ export class GameEngine {
   essenceCores: EssenceCore[] = [];
   portalManager: PortalManager;
 
+  // Kill streak system
+  killStreakCount = 0;       // kills within streak window
+  killStreakTimer = 0;       // resets on no-kill
+
   input: InputManager;
   gameCanvas: HTMLCanvasElement;
   gameCtx: CanvasRenderingContext2D;
@@ -598,6 +602,15 @@ export class GameEngine {
         } else if (this.weaponSelectionOpen) {
           this.updateWeaponSelection(dt);
         } else {
+          // Update kill streak
+          if (this.killStreakTimer > 0) {
+            this.killStreakTimer -= dt;
+            if (this.killStreakTimer <= 0) {
+              this.killStreakCount = 0;
+              this.killStreakTimer = 0;
+            }
+          }
+
           this.update(effectiveDt);
           this.essenceCores = EssenceMagnetSystem.update(this.essenceCores, this.player, this.particles, effectiveDt, (core) => {
             const collectorBonus = getSoulCollectorBonus(this.amuletInventory);
@@ -1739,38 +1752,63 @@ export class GameEngine {
 
   private onEnemyKilled(e: EnemyState, byMelee = false) {
     const isBoss = e.type === 'boss';
+    const isHeavy = e.type === 'tank' || e.type === 'necromancer';
+    const weapon = this.player.weapon;
 
-    // 1) HIT STOP
-    // Micro-freeze for impact satisfaction
-    this.hitStopTimer = isBoss ? 0.15 : 0.06;
-
-    // 2) Marcar como morto imediatamente — bloqueia IA, colisão e dano
+    // === ENEMY DEATH LOGIC ===
     e.isDying = true;
-    e.dyingTimer = 0; // 0 = remoção garantida no primeiro ciclo do update
-    e.hp = 0;        // Garantir HP = 0
+    e.dyingTimer = 0;
+    e.hp = 0;
 
-    // 3) SCREEN SHAKE
-    const shakeIntensity = isBoss ? 15 : (e.type === 'tank' || e.type === 'necromancer' ? 6 : 2.5);
-    this.addEffect('shake', shakeIntensity, isBoss ? 0.6 : 0.15);
+    // === KILL STREAK ===
+    this.killStreakCount++;
+    this.killStreakTimer = 1.8; // janela: 1.8s sem matar reseta
+    const isStreak = this.killStreakCount >= 3;
 
-    // 4) DIMENSIONAL FRAGMENTATION (Particles)
-    const particleCount = isBoss ? 30 : 12;
+    // === HIT STOP — afinado por tipo e arma ===
+    if (isBoss) {
+      this.hitStopTimer = 0.16;
+    } else if (isHeavy) {
+      this.hitStopTimer = 0.10;
+    } else if (weapon === 'daggers') {
+      this.hitStopTimer = 0.045; // katana: ultra-snappy
+    } else if (weapon === 'staff') {
+      this.hitStopTimer = 0.07;  // staff: explosivo
+    } else {
+      this.hitStopTimer = 0.07;  // espada: equilibrado
+    }
+
+    // === SCREEN SHAKE ===
+    const shakeIntensity = isBoss ? 15 : isHeavy ? 6 : isStreak ? 4 : 2.5;
+    const shakeDuration = isBoss ? 0.6 : isHeavy ? 0.2 : 0.12;
+    this.addEffect('shake', shakeIntensity, shakeDuration);
+
+    // === DIMENSIONAL DEATH EFFECT ===
+    // Shockwave em TODAS as mortes (onda dupla em heavy/boss)
+    DimensionalDeathEffect.spawnWave(this.particles, e.x, e.y, isBoss || isHeavy);
+
+    // Partículas — 3 camadas com variação por arma
+    const particleCount = isBoss ? 32 : isHeavy ? 18 : 13;
     const angle = e.lastHitAngle ?? (Math.random() * Math.PI * 2);
-    DeathParticles.spawn(this.particles, e.x, e.y, angle, particleCount, isBoss);
+    DeathParticles.spawn(this.particles, e.x, e.y, angle, particleCount, isBoss, weapon);
 
-    // 5) NÚCLEO DE ESSÊNCIA (DROP)
+    // Burst extra em kill streak
+    if (isStreak) {
+      DeathParticles.spawnStreakBurst(this.particles, e.x, e.y);
+    }
+
+    // === ESSÊNCIA DROP ===
     const xpAmount = getXPForEnemy(e.type);
     const soulAmount = this.getSoulsForEnemy(e.type);
     const core = EssenceCoreDrop.create(e.x, e.y, isBoss, xpAmount, soulAmount);
     this.essenceCores.push(core);
 
-    // 6) BOSS SPECIALS
+    // === BOSS ESPECIAIS ===
     if (isBoss) {
-      DimensionalDeathEffect.spawnWave(this.particles, e.x, e.y);
+      DimensionalDeathEffect.spawnWave(this.particles, e.x, e.y, true); // segunda onda
       this.addEffect('flash', 1, 0.4, 'rgba(100, 0, 200, 0.5)');
       SFX.bossKill(this.bossKillFloor);
 
-      // Drop amulet — add to inventory directly, reveal handled by bossKillSequence
       const amuletId = getRandomBossAmuletDrop(this.amuletInventory);
       if (amuletId) {
         addAmulet(this.amuletInventory, amuletId);
@@ -1779,32 +1817,30 @@ export class GameEngine {
 
       this.slowMoTimer = 1.2;
       this.slowMoFactor = 0.2;
+    } else if (isStreak) {
+      SFX.enemyDeathStreak();  // reward ping multi-kill
+    } else if (isHeavy) {
+      SFX.enemyDeathHeavy();   // impacto mais pesado
     } else {
       SFX.enemyDeath();
-      // Legacy soul collect replaced by essence system, but keep souls for now
-      // We'll award souls when essence is picked up
     }
 
     this.stats.enemiesDefeated++;
 
-    // War Rhythm amulet — gain attack speed on kill
+    // War Rhythm amulet
     if (isAmuletEquipped(this.amuletInventory, 'war_rhythm')) {
       this.warRhythm.stacks = Math.min(this.warRhythm.maxStacks, this.warRhythm.stacks + 1);
       this.warRhythm.decayTimer = this.warRhythm.decayDelay;
     }
 
-    // Melee kill reward: small heal
+    // Recompensa por morte melee
     if (byMelee) {
       const healAmt = 3;
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + healAmt);
       spawnDamageText(this.particles, this.player.x, this.player.y - 14, `+${healAmt}`, C.COLORS.healText);
-      // Brief slow-mo on melee kill for impact feel
       this.slowMoTimer = Math.max(this.slowMoTimer, 0.08);
       this.slowMoFactor = Math.min(this.slowMoFactor, 0.4);
     }
-
-    // NOTE: Remoção real do inimigo da lista ocorre no update loop via deadEnemySet
-    // A verificação de liberação das fendas (enemies.length === 0) acontece APÓS a remoção real
   }
 
   private handleLevelUp(guaranteeLegendary = false) {

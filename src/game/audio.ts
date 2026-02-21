@@ -142,9 +142,27 @@ export const SFX = {
   },
 
   enemyDeath() {
-    // Ethereal Dissipation — High-pass airy whisper
-    playNoise(0.2, 0.04, 2500, 'highpass');
-    playFreqSweep(1200, 2500, 0.25, 'sine', 0.03); // Shimmering rising tail
+    // Dimensional dissipation — dry impact + rising ethereal tail
+    playFreqSweep(1400, 2800, 0.18, 'sine', 0.025); // Shimmering rising tail
+    playNoise(0.07, 0.05, 3200, 'highpass');          // Crisp airy burst
+    playTone(180, 0.08, 'sine', 0.04);                // Subtle low body
+  },
+
+  // Heavy enemy death (tank, necromancer) — more weight
+  enemyDeathHeavy() {
+    playFreqSweep(800, 80, 0.25, 'sawtooth', 0.08);   // Power descend
+    playNoise(0.15, 0.08, 1200, 'lowpass');            // Body thud
+    playFreqSweep(1200, 2400, 0.2, 'sine', 0.02);     // Shimmer tail
+    setTimeout(() => playTone(60, 0.15, 'sine', 0.06), 80); // Sub rumble
+  },
+
+  // Multi-kill streak — brief ascending chime reward
+  enemyDeathStreak() {
+    // Quick ascent chord — addictive reward ping
+    playTone(880, 0.06, 'sine', 0.06);
+    setTimeout(() => playTone(1108, 0.06, 'sine', 0.05), 40);
+    setTimeout(() => playTone(1318, 0.08, 'sine', 0.04), 80);
+    playNoise(0.04, 0.03, 6000, 'highpass'); // Crisp air
   },
 
   playerHit() {

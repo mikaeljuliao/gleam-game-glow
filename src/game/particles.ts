@@ -273,6 +273,9 @@ export function updateParticles(particles: Particle[], dt: number): Particle[] {
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     p.life -= dt;
+    if (p.angle !== undefined && p.spin !== undefined) {
+      p.angle += p.spin * dt;
+    }
     if (p.type === 'text') {
       p.vy *= 0.95;
     }

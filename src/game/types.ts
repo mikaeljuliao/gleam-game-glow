@@ -204,6 +204,8 @@ export interface Particle {
   type: 'blood' | 'dust' | 'xp' | 'text' | 'explosion' | 'spark' | 'trail' | 'shockwave' | 'ember' | 'ghost' | 'fog' | 'horror' | 'soul' | 'dimensional_shard' | 'essence_trail';
   text?: string;
   radius?: number;
+  angle?: number;
+  spin?: number;
 }
 
 export interface Obstacle {
