@@ -1916,8 +1916,8 @@ export class GameEngine {
     const dy = this.player.y - portal.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Professional enter range or manual press
-    if (dist < 38 || this.input.isJustPressed('e')) {
+    // Physical collision detection
+    if (dist < 28) {
       this.enterPortal(portal);
     }
 

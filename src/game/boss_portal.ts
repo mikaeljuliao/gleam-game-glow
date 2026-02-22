@@ -362,8 +362,8 @@ export class BossPortalSystem {
         ctx.textAlign = 'center';
 
         // Discrete background bar
-        const text = "[E] AVANÇAR PARA O PRÓXIMO ANDAR";
-        ctx.font = "600 10px " + C.HUD_FONT;
+        const text = "Avançar para o próximo andar";
+        ctx.font = "600 9px " + C.HUD_FONT;
         const metrics = ctx.measureText(text);
         const bgW = metrics.width + 20;
 
