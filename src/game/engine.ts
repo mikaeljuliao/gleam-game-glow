@@ -13,7 +13,8 @@ import {
 } from './particles';
 import { getRandomUpgrades, checkSynergies, getOwnedTags, SYNERGIES } from './upgrades';
 import { PortalManager } from './portals';
-import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins, renderWeaponSelectionOverlay, spawnVacuumImpact, ProjectileOrigin, HandCastEffect, EnemyProjectileImpact, StaffChargeEffect, StaffImpactEffect, renderEssenceCores, renderDimensionalRift } from './renderer';
+import { portalSystem } from './boss_portal';
+import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins, renderWeaponSelectionOverlay, spawnVacuumImpact, ProjectileOrigin, HandCastEffect, EnemyProjectileImpact, StaffChargeEffect, StaffImpactEffect, renderEssenceCores } from './renderer';
 import { SFX, initAudio } from './audio';
 import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive, updateHPHorror, renderHPHorror, getHPLightPulse } from './horror';
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
@@ -1588,9 +1589,15 @@ export class GameEngine {
     }
 
     // Portal Interaction
-    const nearPortal = this.portalManager.checkProximity(this.player);
-    if (nearPortal) {
-      this.handlePortalInput(nearPortal);
+    if (portalSystem.isActive()) {
+      portalSystem.update(dt, this.player, () => {
+        this.nextFloor();
+      });
+
+      const nearPortal = this.portalManager.checkProximity(this.player);
+      if (nearPortal) {
+        this.handlePortalInput(nearPortal);
+      }
     }
 
     // Screen effects
@@ -1881,17 +1888,22 @@ export class GameEngine {
 
   // Manual Rift/Portal spawning — replaces victory timer
   spawnExitPortal() {
+    if (portalSystem.isActive()) return; // Safety: only once
+
     this.pendingNextFloor = true;
     const px = Math.floor(C.dims.gw / 2);
     const py = Math.floor(C.dims.gh / 2);
 
+    const portalId = `exit_${this.dungeon.floor}`;
     this.portalManager.addPortal({
-      id: `exit_${this.dungeon.floor}`,
+      id: portalId,
       x: px,
       y: py,
       state: 'available',
       targetFloor: this.dungeon.floor + 1
     });
+
+    portalSystem.spawn(px, py);
 
     this.addEffect('flash', 1, 0.4, 'rgba(140, 60, 255, 0.4)');
     SFX.portalSpawn();
@@ -1904,9 +1916,17 @@ export class GameEngine {
     const dy = this.player.y - portal.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Auto-enter if very close, or manual enter if nearby
-    if (dist < 35 || this.input.isJustPressed('e')) {
+    // Professional enter range or manual press
+    if (dist < 38 || this.input.isJustPressed('e')) {
       this.enterPortal(portal);
+    }
+
+    // Proximity shake
+    if (dist < 100) {
+      const shakeIntensity = Math.max(0, (1 - dist / 100) * 0.5);
+      if (shakeIntensity > 0) {
+        this.addEffect('shake', shakeIntensity, 0.1);
+      }
     }
   }
 
@@ -1914,21 +1934,22 @@ export class GameEngine {
     if (this.isTransitioning) return;
     this.isTransitioning = true;
 
-    // 1) Logic
+    // 1) Logic & Professional Sequence
     this.portalManager.markCompleted(portal.id);
-    this.addEffect('flash', 2, 0.6, 'rgba(30, 0, 80, 0.8)');
     SFX.portalEnter();
+
+    // Trigger the cinematic transition and micro-freeze (0.1s)
+    this.hitStopTimer = 0.1;
+    portalSystem.startTransition();
+
+    // Slow down time briefly for effect
+    this.slowMoTimer = 1.0;
+    this.slowMoFactor = 0.3;
 
     // 2) Visual / Flow
     if (this.callbacks.onPortalEnter) {
       this.callbacks.onPortalEnter(portal);
     }
-
-    // 3) Transition
-    setTimeout(() => {
-      this.isTransitioning = false;
-      this.nextFloor();
-    }, 600);
   }
 
   private checkDoorTransition(room: DungeonRoom) {
@@ -1987,6 +2008,8 @@ export class GameEngine {
     this.callbacks.onFloorChange(newFloor);
     SFX.floorChange();
     this.portalManager.clearFloorPortals();
+    this.isTransitioning = false;
+    portalSystem.reset();
     // Save on floor change
     saveGame(this.player, this.dungeon, this.stats);
   }
@@ -2552,7 +2575,7 @@ export class GameEngine {
       renderHiddenTraps(ctx, room.hiddenTraps, this.gameTime);
     }
     renderDoors(ctx, room, this.gameTime, getDoorsLockedTimer() > 0, this.dungeon, this.player.x, this.player.y);
-    this.portalManager.getPortals().forEach(p => renderDimensionalRift(ctx, p, this.gameTime, this.player.x, this.player.y));
+    portalSystem.render(ctx, this.gameTime, this.player);
     renderObstacles(ctx, room.obstacles);
     const isCollected = room.treasureCollected || room.shrineUsed || room.trapTriggered || false;
     renderSpecialRoom(ctx, room.type, this.gameTime, isCollected, room.trapType, this.player.x, this.player.y);
@@ -2722,9 +2745,6 @@ export class GameEngine {
     return 1;
   }
 
-  // Base attack speed (without War Rhythm bonus)
-  private _baseAttackSpeedMult = 1;
-  private _baseMoveSpeedMult = 1;
   getBaseAttackSpeedMult(): number {
     return this._baseAttackSpeedMult;
   }
