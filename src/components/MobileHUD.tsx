@@ -87,8 +87,7 @@ const MobileHUD = ({ engineRef, onOpenInventory, onOpenMap }: MobileHUDProps) =>
     const engine = engineRef.current;
     if (!engine) return;
     // Directly trigger potion use like keyboard Q
-    (engine.input as any).keys.add('q');
-    setTimeout(() => (engine.input as any).keys.delete('q'), 80);
+    engine.input.triggerKey('q');
   }, [engineRef]);
 
   const handleInventory = useCallback((e: React.TouchEvent) => {

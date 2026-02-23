@@ -10,7 +10,9 @@ function loadBrightness(): number {
   try {
     const val = localStorage.getItem(BRIGHTNESS_KEY);
     if (val !== null) return parseFloat(val);
-  } catch { }
+  } catch (e) {
+    console.warn('Failed to load brightness from localStorage', e);
+  }
   return 0; // 0 = default, range -0.5 to 0.5
 }
 
@@ -22,7 +24,9 @@ export function setBrightness(val: number) {
   brightnessValue = Math.max(-0.5, Math.min(0.5, val));
   try {
     localStorage.setItem(BRIGHTNESS_KEY, brightnessValue.toString());
-  } catch { }
+  } catch (e) {
+    console.warn('Failed to save brightness to localStorage', e);
+  }
 }
 
 /** 

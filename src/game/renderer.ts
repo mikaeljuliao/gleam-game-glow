@@ -40,9 +40,43 @@ function drawHudText(ctx: CanvasRenderingContext2D, text: string, x: number, y: 
 // This fills the "black bars" with stone wall textures so the arena feels immersive
 export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: number, vp: Viewport, floor = 1) {
   const { gox, goy, rw, rh } = vp;
-  const ts = C.TILE_SIZE;
   const biome = getBiome(floor);
 
+  // 1. FILL BACKGROUND
+  ctx.fillStyle = biome.bgLayer2;
+  ctx.fillRect(-gox, -goy, rw, rh);
+
+  // 2. PARALLAX LAYER 2 (Furthest)
+  ctx.fillStyle = biome.bgLayer1;
+  const p2x = (-gox * 0.2) % 400;
+  const p2y = (-goy * 0.2) % 400;
+
+  for (let i = -1; i < Math.ceil(rw / 400) + 1; i++) {
+    const x = i * 400 + p2x - gox;
+    if (biome.theme === 'crystal') {
+      // Distant icy peaks
+      ctx.beginPath();
+      ctx.moveTo(x, rh - goy);
+      ctx.lineTo(x + 200, rh - goy - 150);
+      ctx.lineTo(x + 400, rh - goy);
+      ctx.fill();
+    } else if (biome.theme === 'volcano') {
+      // Volcanic ridges
+      ctx.beginPath();
+      ctx.moveTo(x, rh - goy);
+      ctx.quadraticCurveTo(x + 200, rh - goy - 200, x + 400, rh - goy);
+      ctx.fill();
+    } else {
+      // Forest silhouettes
+      ctx.fillRect(x + 50, rh - goy - 120, 30, 120);
+      ctx.beginPath();
+      ctx.arc(x + 65, rh - goy - 120, 50, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // 3. PARALLAX LAYER 1 (Walls / Pillars)
+  const ts = C.TILE_SIZE;
   const startCol = Math.floor(-gox / ts) - 1;
   const endCol = Math.ceil((rw - gox) / ts) + 1;
   const startRow = Math.floor(-goy / ts) - 1;
@@ -56,59 +90,57 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
       const y = row * ts;
       const hash = ((row * 7 + col * 13) & 0xFF);
 
-      // Warmer, more visible stone walls — based on biome color
-      const shade = 0.8 + (hash % 10) * 0.03;
+      // Main structural walls
       ctx.fillStyle = biome.wall;
-      ctx.globalAlpha = shade;
+      ctx.globalAlpha = 0.95 + (hash % 10) * 0.005;
       ctx.fillRect(x, y, ts, ts);
       ctx.globalAlpha = 1.0;
 
-      // Stone brick mortar lines
-      ctx.fillStyle = biome.wallDetail;
-      if ((row + col) % 2 === 0) {
-        ctx.fillRect(x, y, ts, 1);
-        ctx.fillRect(x, y, 1, ts);
-      }
-      // Alternate brick pattern
-      if ((row + col) % 2 === 1) {
-        ctx.fillRect(x + ts / 2, y, 1, ts);
-      }
-
-      // Cracks & details
-      if (hash % 11 === 0) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.fillRect(x + 3, y + 5, 5, 1);
-      }
-
-      // Biome-specific details (Moss/Ash/etc)
-      if (hash % 23 === 0) {
-        ctx.fillStyle = biome.detail;
-        ctx.fillRect(x + 1, y + ts - 4, 7, 3);
-      }
-
-      // Pillar columns every ~6 tiles along arena edge
-      const distToArenaCol = col < 0 ? -col : col - C.dims.rc + 1;
-      const distToArenaRow = row < 0 ? -row : row - C.dims.rr + 1;
-      const nearEdge = (distToArenaCol === 1 || distToArenaRow === 1);
-
-      if (nearEdge && (col % 6 === 0 || row % 5 === 0)) {
+      // Vertical Pillar Details
+      if (col % 6 === 0) {
         ctx.fillStyle = biome.wallTop;
-        ctx.fillRect(x + 2, y, ts - 4, ts);
+        ctx.fillRect(x + 4, y, ts - 8, ts);
         ctx.fillStyle = biome.wallDetail;
-        ctx.fillRect(x + 3, y, 1, ts);
+        ctx.fillRect(x + 5, y, 1, ts);
+      }
+
+      // Biome decorative noise
+      if (hash % 15 === 0) {
+        ctx.fillStyle = biome.detail;
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath();
+        ctx.arc(x + ts / 2, y + ts / 2, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
       }
     }
   }
 
-  // Soft fog/mist along margins — atmospheric glow matching biome accent
-  const fogAlpha = 0.03 + Math.sin(time * 0.5) * 0.01;
-  const fogColor = biome.accentGlow.replace('0.15', fogAlpha.toString()).replace('0.2', fogAlpha.toString());
+  // 4. GOD RAYS (Volumetric Light)
+  const rayAlpha = 0.05 + Math.sin(time * 0.4) * 0.02;
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 3; i++) {
+    const rX = ((time * 20 + i * 250) % (rw + 400)) - 200 - gox;
+    const rayGrad = ctx.createLinearGradient(rX, -goy, rX + 150, rh - goy);
+    rayGrad.addColorStop(0, biome.rays.replace('0.1', rayAlpha.toString()));
+    rayGrad.addColorStop(1, 'rgba(0,0,0,0)');
 
-  // Outer fade
-  const grad = ctx.createRadialGradient(C.dims.gw / 2, C.dims.gh / 2, 200, C.dims.gw / 2, C.dims.gh / 2, 600);
-  grad.addColorStop(0, 'rgba(0,0,0,0)');
-  grad.addColorStop(1, fogColor);
-  ctx.fillStyle = grad;
+    ctx.fillStyle = rayGrad;
+    ctx.beginPath();
+    ctx.moveTo(rX, -goy);
+    ctx.lineTo(rX + 80, -goy);
+    ctx.lineTo(rX + 250, rh - goy);
+    ctx.lineTo(rX + 150, rh - goy);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // 5. ATMOSPHERIC FOG
+  const fogGrad = ctx.createRadialGradient(C.dims.gw / 2, C.dims.gh / 2, 250, C.dims.gw / 2, C.dims.gh / 2, 700);
+  fogGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  fogGrad.addColorStop(1, biome.fog);
+  ctx.fillStyle = fogGrad;
   ctx.fillRect(-gox, -goy, rw, rh);
 }
 export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor = 1) {
@@ -116,7 +148,6 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
   const ts = C.TILE_SIZE;
 
   // Render floor slabs (Large bricks/tiles)
-  // We use a larger grid for slabs (e.g. 40x40 or 3x2 tiles)
   for (let row = 0; row < C.dims.rr; row++) {
     for (let col = 0; col < C.dims.rc; col++) {
       const x = col * ts;
@@ -124,80 +155,64 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
       const isEdge = row === 0 || row === C.dims.rr - 1 || col === 0 || col === C.dims.rc - 1;
 
       if (isEdge) {
-        // Architectural Walls with Depth
-        const isBottom = row === C.dims.rr - 1;
+        // SIDE WALLS & TOP TRIMS
         const isTop = row === 0;
-
         ctx.fillStyle = biome.wall;
         ctx.fillRect(x, y, ts, ts);
 
-        // Heavy Top Face (Architectural perspective)
+        // Top architectural face
         if (isTop) {
           ctx.fillStyle = biome.wallTop;
           ctx.fillRect(x, y, ts, 12);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-          ctx.fillRect(x, y, ts, 1); // Edge highlight
-        } else {
-          ctx.fillStyle = biome.wallTop;
-          ctx.fillRect(x, y, ts, 3);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+          ctx.fillRect(x, y, ts, 1);
         }
 
-        // Brick mortar lines on side walls
-        ctx.fillStyle = biome.wallDetail;
-        if ((row + col) % 3 === 0) {
-          ctx.fillRect(x + 4, y + 14, ts - 8, 1);
-        }
-
-        // Baseboard / Floor Trim
-        if (!isTop) {
-          ctx.fillStyle = biome.seam;
-          ctx.fillRect(x, y + ts - 2, ts, 2);
+        // Baseboard Light Bounce (Glow from floor onto wall base)
+        if (row === C.dims.rr - 1) {
+          const bounce = ctx.createLinearGradient(x, y + ts - 5, x, y + ts);
+          bounce.addColorStop(0, 'rgba(0,0,0,0)');
+          bounce.addColorStop(1, biome.accentGlow.replace('0.2', '0.1'));
+          ctx.fillStyle = bounce;
+          ctx.fillRect(x, y + ts - 5, ts, 5);
         }
       } else {
-        // Material Slabs logic
-        // Group tiles into 3x2 or 2x2 slabs using floor/hash
+        // SLABS
         const slabCol = Math.floor(col / 3);
         const slabRow = Math.floor(row / 2);
         const slabID = (slabCol * 13 + slabRow * 7) % 100;
 
+        // Base color with painterly mottling
         ctx.fillStyle = slabID % 2 === 0 ? biome.floor : biome.floorAlt;
         ctx.fillRect(x, y, ts, ts);
 
-        // Slab Seams & Bevels
-        const inSlabCol = col % 3;
-        const inSlabRow = row % 2;
-
-        ctx.fillStyle = biome.seam;
-        // Draw seams at slab edges
-        if (inSlabCol === 0) ctx.fillRect(x, y, 1, ts);
-        if (inSlabRow === 0) ctx.fillRect(x, y, ts, 1);
-
-        // Material Variation / Procedural Noise
-        const noise = (row * 31 + col * 17) % 10;
+        // Subtle surface variations
+        const noise = (row * 31 + col * 17) % 6;
         if (noise === 0) {
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
           ctx.fillRect(x + 2, y + 2, ts - 4, ts - 4);
+        } else if (noise === 1) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+          ctx.fillRect(x + 1, y + 1, ts - 2, 2);
         }
 
-        // Wear and Tear (cracks, details)
-        if (slabID % 17 === 0 && inSlabCol === 1 && inSlabRow === 1) {
-          ctx.fillStyle = biome.seam;
-          ctx.globalAlpha = 0.4;
-          ctx.fillRect(x + 5, y + 8, 8, 1);
-          ctx.fillRect(x + 9, y + 5, 1, 6);
-          ctx.globalAlpha = 1.0;
-        }
+        // Seams
+        ctx.fillStyle = biome.seam;
+        if (col % 3 === 0) ctx.fillRect(x, y, 1, ts);
+        if (row % 2 === 0) ctx.fillRect(x, y, ts, 1);
 
-        // Biome detail (Moss/Rust/Ash)
+        // Biome Detail (Moss/Rust/Heat)
         if (slabID % 23 === 0) {
           ctx.fillStyle = biome.detail;
-          ctx.fillRect(x + 2, y + ts - 5, ts - 4, 3);
+          ctx.globalAlpha = 0.4;
+          ctx.fillRect(x + 2, y + ts - 6, ts - 4, 4);
+          ctx.globalAlpha = 1.0;
         }
       }
     }
   }
 
-  // Wall torches - rendered with biome-specific colors
+  // Torches
   const torchPositions: { x: number; y: number }[] = [];
   for (let col = 4; col < C.dims.rc; col += 8) {
     torchPositions.push({ x: col * C.TILE_SIZE, y: C.TILE_SIZE });
@@ -208,42 +223,32 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
     torchPositions.push({ x: C.dims.gw - C.TILE_SIZE, y: row * C.TILE_SIZE });
   }
 
-  const flicker = Math.sin(time * 8) * 0.15 + 0.85;
-  const flicker2 = Math.sin(time * 11 + 1.3) * 0.1 + 0.9;
-
+  const flicker = Math.sin(time * 8) * 0.1 + 0.9;
   for (let ti = 0; ti < torchPositions.length; ti++) {
     const t = torchPositions[ti];
-    const localFlicker = ti % 2 === 0 ? flicker : flicker2;
+    const localFlicker = flicker * (1 + Math.sin(time * 10 + ti) * 0.1);
 
-    // Biome-specific light pool
-    const floorGlow = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 60);
-    floorGlow.addColorStop(0, biome.accentGlow.replace('0.15', (0.12 * localFlicker).toString()));
+    // Glow pool
+    const floorGlow = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 70);
+    floorGlow.addColorStop(0, biome.accentGlow.replace('0.2', (0.15 * localFlicker).toString()));
     floorGlow.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = floorGlow;
-    ctx.fillRect(t.x - 60, t.y - 60, 120, 120);
+    ctx.fillRect(t.x - 70, t.y - 70, 140, 140);
 
-    // Torch light core
-    const g = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 15);
-    g.addColorStop(0, biome.accent);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = 0.4 * localFlicker;
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(t.x, t.y, 15, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1.0;
-
-    // Torch handle
-    ctx.fillStyle = biome.wallDetail;
-    ctx.fillRect(t.x - 1, t.y, 2, 8);
-
-    // Flame
-    const fSway = Math.sin(time * 12 + ti * 2) * 1;
+    // Flame Core
     ctx.fillStyle = biome.accent;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = biome.accent;
     ctx.beginPath();
-    ctx.moveTo(t.x - 2 + fSway * 0.5, t.y - 2);
-    ctx.quadraticCurveTo(t.x + fSway, t.y - 8, t.x + fSway * 0.3, t.y - 2);
+    const fSway = Math.sin(time * 12 + ti) * 2;
+    ctx.moveTo(t.x - 2 + fSway * 0.5, t.y);
+    ctx.quadraticCurveTo(t.x + fSway, t.y - 10, t.x + fSway * 0.2, t.y);
     ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Handle
+    ctx.fillStyle = biome.wallDetail;
+    ctx.fillRect(t.x - 1, t.y - 2, 2, 10);
   }
 }
 
@@ -379,109 +384,169 @@ export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, ti
   if (room.doors.east) drawDoor(C.dims.gw - C.TILE_SIZE, midY - dw / 2, C.TILE_SIZE, dw, 'east');
 }
 
-export function renderObstacles(ctx: CanvasRenderingContext2D, obstacles: Obstacle[]) {
+export function renderObstacles(ctx: CanvasRenderingContext2D, obstacles: Obstacle[], floor = 1) {
+  const biome = getBiome(floor);
+  const time = Date.now() / 1000;
+
   for (const o of obstacles) {
     const hash = ((o.x * 7 + o.y * 13) & 0xFF);
 
-    // Projected shadow (longer, softer, directional — as if lit from above-left)
-    const shadowOff = 4;
-    const shadowGrad = ctx.createLinearGradient(o.x + shadowOff, o.y + shadowOff, o.x + o.w + shadowOff + 3, o.y + o.h + shadowOff + 3);
-    shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.35)');
-    shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = shadowGrad;
-    ctx.fillRect(o.x + shadowOff, o.y + shadowOff, o.w + 3, o.h + 3);
+    // 0. AMBIENT OCCLUSION (Soft floor shadow at base only)
+    const aoGrad = ctx.createRadialGradient(o.x + o.w / 2, o.y + o.h / 2, 2, o.x + o.w / 2, o.y + o.h / 2, Math.max(o.w, o.h) * 1.5);
+    aoGrad.addColorStop(0, 'rgba(0,0,0,0.6)');
+    aoGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = aoGrad;
+    ctx.fillRect(o.x - 10, o.y - 10, o.w + 20, o.h + 20);
 
-    // Base body — slight color variation per pillar
-    const bodyR = 30 + (hash % 8);
-    const bodyG = 28 + (hash % 6);
-    const bodyB = 42 + (hash % 10);
-    ctx.fillStyle = `rgb(${bodyR}, ${bodyG}, ${bodyB})`;
+    // 1. BIOME HERO SILHOUETTE
+    ctx.save();
+    ctx.beginPath();
+
+    if (biome.theme === 'forest') {
+      const steps = 16;
+      for (let i = 0; i <= steps; i++) {
+        const angle = (i / steps) * Math.PI * 2;
+        const drift = Math.sin(angle * 4 + hash) * 6;
+        const r = o.w / 2 + drift;
+        const px = o.x + o.w / 2 + Math.cos(angle) * r;
+        const py = o.y + o.h / 2 + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+    } else if (biome.theme === 'crystal') {
+      const pts = [
+        [o.x + 4, o.y - 4], [o.x + o.w - 2, o.y + 2],
+        [o.x + o.w + 6, o.y + o.h * 0.4], [o.x + o.w + 2, o.y + o.h + 4],
+        [o.x + 2, o.y + o.h], [o.x - 4, o.y + o.h * 0.5]
+      ];
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      pts.forEach(p => ctx.lineTo(p[0], p[1]));
+    } else {
+      ctx.moveTo(o.x, o.y);
+      ctx.lineTo(o.x + o.w + 4, o.y - 2);
+      ctx.lineTo(o.x + o.w + 2, o.y + o.h + 4);
+      ctx.lineTo(o.x - 4, o.y + o.h + 2);
+    }
+    ctx.closePath();
+    ctx.clip();
+
+    // 2. PAINTERLY BASE LAYERING
+    ctx.fillStyle = biome.wall;
+    ctx.fillRect(o.x - 10, o.y - 10, o.w + 20, o.h + 20);
+
+    // Layered texture noise
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.05)';
+      const tx = o.x + (hash * (i + 1)) % o.w;
+      const ty = o.y + (hash * (i + 2)) % o.h;
+      ctx.fillRect(tx, ty, 20, 20);
+    }
+
+    // 3. SPECIALIZED BIOME ELEMENTS
+    if (biome.theme === 'forest') {
+      // DENSE LEAVES CLUSTERS
+      const leafColors = ["#1a3a1a", "#2a5a27", "#4a8a3b"];
+      for (let i = 0; i < 8; i++) {
+        const lx = o.x + ((hash * (i + 7)) % o.w);
+        const ly = o.y + ((hash * (i + 4)) % o.h);
+        const r = 10 + (i % 3) * 4;
+
+        ctx.fillStyle = leafColors[i % 3];
+        ctx.beginPath();
+        for (let j = 0; j < 6; j++) {
+          const a = j * Math.PI / 3;
+          const lr = r * (0.8 + Math.sin(a * 3) * 0.2);
+          ctx.lineTo(lx + Math.cos(a) * lr, ly + Math.sin(a) * lr);
+        }
+        ctx.fill();
+
+        // Leaf stroke for definition
+        ctx.strokeStyle = "rgba(0,0,0,0.2)";
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+      // Hanging Ivy
+      ctx.strokeStyle = "#1a3a1a";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(o.x + o.w * 0.4, o.y);
+      ctx.quadraticCurveTo(o.x + o.w * 0.1, o.y + o.h * 0.5, o.x + o.w * 0.3, o.y + o.h + 10);
+      ctx.stroke();
+    }
+    else if (biome.theme === 'crystal') {
+      // FACETED CRYSTALS
+      for (let i = 0; i < 4; i++) {
+        const cx = o.x + (o.w * 0.2) + (i * 12);
+        const cy = o.y + (o.h * 0.2) + (i * 8);
+
+        // Inner Refraction Gradient
+        const cGrad = ctx.createLinearGradient(cx, cy - 10, cx + 10, cy + 20);
+        cGrad.addColorStop(0, "#ffffff");
+        cGrad.addColorStop(0.3, biome.accent);
+        cGrad.addColorStop(1, "#0a1a3a");
+
+        ctx.fillStyle = cGrad;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + 15, cy - 20);
+        ctx.lineTo(cx + 25, cy);
+        ctx.lineTo(cx + 12, cy + 30);
+        ctx.closePath();
+        ctx.fill();
+
+        // Shine Glint
+        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        ctx.fillRect(cx + 8, cy - 8, 2, 8);
+      }
+    }
+    else if (biome.theme === 'volcano') {
+      // MAGMA CORE & WEBS
+      const glow = 0.7 + Math.sin(time * 5 + hash) * 0.3;
+      ctx.shadowBlur = 10 * glow;
+      ctx.shadowColor = "#ff2200";
+
+      // Vein System
+      ctx.strokeStyle = "#ff4400";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(o.x - 5, o.y + o.h * 0.4);
+      ctx.bezierCurveTo(o.x + o.w * 0.4, o.y + o.h * 0.1, o.x + o.w * 0.6, o.y + o.h * 0.9, o.x + o.w + 5, o.y + o.h * 0.6);
+      ctx.stroke();
+
+      // White-Hot Core
+      ctx.strokeStyle = "#fffbea";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.shadowBlur = 0;
+
+      // Bubbling Detail
+      ctx.fillStyle = "rgba(255, 120, 0, 0.4)";
+      for (let i = 0; i < 4; i++) {
+        const bx = o.x + (hash * i) % o.w;
+        const by = o.y + (hash + i) % o.h;
+        ctx.beginPath();
+        ctx.arc(bx, by, 3 * glow, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // 4. GLOBAL ILLUMINATION (Post-Clip)
+    ctx.restore();
+
+    // Directional Rim Highlight (Top-Left Light Source)
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(o.x, o.y + o.h);
+    ctx.lineTo(o.x, o.y);
+    ctx.lineTo(o.x + o.w, o.y);
+    ctx.stroke();
+
+    // Biome Wash (Tint everything slightly with god-ray color)
+    ctx.fillStyle = biome.rays.replace('0.1', '0.05');
+    ctx.globalCompositeOperation = 'soft-light';
     ctx.fillRect(o.x, o.y, o.w, o.h);
-
-    // Stone brick lines (horizontal mortar)
-    ctx.fillStyle = 'rgba(15, 12, 25, 0.3)';
-    const brickH = 5;
-    for (let by = o.y + brickH; by < o.y + o.h - 2; by += brickH) {
-      ctx.fillRect(o.x, by, o.w, 1);
-    }
-    // Vertical mortar (offset per row)
-    for (let by = o.y; by < o.y + o.h - 2; by += brickH) {
-      const row = Math.floor((by - o.y) / brickH);
-      const vOff = row % 2 === 0 ? o.w * 0.4 : o.w * 0.7;
-      ctx.fillRect(o.x + vOff, by, 1, brickH);
-    }
-
-    // Top cap — lighter highlight
-    ctx.fillStyle = C.COLORS.obstacleTop;
-    ctx.fillRect(o.x, o.y, o.w, 3);
-    // Top bevel highlight
-    ctx.fillStyle = 'rgba(80, 75, 100, 0.3)';
-    ctx.fillRect(o.x, o.y, o.w, 1);
-
-    // Bottom edge — darker
-    ctx.fillStyle = 'rgba(10, 8, 18, 0.4)';
-    ctx.fillRect(o.x, o.y + o.h - 1, o.w, 1);
-
-    // Left edge highlight (light source from left)
-    ctx.fillStyle = 'rgba(60, 55, 80, 0.2)';
-    ctx.fillRect(o.x, o.y + 3, 1, o.h - 4);
-
-    // Right edge shadow
-    ctx.fillStyle = 'rgba(10, 8, 18, 0.25)';
-    ctx.fillRect(o.x + o.w - 1, o.y + 3, 1, o.h - 4);
-
-    // Cracks — unique per pillar based on hash
-    ctx.strokeStyle = 'rgba(12, 10, 20, 0.35)';
-    ctx.lineWidth = 0.6;
-    if (hash % 3 === 0) {
-      // Diagonal crack from top-left
-      ctx.beginPath();
-      ctx.moveTo(o.x + 2, o.y + 4);
-      ctx.lineTo(o.x + o.w * 0.4, o.y + o.h * 0.35);
-      ctx.lineTo(o.x + o.w * 0.35, o.y + o.h * 0.5);
-      ctx.stroke();
-    }
-    if (hash % 5 === 0) {
-      // Horizontal crack mid-section
-      ctx.beginPath();
-      ctx.moveTo(o.x + o.w * 0.3, o.y + o.h * 0.6);
-      ctx.lineTo(o.x + o.w * 0.8, o.y + o.h * 0.55);
-      ctx.stroke();
-    }
-    if (hash % 7 === 0) {
-      // Small chip/dent
-      ctx.fillStyle = 'rgba(10, 8, 18, 0.3)';
-      ctx.fillRect(o.x + o.w * 0.6, o.y + o.h * 0.3, 3, 2);
-    }
-
-    // Moss/lichen patches — green growth on stone
-    if (hash % 4 < 2) {
-      // Bottom moss (most common — moisture collects at base)
-      ctx.fillStyle = 'rgba(25, 55, 30, 0.18)';
-      const mossW = 4 + (hash % 5);
-      const mossX = o.x + (hash % 3) * 2;
-      ctx.fillRect(mossX, o.y + o.h - 4, mossW, 4);
-      // Brighter spots
-      ctx.fillStyle = 'rgba(35, 70, 35, 0.1)';
-      ctx.fillRect(mossX + 1, o.y + o.h - 3, mossW * 0.6, 2);
-    }
-    if (hash % 6 === 0) {
-      // Side moss (rarer)
-      ctx.fillStyle = 'rgba(20, 50, 28, 0.15)';
-      ctx.fillRect(o.x, o.y + o.h * 0.5, 3, 6);
-    }
-    if (hash % 9 === 0) {
-      // Top moss patch (very rare — ancient pillar)
-      ctx.fillStyle = 'rgba(22, 48, 25, 0.12)';
-      ctx.fillRect(o.x + 2, o.y + 3, o.w - 4, 2);
-    }
-
-    // Small stone detail textures
-    ctx.fillStyle = 'rgba(50, 45, 70, 0.15)';
-    ctx.fillRect(o.x + 3, o.y + o.h * 0.4, 2, 1);
-    if (hash % 2 === 0) {
-      ctx.fillRect(o.x + o.w - 5, o.y + o.h * 0.7, 2, 1);
-    }
+    ctx.globalCompositeOperation = 'source-over';
   }
 }
 
@@ -1143,7 +1208,7 @@ function drawIdleRunPose(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
     const isBackFrame = currentFrame.src.includes('costa');
 
     // Determine active socket - Sprite flip already handles the side change
-    let socket = currentFrame.handSocket || (isBackFrame ? SOCKET_BACK_R : SOCKET_FRONT_R);
+    const socket = currentFrame.handSocket || (isBackFrame ? SOCKET_BACK_R : SOCKET_FRONT_R);
 
 
     let sx = socket.x;
@@ -1904,7 +1969,7 @@ export function renderWeaponSelectionOverlay(ctx: CanvasRenderingContext2D, sele
     if (isLocked) {
       ctx.filter = 'grayscale(100%) brightness(50%)';
     }
-    const pDummy = { weapon: opt.id } as any;
+    const pDummy = { weapon: opt.id as WeaponType } as PlayerState;
     drawEquippedWeapon(ctx, pDummy, isMobileScreen ? 30 : 40, 0, time);
     ctx.restore();
 
@@ -1937,7 +2002,8 @@ export function renderWeaponSelectionOverlay(ctx: CanvasRenderingContext2D, sele
 }
 
 
-export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: number) {
+export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: number, floor: number = 1) {
+  const biome = getBiome(floor);
   // Never render dead enemies — they must be removed from the list before rendering
   if (e.isDying) return;
 
@@ -1981,10 +2047,10 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
       tank: C.COLORS.tank, boss: C.COLORS.boss,
       wraith: C.COLORS.wraith, bomber: C.COLORS.bomber,
       swarm: C.COLORS.swarm, necromancer: C.COLORS.necromancer,
-      stalker: C.COLORS.stalker, phantom: '#ff00ff',
+      stalker: C.COLORS.stalker, phantom: C.COLORS.phantom,
       flash_hunter: C.COLORS.flashHunter, distortion: C.COLORS.distortion,
       flicker_fiend: C.COLORS.flickerFiend, warper: C.COLORS.warper,
-      accelerator: C.COLORS.accelerator,
+      accelerator: C.COLORS.accelerator, ranged: C.COLORS.ranged,
     };
     ctx.fillStyle = colorMap[e.type] || C.COLORS.chaser;
   }
@@ -2360,41 +2426,64 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
       ctx.fillStyle = '#111111';
       ctx.fillRect(x - 3, y + hover + 4, 6, 1.5);
       ctx.fillRect(x - 2, y + hover + 8, 4, 1.5);
+      break;
     }
 
-    case 'wraith': {
-      // ═══ LOST SOUL - Espectro Dimensional ═══
-      const float = Math.sin(time * 4) * 5;
-      const alpha = e.phaseAlpha;
-      ctx.globalAlpha = alpha;
+    case 'necromancer': {
+      // ═══ VOID CHANNELER - O Invocador de Almas ═══
+      const hover = Math.sin(time * 3) * 5;
+      const coreSpin = time * 1.5;
+      const summonPulse = Math.max(0, 1 - (e.summonTimer / C.NECRO_SUMMON_COOLDOWN));
 
-      // Mist Trail
-      for (let i = 0; i < 4; i++) {
-        ctx.fillStyle = `rgba(0, 255, 200, ${(0.2 - i * 0.04) * alpha})`;
+      // 1. FLOATING RITUAL CIRCLES
+      ctx.strokeStyle = `rgba(150, 50, 255, ${0.3 + Math.sin(time * 8) * 0.1})`;
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 2; i++) {
+        const angleOffset = i * Math.PI;
         ctx.beginPath();
-        ctx.arc(x - e.vx * i * 3, y + float + 5 + i * 4, half - i, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.ellipse(x, y + hover, half + 12, (half + 12) * 0.3, coreSpin + angleOffset, 0, Math.PI * 2);
+        ctx.stroke();
       }
 
-      // ETHEREAL BODY (Wispy)
-      const wColor = e.flashTime > 0 ? C.COLORS.white : 'rgba(0, 255, 200, 0.6)';
-      ctx.fillStyle = wColor;
+      // 2. SPECTRAL ROBES (Tattered and flowing)
+      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : '#150025';
       ctx.beginPath();
-      ctx.moveTo(x, y - half + float);
-      ctx.quadraticCurveTo(x + half + 2, y + float, x, y + half + 6 + float);
-      ctx.quadraticCurveTo(x - half - 2, y + float, x, y - half + float);
+      ctx.moveTo(x, y - half - 8 + hover);
+      // Flowing sleeves
+      ctx.lineTo(x + half + 6, y + hover);
+      ctx.lineTo(x + 4, y + half + 10 + hover);
+      ctx.lineTo(x - 4, y + half + 10 + hover);
+      ctx.lineTo(x - half - 6, y + hover);
+      ctx.closePath();
       ctx.fill();
 
-      // Hollow Eyes
-      ctx.fillStyle = '#000000';
+      // 3. EYES OF THE ABYSS (Pulsing purple)
+      const eyeGlow = 0.6 + Math.sin(time * 12) * 0.4;
+      ctx.fillStyle = `rgba(200, 100, 255, ${eyeGlow})`;
+      ctx.fillRect(x - 3, y - half + 2 + hover, 1.5, 3);
+      ctx.fillRect(x + 1.5, y - half + 2 + hover, 1.5, 3);
+
+      // 4. VOID CORE (The summoning heart)
+      const coreSize = 4 + Math.sin(time * 10) * 1 + summonPulse * 4;
+      const coreGrad = ctx.createRadialGradient(x, y + hover, 0, x, y + hover, coreSize);
+      coreGrad.addColorStop(0, '#ffffff');
+      coreGrad.addColorStop(0.5, '#9933cc');
+      coreGrad.addColorStop(1, 'rgba(0,0,0,0)');
+
+      ctx.fillStyle = coreGrad;
       ctx.beginPath();
-      ctx.ellipse(x - 3, y - 2 + float, 2, 4, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(x + 3, y - 2 + float, 2, 4, 0, 0, Math.PI * 2);
+      ctx.arc(x, y + hover, coreSize, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.globalAlpha = 1;
+      // Summoning rings (when ready to summon)
+      if (e.summonTimer < 0.5) {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${1 - e.summonTimer * 2})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y + hover, half + 20 - e.summonTimer * 20, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
       break;
     }
 
@@ -2640,55 +2729,83 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
       break;
     }
 
-    case 'accelerator': {
-      // ═══ SPIRIT COMET - Bólido de Energia Espectral ═══
-      ctx.globalAlpha = Math.max(0.3, e.stealthAlpha);
-      const accel = e.stealthAlpha;
-      const stretch = accel > 0.8 ? 15 : 0;
 
-      // 1. SPECTRAL TRAIL (Graceful fire)
-      if (accel > 0.7) {
-        const tGrad = ctx.createLinearGradient(x - half - stretch, y, x + half, y);
-        tGrad.addColorStop(0, 'rgba(255, 100, 0, 0)');
-        tGrad.addColorStop(1, 'rgba(255, 200, 0, 0.4)');
-        ctx.fillStyle = tGrad;
-        ctx.beginPath();
-        ctx.moveTo(x - half - 20 - stretch, y);
-        ctx.lineTo(x, y - 5);
-        ctx.lineTo(x, y + 5);
-        ctx.closePath();
-        ctx.fill();
-      }
 
-      // 2. SLEEK AERODYNAMIC CORE (Needle shape)
-      const hColor = e.flashTime > 0 ? C.COLORS.white : '#1a0000';
-      ctx.fillStyle = hColor;
+    case 'ranged': {
+      // ═══ GLINT SENTINEL - Crystalline Faceted Construct ═══
+      const hover = Math.sin(time * 2) * 3;
+      const crystalPulse = 0.5 + Math.sin(time * 4) * 0.5;
+
+      // 1. HARD SURFACE BODY (Faceted Diamond Shape)
+      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : biome.wallTop;
       ctx.beginPath();
-      ctx.moveTo(x + half + 8, y);
-      ctx.lineTo(x - half - 4 - stretch, y - half + 2);
-      ctx.lineTo(x - half - 4 - stretch, y + half - 2);
+      ctx.moveTo(x, y - half - 5 + hover);
+      ctx.lineTo(x + half + 5, y + hover);
+      ctx.lineTo(x, y + half + 5 + hover);
+      ctx.lineTo(x - half - 5, y + hover);
       ctx.closePath();
       ctx.fill();
 
-      // Golden Trim
-      ctx.strokeStyle = '#ffd700';
+      // 2. FACET SHADING
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.beginPath();
+      ctx.moveTo(x, y - half - 5 + hover);
+      ctx.lineTo(x + half + 5, y + hover);
+      ctx.lineTo(x, y + hover);
+      ctx.fill();
+
+      // 3. CORE ENERGY (Biome specific)
+      const cGrad = ctx.createRadialGradient(x, y + hover, 0, x, y + hover, 8);
+      cGrad.addColorStop(0, '#ffffff');
+      cGrad.addColorStop(1, biome.accent);
+      ctx.fillStyle = cGrad;
+      ctx.shadowBlur = 12 * crystalPulse;
+      ctx.shadowColor = biome.accent;
+      ctx.beginPath();
+      ctx.arc(x, y + hover, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      break;
+    }
+
+    case 'accelerator': {
+      // ═══ SPECTRAL BOLIDE - High-speed Energy Entity ═══
+      const speed = e.stealthAlpha; // Reusing internal state for visual speed
+      const stretch = 15 * speed;
+
+      // 1. DYNAMIC ENERGY TRAIL
+      const tGrad = ctx.createLinearGradient(x - half - stretch - 20, y, x, y);
+      tGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      tGrad.addColorStop(1, biome.accentGlow.replace('0.2', '0.6'));
+      ctx.fillStyle = tGrad;
+      ctx.beginPath();
+      ctx.moveTo(x - half - 30 - stretch, y);
+      ctx.lineTo(x, y - half);
+      ctx.lineTo(x, y + half);
+      ctx.closePath();
+      ctx.fill();
+
+      // 2. PROJECTILE CORE (Needle)
+      ctx.fillStyle = e.flashTime > 0 ? C.COLORS.white : (biome.theme === 'volcano' ? '#1a0505' : '#05051a');
+      ctx.beginPath();
+      ctx.moveTo(x + half + 10, y);
+      ctx.lineTo(x - half - stretch, y - 4);
+      ctx.lineTo(x - half - stretch, y + 4);
+      ctx.closePath();
+      ctx.fill();
+
+      // 3. WAKE SPARK (Rim highlight)
+      ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.3;
       ctx.stroke();
-
-      // 3. PILOT'S GAZE (Steady white slit)
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(x + 2, y - 0.5, 6, 1);
-
       ctx.globalAlpha = 1;
       break;
     }
 
     case 'boss': {
       const breathe = Math.sin(time * 2) * 1;
-      // Import floor from bosses module
-      const bossFloor = (window as any).__bossFloor || 1;
-
-      switch (bossFloor) {
+      switch (floor) {
         case 2: {
           // ═══ CELESTIAL GOLDEN HUNTER - O Caçador Divino ═══
           const float = Math.sin(time * 3) * 4;
@@ -5115,6 +5232,67 @@ export function renderTrapEffectOverlay(
     const pulse = Math.sin(time * 6) * 0.3 + 0.7;
     ctx.strokeStyle = `rgba(255, 0, 0, ${0.3 * pulse})`;
     ctx.lineWidth = 3;
-    ctx.strokeRect(2, 2, C.dims.gw - 4, C.dims.gh - 4);
   }
+}
+
+/**
+ * Biome Ambient Screen Effects: Full-screen immersion layers
+ */
+export function renderBiomeAmbientFX(ctx: CanvasRenderingContext2D, time: number, floor: number, vp: Viewport) {
+  const biome = getBiome(floor);
+  const { rw, rh, gox, goy } = vp;
+
+  // We render relative to screen space, so we use absolute viewport sizes
+  // but we need to offset back from the global arena transform if we are inside a save/translate
+  // However, calling this after all arena elements is best.
+
+  ctx.save();
+  // Ensure we are in screen coordinates (undoing the gox/goy translate if needed)
+  // But usually called outside the shake/translate.
+
+  if (biome.theme === 'crystal') {
+    // 1. FROST VIGNETTE
+    const fGrad = ctx.createRadialGradient(rw / 2, rh / 2, rh / 3, rw / 2, rh / 2, rh / 1.2);
+    fGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    fGrad.addColorStop(1, 'rgba(200, 240, 255, 0.15)');
+    ctx.fillStyle = fGrad;
+    ctx.fillRect(-gox, -goy, rw, rh);
+
+    // 2. FLOATING ICE SHARDS
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    for (let i = 0; i < 15; i++) {
+      const h = (i * 137 + time * 15) % rw - gox;
+      const v = (i * 253 + time * 10) % rh - goy;
+      ctx.fillRect(h, v, 2, 2);
+    }
+  }
+  else if (biome.theme === 'forest') {
+    // 1. GLOWING SPORES
+    ctx.fillStyle = biome.accentGlow.replace(/[\d.]+\)$/, '0.4)');
+    for (let i = 0; i < 20; i++) {
+      const h = (i * 91 + Math.sin(time * 0.5 + i) * 20) % rw - gox;
+      const v = (i * 123 - time * 12) % rh - goy;
+      const s = 1 + (i % 2);
+      ctx.beginPath();
+      ctx.arc(h, v, s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  else if (biome.theme === 'volcano') {
+    // 1. HEAT PULSE
+    const heatAlpha = 0.04 + Math.sin(time * 3) * 0.02;
+    ctx.fillStyle = `rgba(255, 80, 0, ${heatAlpha})`;
+    ctx.fillRect(-gox, -goy, rw, rh);
+
+    // 2. RISING ASH EMBERS
+    for (let i = 0; i < 25; i++) {
+      const h = (i * 157 + Math.sin(time + i) * 15) % rw - gox;
+      const v = (i * 211 - time * 60) % rh - goy;
+      const glow = 0.5 + Math.random() * 0.5;
+      ctx.fillStyle = `rgba(255, 180, 50, ${glow})`;
+      ctx.fillRect(h, v, 1.5, 1.5);
+    }
+  }
+
+  ctx.restore();
 }

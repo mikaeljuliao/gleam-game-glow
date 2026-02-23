@@ -14,9 +14,22 @@ export interface PortalOrbitalParticle {
     dot?: boolean; // For EnergyDots on the edge
 }
 
+export interface GroundParticle {
+    x: number;
+    y: number;
+    targetX: number;
+    targetY: number;
+    life: number;
+    progress: number;
+    size: number;
+    color: string;
+    curX?: number;
+    curY?: number;
+}
+
 export class BossPortalSystem {
     private particles: PortalOrbitalParticle[] = [];
-    private groundParticles: any[] = [];
+    private groundParticles: GroundParticle[] = [];
     private spawnTimer = 0;
     private portalPos: Vec2 | null = null;
     private portalExists = false;
@@ -214,14 +227,17 @@ export class BossPortalSystem {
         // --- GROUND PARTICLES ---
         this.renderGroundParticles(ctx);
 
-        // --- FLOATING TEXT ---
-        if (this.interactionAlpha > 0.01) {
-            this.renderFloatingText(ctx, time);
-        }
-
         // --- TRANSITION OVERLAY ---
         if (this.isTransitioning) {
             this.renderTransitionOverlay(ctx);
+        }
+    }
+
+    renderInteractionText(ctx: CanvasRenderingContext2D, time: number) {
+        if (!this.portalExists || !this.portalPos) return;
+        // --- FLOATING TEXT ---
+        if (this.interactionAlpha > 0.01) {
+            this.renderFloatingText(ctx, time);
         }
     }
 

@@ -111,7 +111,7 @@ export interface Portal {
 
 export type WeaponType = 'sword' | 'daggers' | 'staff';
 
-export type EnemyType = 'chaser' | 'shooter' | 'tank' | 'boss' | 'wraith' | 'bomber' | 'swarm' | 'necromancer' | 'stalker' | 'phantom' | 'flash_hunter' | 'distortion' | 'flicker_fiend' | 'warper' | 'accelerator';
+export type EnemyType = 'chaser' | 'shooter' | 'tank' | 'boss' | 'wraith' | 'bomber' | 'swarm' | 'necromancer' | 'stalker' | 'phantom' | 'flash_hunter' | 'distortion' | 'flicker_fiend' | 'warper' | 'accelerator' | 'ranged';
 
 export type TrapType = 'spikes' | 'phantom_summon' | 'poison_cloud' | 'bear_trap';
 
@@ -190,6 +190,7 @@ export interface ProjectileState {
   maxLifetime: number;
   // Enemy projectile visual identity
   projectileKind?: 'basic' | 'needle' | 'heavy' | 'boss_orb' | 'boss_arc' | 'boss_void' | 'boss_frag' | 'staff_bolt';
+  _split?: boolean;
 }
 
 export interface Particle {
@@ -215,6 +216,8 @@ export interface Obstacle {
   h: number;
 }
 
+export type RoomLayout = 'dual_wing' | 'central_hub' | 's_path' | 'choke_split' | 'gauntlet' | 'pillars' | 'none';
+
 export interface DungeonRoom {
   gridX: number;
   gridY: number;
@@ -225,6 +228,7 @@ export interface DungeonRoom {
   visited: boolean;
   isBossRoom: boolean;
   type: 'normal' | 'boss' | 'start' | 'treasure' | 'trap' | 'shrine' | 'vendor';
+  layout?: RoomLayout;
   // Special room state
   treasureCollected?: boolean;
   trapTriggered?: boolean;
@@ -242,7 +246,7 @@ export interface HorrorEvent {
   timer: number;
   x?: number;
   y?: number;
-  data?: any;
+  data?: unknown;
 }
 
 export interface EnemySpawn {

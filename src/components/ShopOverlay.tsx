@@ -76,7 +76,7 @@ const ShopOverlay = ({ items, coins: souls, shopType, onBuy, onClose }: ShopOver
       if (i >= text.length) clearInterval(interval);
     }, 35);
     return () => clearInterval(interval);
-  }, []);
+  }, [shopType]);
 
   const handleBuy = (index: number) => {
     const item = items[index];

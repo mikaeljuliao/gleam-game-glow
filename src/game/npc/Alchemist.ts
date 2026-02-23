@@ -13,7 +13,7 @@ export class AlchemistNPC {
     }
 
     static onInteract(engine: GameEngine) {
-        (engine as any).shopType = 'potion';
+        engine.shopType = 'potion';
         engine.startDialogue(this.getDialogue());
     }
 }

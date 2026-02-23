@@ -19,6 +19,7 @@ export function createEnemy(type: EnemyType, x: number, y: number): EnemyState {
     flicker_fiend: { hp: C.FLICKER_HP, speed: C.FLICKER_SPEED, damage: C.FLICKER_DAMAGE, size: C.FLICKER_SIZE },
     warper: { hp: C.WARPER_HP, speed: C.WARPER_SPEED, damage: C.WARPER_DAMAGE, size: C.WARPER_SIZE },
     accelerator: { hp: C.ACCEL_HP, speed: C.ACCEL_SPEED, damage: C.ACCEL_DAMAGE, size: C.ACCEL_SIZE },
+    ranged: { hp: 35, speed: 25, damage: 16, size: 14 },
     boss: { hp: C.BOSS_HP, speed: C.BOSS_SPEED, damage: C.BOSS_DAMAGE, size: C.BOSS_SIZE },
   };
   const c = configs[type];
@@ -382,6 +383,23 @@ export function updateEnemy(e: EnemyState, player: PlayerState, dt: number, allE
       break;
     }
 
+    case 'ranged': {
+      // Shoots at distance, stays away (Glint Sentinel)
+      if (dist > 180) {
+        e.x += (n.x + sepX) * e.speed * dt;
+        e.y += (n.y + sepY) * e.speed * dt;
+      } else if (dist < 120) {
+        e.x += (-n.x + sepX) * e.speed * dt;
+        e.y += (-n.y + sepY) * e.speed * dt;
+      }
+      if (e.attackCooldown <= 0 && dist < 220) {
+        e.attackCooldown = 2.0;
+        const angle = Math.atan2(dy, dx);
+        projectiles.push(makeNeedleProjectile(e.x, e.y, angle, e.damage));
+      }
+      break;
+    }
+
     case 'boss': {
       updateBossAI(e, player, dx, dy, dist, dt, projectiles, allEnemies);
       break;
@@ -408,7 +426,7 @@ export function getXPForEnemy(type: EnemyType): number {
   const xpMap: Record<EnemyType, number> = {
     swarm: 3, chaser: 8, shooter: 10, bomber: 12, wraith: 15, tank: 15,
     necromancer: 20, stalker: 18, phantom: 5, boss: 60,
-    flash_hunter: 15, distortion: 22, flicker_fiend: 14, warper: 16, accelerator: 18,
+    flash_hunter: 15, distortion: 22, flicker_fiend: 14, warper: 16, accelerator: 18, ranged: 20,
   };
   return xpMap[type];
 }

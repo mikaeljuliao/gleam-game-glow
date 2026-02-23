@@ -24,8 +24,8 @@ export class MerchantNPC {
     }
 
     static onInteract(engine: GameEngine) {
-        (engine as any).shopType = 'normal';
-        engine.startDialogue(this.getDialogue((engine as any).vendorFirstMeet));
-        (engine as any).vendorFirstMeet = false;
+        engine.shopType = 'normal';
+        engine.startDialogue(this.getDialogue(engine.vendorFirstMeet));
+        engine.vendorFirstMeet = false;
     }
 }

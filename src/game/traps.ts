@@ -1,7 +1,7 @@
 // Hidden trap system — invisible traps with subtle floor hints
 // Traps activate on player proximity and cause severe debuffs/effects
 
-import { PlayerState, EnemyState, Particle } from './types';
+import { PlayerState, EnemyState, Particle, EnemyType } from './types';
 import * as C from './constants';
 
 export type HiddenTrapType =
@@ -143,7 +143,7 @@ export function checkTrapCollision(player: PlayerState, traps: HiddenTrap[]): Hi
 
 // Apply trap effect. Returns data for engine to use (e.g. enemies to spawn).
 export interface TrapActivationResult {
-  spawnEnemies: Array<{ type: string; x: number; y: number }>;
+  spawnEnemies: Array<{ type: EnemyType; x: number; y: number }>;
   buffEnemies: boolean;
   speedBoostEnemies: boolean;
 }

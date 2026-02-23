@@ -14,7 +14,7 @@ import {
 import { getRandomUpgrades, checkSynergies, getOwnedTags, SYNERGIES } from './upgrades';
 import { PortalManager } from './portals';
 import { portalSystem } from './boss_portal';
-import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins, renderWeaponSelectionOverlay, spawnVacuumImpact, ProjectileOrigin, HandCastEffect, EnemyProjectileImpact, StaffChargeEffect, StaffImpactEffect, renderEssenceCores } from './renderer';
+import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins, renderWeaponSelectionOverlay, spawnVacuumImpact, ProjectileOrigin, HandCastEffect, EnemyProjectileImpact, StaffChargeEffect, StaffImpactEffect, renderEssenceCores, renderBiomeAmbientFX } from './renderer';
 import { SFX, initAudio } from './audio';
 import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive, updateHPHorror, renderHPHorror, getHPLightPulse } from './horror';
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
@@ -82,11 +82,11 @@ export class GameEngine {
   shrineCooldown = false;
   shopOpen = false;
   private shopItems: ShopItem[] = [];
-  private shopType: 'normal' | 'potion' = 'normal';
+  public shopType: 'normal' | 'potion' = 'normal';
   private currentNPC: 'merchant' | 'alchemist' | null = null;
   private potionCooldown = 0; // Prevent spam
   vendorInteractCooldown = 0;
-  merchantFirstMeet = true;
+  vendorFirstMeet = true;
   alchemistFirstMeet = true;
   vendorDialogueActive = false;
   vendorDialogueLines: string[] = [];
@@ -169,6 +169,9 @@ export class GameEngine {
       restorePlayerState(this.player, saved.player);
       this.dungeon = restoreDungeon(saved.dungeon);
       this.stats = { ...saved.stats };
+      if (saved.amulets) {
+        this.amuletInventory = saved.amulets;
+      }
       this.player.x = C.dims.gw / 2;
       this.player.y = C.dims.gh / 2;
       this.player.trail = [];
@@ -721,6 +724,7 @@ export class GameEngine {
 
   private spawnRoomEnemies() {
     const room = getCurrentRoom(this.dungeon);
+    console.log(`[ENGINE] spawnRoomEnemies: RoomType=${room.type}, Layout=${room.layout}, Obstacles=${room.obstacles.length}`);
     this.enemies = [];
     this.bossWasSpawned = false;
     resetTrapEffects(this.player);
@@ -751,7 +755,7 @@ export class GameEngine {
       }
       if (room.isBossRoom && !this.bossIntroPlayed) {
         setBossFloor(this.dungeon.floor);
-        (window as any).__bossFloor = this.dungeon.floor;
+        (window as unknown as { __bossFloor: number }).__bossFloor = this.dungeon.floor;
         this.bossKillFloor = this.dungeon.floor;
         this.bossIntroPlayed = true;
         console.log(`[BOSS] Boss room entered on floor ${this.dungeon.floor}, total enemies: ${this.enemies.length}`);
@@ -857,7 +861,7 @@ export class GameEngine {
     this.saveTimer += dt;
     if (this.saveTimer >= 30) {
       this.saveTimer = 0;
-      saveGame(this.player, this.dungeon, this.stats);
+      saveGame(this.player, this.dungeon, this.stats, this.amuletInventory);
     }
 
     // Victory countdown — player can move but no combat
@@ -1025,7 +1029,7 @@ export class GameEngine {
         if (progress >= strike.activeWindow[0]) {
           this._hitTriggeredThisSwing = true;
           this.doMeleeHit();
-          (SFX as any)[strike.sfx]();
+          (SFX as unknown as Record<string, () => void>)[strike.sfx]();
         }
       } else if (this.player.weapon === 'sword') {
         // Longsword timing (legacy style)
@@ -1273,6 +1277,19 @@ export class GameEngine {
       const alive = updateProjectile(p, dt);
       if (!alive) return false;
 
+      // Obstacle collision (Tactical cover)
+      for (const o of room.obstacles) {
+        const closestX = Math.max(o.x, Math.min(p.x, o.x + o.w));
+        const closestY = Math.max(o.y, Math.min(p.y, o.y + o.h));
+        const dx = p.x - closestX;
+        const dy = p.y - closestY;
+        if ((dx * dx + dy * dy) < p.size * p.size) {
+          if (p.projectileKind === 'staff_bolt') StaffImpactEffect.spawn(this.particles, p.x, p.y);
+          else spawnVacuumImpact(this.particles, p.x, p.y);
+          return false;
+        }
+      }
+
       // boss_frag split mechanic — spawn two child orbs at 40% lifetime
       const splits = tryFragSplit(p);
       if (splits.length > 0) this.projectiles.push(...splits);
@@ -1376,7 +1393,8 @@ export class GameEngine {
         if (this.circleCollide(p.x, p.y, p.size, this.player.x, this.player.y, this.player.width / 2)) {
           const result = this.applyDamageToPlayer(p.damage);
           if (result.damaged) {
-            let shake = 3, flash = 0.1, color = 'rgb(255, 0, 0)';
+            let shake = 3, flash = 0.1;
+            const color = 'rgb(255, 0, 0)';
             if (p.projectileKind === 'heavy') { shake = 8; flash = 0.25; }
             if (p.projectileKind?.startsWith('boss')) { shake = 6; flash = 0.2; }
 
@@ -1988,7 +2006,7 @@ export class GameEngine {
         resetArenaFX();
         this.spawnRoomEnemies();
         // Auto-save on room transition
-        saveGame(this.player, this.dungeon, this.stats);
+        saveGame(this.player, this.dungeon, this.stats, this.amuletInventory);
       }
     }
   }
@@ -2011,7 +2029,7 @@ export class GameEngine {
     this.isTransitioning = false;
     portalSystem.reset();
     // Save on floor change
-    saveGame(this.player, this.dungeon, this.stats);
+    saveGame(this.player, this.dungeon, this.stats, this.amuletInventory);
   }
 
   private gameOver() {
@@ -2226,7 +2244,7 @@ export class GameEngine {
     if (result.spawnEnemies.length > 0) {
       HorrorSFX.phantomScream();
       for (const spawn of result.spawnEnemies) {
-        const enemy = createEnemy(spawn.type as any, spawn.x, spawn.y);
+        const enemy = createEnemy(spawn.type, spawn.x, spawn.y);
         scaleEnemyForFloor(enemy, this.dungeon.floor);
         this.enemies.push(enemy);
       }
@@ -2575,17 +2593,24 @@ export class GameEngine {
       renderHiddenTraps(ctx, room.hiddenTraps, this.gameTime);
     }
     renderDoors(ctx, room, this.gameTime, getDoorsLockedTimer() > 0, this.dungeon, this.player.x, this.player.y);
+
+    renderObstacles(ctx, room.obstacles, this.dungeon.floor);
     portalSystem.render(ctx, this.gameTime, this.player);
-    renderObstacles(ctx, room.obstacles);
+
     const isCollected = room.treasureCollected || room.shrineUsed || room.trapTriggered || false;
     renderSpecialRoom(ctx, room.type, this.gameTime, isCollected, room.trapType, this.player.x, this.player.y);
 
     for (const p of this.projectiles) renderProjectile(ctx, p, this.gameTime);
     for (const e of this.enemies) {
-      if (e.isDying) continue; // skip dead enemies — should already be removed, safety guard
-      renderEnemy(ctx, e, this.gameTime);
+      if (e.isDying) continue;
+      renderEnemy(ctx, e, this.gameTime, this.dungeon.floor);
     }
     renderEssenceCores(ctx, this.essenceCores, this.gameTime);
+
+    // render effects BEFORE player as requested
+    renderParticles(ctx, this.particles);
+    renderArenaOverlayFX(ctx, this.gameTime);
+
     renderPlayer(ctx, this.player, this.gameTime);
 
     // Weapon Specific Effects
@@ -2638,8 +2663,6 @@ export class GameEngine {
       }
       ctx.restore();
     }
-    renderParticles(ctx, this.particles);
-    renderArenaOverlayFX(ctx, this.gameTime);
 
     // Lighting with breathing light effect
     let lightRadius = C.LIGHT_RADIUS;
@@ -2656,6 +2679,9 @@ export class GameEngine {
     // Horror events overlay
     renderHorrorEvents(ctx, this.horrorEvents, this.gameTime, vp);
 
+    // Biome Ambient Effects (Spores, Embers, Frost)
+    renderBiomeAmbientFX(ctx, this.gameTime, this.dungeon.floor, vp);
+
     ctx.restore(); // shake
 
     applyScreenEffects(ctx, this.effects, vp);
@@ -2665,6 +2691,9 @@ export class GameEngine {
     applyBrightness(ctx);
 
     renderHUD(ctx, this.player, this.dungeon, this.stats.timePlayed, this.enemies.length, this.tutorialTimer, this.input.isMobile, vp);
+
+    // PORTAL TEXT - ABSOLUTE LAST ON TOP
+    portalSystem.renderInteractionText(ctx, this.gameTime);
 
     // Victory countdown overlay
     if (this.victoryActive) {

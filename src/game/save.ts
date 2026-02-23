@@ -1,5 +1,6 @@
 // localStorage save system for crash recovery
-import { PlayerState, DungeonMap, DungeonRoom, GameStats, EnemySpawn } from './types';
+import { PlayerState, DungeonMap, DungeonRoom, GameStats, EnemySpawn, RoomLayout } from './types';
+import { AmuletInventory } from './amulets';
 
 const SAVE_KEY = 'dungeon_of_shadows_save';
 
@@ -21,8 +22,9 @@ interface SaveData {
     lifesteal: number;
     piercing: boolean;
     explosive: boolean;
-    coins: number; // legacy name kept for save compat
+    souls: number;
   };
+  amulets: AmuletInventory;
   dungeon: {
     floor: number;
     currentRoomKey: string;
@@ -39,6 +41,8 @@ interface SaveData {
       trapTriggered: boolean;
       shrineUsed: boolean;
       trapType?: string;
+      layout?: string;
+      obstacles: Array<{ x: number; y: number; w: number; h: number }>;
       enemySpawns: EnemySpawn[];
     }>;
   };
@@ -46,7 +50,7 @@ interface SaveData {
   timestamp: number;
 }
 
-export function saveGame(player: PlayerState, dungeon: DungeonMap, stats: GameStats): void {
+export function saveGame(player: PlayerState, dungeon: DungeonMap, stats: GameStats, amulets?: AmuletInventory): void {
   try {
     const rooms: SaveData['dungeon']['rooms'] = [];
     for (const [key, room] of dungeon.rooms) {
@@ -62,7 +66,9 @@ export function saveGame(player: PlayerState, dungeon: DungeonMap, stats: GameSt
         treasureCollected: room.treasureCollected || false,
         trapTriggered: room.trapTriggered || false,
         shrineUsed: room.shrineUsed || false,
-        trapType: (room as any).trapType,
+        trapType: room.trapType,
+        layout: room.layout,
+        obstacles: room.obstacles || [],
         enemySpawns: room.enemies || [],
       });
     }
@@ -85,8 +91,9 @@ export function saveGame(player: PlayerState, dungeon: DungeonMap, stats: GameSt
         lifesteal: player.lifesteal,
         piercing: player.piercing,
         explosive: player.explosive,
-        coins: player.souls,
+        souls: player.souls,
       },
+      amulets: amulets || { owned: [], maxEquipped: 4, consumables: [] },
       dungeon: {
         floor: dungeon.floor,
         currentRoomKey: dungeon.currentRoomKey,
@@ -96,9 +103,11 @@ export function saveGame(player: PlayerState, dungeon: DungeonMap, stats: GameSt
       timestamp: Date.now(),
     };
 
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    const serialized = JSON.stringify(data);
+    localStorage.setItem(SAVE_KEY, serialized);
+    console.log(`[SAVE] Game successfully saved. Size: ${Math.round(serialized.length / 1024)} KB`);
   } catch (e) {
-    console.warn('Failed to save game:', e);
+    console.error('[SAVE] Failed to save game! This may cause freezes if storage is full. Error:', e);
   }
 }
 
@@ -113,7 +122,8 @@ export function loadGame(): SaveData | null {
       return null;
     }
     return data;
-  } catch {
+  } catch (e) {
+    console.error('[SAVE] Failed to load game:', e);
     return null;
   }
 }
@@ -121,7 +131,9 @@ export function loadGame(): SaveData | null {
 export function clearSave(): void {
   try {
     localStorage.removeItem(SAVE_KEY);
-  } catch {}
+  } catch (e) {
+    console.warn('[SAVE] Could not clear localStorage:', e);
+  }
 }
 
 export function hasSave(): boolean {
@@ -145,7 +157,7 @@ export function restorePlayerState(player: PlayerState, saved: SaveData['player'
   player.lifesteal = saved.lifesteal;
   player.piercing = saved.piercing;
   player.explosive = saved.explosive;
-  player.souls = (saved as any).coins || 0;
+  player.souls = saved.souls || (saved as unknown as { coins: number }).coins || 0;
 }
 
 export function restoreDungeon(saved: SaveData['dungeon']): DungeonMap {
@@ -155,8 +167,7 @@ export function restoreDungeon(saved: SaveData['dungeon']): DungeonMap {
       gridX: r.gridX,
       gridY: r.gridY,
       doors: r.doors,
-      enemies: r.enemySpawns || [], // restore enemy spawn data
-      obstacles: [], // will be regenerated
+      enemies: r.enemySpawns || [],
       cleared: r.cleared,
       visited: r.visited,
       isBossRoom: r.isBossRoom,
@@ -164,6 +175,8 @@ export function restoreDungeon(saved: SaveData['dungeon']): DungeonMap {
       treasureCollected: r.treasureCollected,
       trapTriggered: r.trapTriggered,
       shrineUsed: r.shrineUsed,
+      layout: r.layout as RoomLayout,
+      obstacles: r.obstacles || [],
     });
   }
   return {

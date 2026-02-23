@@ -1,0 +1,1 @@
+﻿src/game/renderer.ts(2676,10): error TS2678: Type '"ranged"' is not comparable to type 'EnemyType'.

@@ -190,6 +190,16 @@ export class InputManager {
     this.buttonsDown.add(2);
   }
 
+  triggerKey(key: string) {
+    const k = key.toLowerCase();
+    if (!this.keys.has(k)) {
+      this.keysJustPressed.add(k);
+    }
+    this.keys.add(k);
+    // Auto-release after a short delay for simulated presses
+    setTimeout(() => this.keys.delete(k), 80);
+  }
+
   triggerDash() {
     this.touchDashPressed = true;
   }

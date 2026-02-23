@@ -1,4 +1,4 @@
-import { DungeonMap, DungeonRoom, EnemySpawn, EnemyType, Obstacle, TrapType } from './types';
+import { DungeonMap, DungeonRoom, EnemySpawn, EnemyType, Obstacle, TrapType, RoomLayout } from './types';
 import * as C from './constants';
 import { generateHiddenTraps } from './traps';
 
@@ -10,28 +10,81 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function generateObstacles(room: DungeonRoom): Obstacle[] {
-  if (room.type === 'start') return [];
-  const obstacles: Obstacle[] = [];
-  const count = room.isBossRoom ? 2 : randomInt(2, 5);
+function getRoomSafeZones(room: DungeonRoom): Obstacle[] {
+  const zones: Obstacle[] = [];
+  const midX = C.dims.gw / 2;
+  const midY = C.dims.gh / 2;
+  const margin = 80;
+  const doorWidth = 120;
 
-  for (let i = 0; i < count; i++) {
-    const w = randomInt(1, 2) * C.TILE_SIZE;
-    const h = randomInt(1, 2) * C.TILE_SIZE;
-    const x = randomInt(3, C.dims.rc - 5) * C.TILE_SIZE;
-    const y = randomInt(3, C.dims.rr - 5) * C.TILE_SIZE;
+  if (room.doors.north) zones.push({ x: midX - doorWidth / 2, y: 0, w: doorWidth, h: margin });
+  if (room.doors.south) zones.push({ x: midX - doorWidth / 2, y: C.dims.gh - margin, w: doorWidth, h: margin });
+  if (room.doors.west) zones.push({ x: 0, y: midY - doorWidth / 2, w: margin, h: doorWidth });
+  if (room.doors.east) zones.push({ x: C.dims.gw - margin, y: midY - doorWidth / 2, w: margin, h: doorWidth });
 
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    const midX = C.dims.gw / 2;
-    const midY = C.dims.gh / 2;
-    if ((Math.abs(cx - midX) < 40 && (cy < 40 || cy > C.dims.gh - 40)) ||
-      (Math.abs(cy - midY) < 40 && (cx < 40 || cx > C.dims.gw - 40))) {
-      continue;
+  // Also protect the exact center for special rooms or portals
+  zones.push({ x: midX - 40, y: midY - 40, w: 80, h: 80 });
+
+  return zones;
+}
+
+function rectIntersect(r1: Obstacle, r2: Obstacle): boolean {
+  return !(r2.x >= r1.x + r1.w || r2.x + r2.w <= r1.x || r2.y >= r1.y + r1.h || r2.y + r2.h <= r1.y);
+}
+
+function checkConnectivity(room: DungeonRoom, obstacles: Obstacle[]): boolean {
+  const gridW = Math.floor(C.dims.gw / C.TILE_SIZE);
+  const gridH = Math.floor(C.dims.gh / C.TILE_SIZE);
+  const grid = Array(gridW * gridH).fill(true);
+
+  for (const o of obstacles) {
+    const startX = Math.floor(o.x / C.TILE_SIZE);
+    const startY = Math.floor(o.y / C.TILE_SIZE);
+    const endX = Math.ceil((o.x + o.w) / C.TILE_SIZE);
+    const endY = Math.ceil((o.y + o.h) / C.TILE_SIZE);
+    for (let y = startY; y < endY; y++) {
+      for (let x = startX; x < endX; x++) {
+        if (x >= 0 && x < gridW && y >= 0 && y < gridH) {
+          grid[y * gridW + x] = false;
+        }
+      }
     }
-    obstacles.push({ x, y, w, h });
   }
-  return obstacles;
+
+  const doorNodes: { x: number, y: number }[] = [];
+  if (room.doors.north) doorNodes.push({ x: Math.floor(gridW / 2), y: 1 });
+  if (room.doors.south) doorNodes.push({ x: Math.floor(gridW / 2), y: gridH - 2 });
+  if (room.doors.west) doorNodes.push({ x: 1, y: Math.floor(gridH / 2) });
+  if (room.doors.east) doorNodes.push({ x: gridW - 2, y: Math.floor(gridH / 2) });
+
+  if (doorNodes.length <= 1) return true;
+
+  const start = doorNodes[0];
+  const q = [start];
+  const visited = new Set<string>();
+  visited.add(`${start.x},${start.y}`);
+
+  let foundCount = 0;
+  while (q.length > 0) {
+    const curr = q.shift()!;
+    if (doorNodes.some(d => d.x === curr.x && d.y === curr.y)) {
+      foundCount++;
+    }
+
+    const neighbors = [
+      { x: curr.x + 1, y: curr.y }, { x: curr.x - 1, y: curr.y },
+      { x: curr.x, y: curr.y + 1 }, { x: curr.x, y: curr.y - 1 }
+    ];
+    for (const n of neighbors) {
+      const key = `${n.x},${n.y}`;
+      if (n.x >= 0 && n.x < gridW && n.y >= 0 && n.y < gridH && grid[n.y * gridW + n.x] && !visited.has(key)) {
+        visited.add(key);
+        q.push(n);
+      }
+    }
+  }
+
+  return foundCount === doorNodes.length;
 }
 
 function getEnemyTypes(floor: number): EnemyType[] {
@@ -43,67 +96,297 @@ function getEnemyTypes(floor: number): EnemyType[] {
   return types;
 }
 
+function generatePillars(avoidCenter = false): Obstacle[] {
+  const obstacles: Obstacle[] = [];
+  const rows = [4, 10, 16];
+  const cols = [6, 12, 18, 24];
+
+  for (const r of rows) {
+    if (avoidCenter && Math.abs(r - 10) < 2) continue;
+    for (const c of cols) {
+      if (avoidCenter && Math.abs(c - 15) < 3) continue;
+      if (Math.random() < 0.7) {
+        obstacles.push({
+          x: c * C.TILE_SIZE,
+          y: r * C.TILE_SIZE,
+          w: C.TILE_SIZE * 2,
+          h: C.TILE_SIZE * 2
+        });
+      }
+    }
+  }
+  return obstacles;
+}
+
+function createBrokenWall(x: number, y: number, w: number, h: number, vertical = false): Obstacle[] {
+  const pieces: Obstacle[] = [];
+  const minPiece = 2 * C.TILE_SIZE;
+
+  if (vertical) {
+    let currY = y;
+    while (currY < y + h) {
+      const pieceH = Math.min(y + h - currY, randomInt(3, 6) * C.TILE_SIZE);
+      if (pieceH >= minPiece) {
+        pieces.push({ x: x + randomInt(-2, 2), y: currY, w, h: pieceH });
+      }
+      currY += pieceH + randomInt(1, 2) * C.TILE_SIZE;
+    }
+  } else {
+    let currX = x;
+    while (currX < x + w) {
+      const pieceW = Math.min(x + w - currX, randomInt(4, 8) * C.TILE_SIZE);
+      if (pieceW >= minPiece) {
+        pieces.push({ x: currX, y: y + randomInt(-2, 2), w: pieceW, h });
+      }
+      currX += pieceW + randomInt(1, 2) * C.TILE_SIZE;
+    }
+  }
+  return pieces;
+}
+
+function generateDualWing(room: DungeonRoom): Obstacle[] {
+  const obstacles: Obstacle[] = [];
+  const isHorizontal = Math.random() > 0.5;
+  const wallW = 3 * C.TILE_SIZE;
+  const gap = 6 * C.TILE_SIZE;
+  const midX = C.dims.gw / 2;
+  const midY = C.dims.gh / 2;
+
+  if (isHorizontal) {
+    // Left wings
+    obstacles.push(...createBrokenWall(midX - gap / 2 - wallW, 0, wallW, 7 * C.TILE_SIZE, true));
+    obstacles.push(...createBrokenWall(midX - gap / 2 - wallW, C.dims.gh - 7 * C.TILE_SIZE, wallW, 7 * C.TILE_SIZE, true));
+    // Right wings
+    obstacles.push(...createBrokenWall(midX + gap / 2, 0, wallW, 7 * C.TILE_SIZE, true));
+    obstacles.push(...createBrokenWall(midX + gap / 2, C.dims.gh - 7 * C.TILE_SIZE, wallW, 7 * C.TILE_SIZE, true));
+  } else {
+    // Top wings
+    obstacles.push(...createBrokenWall(0, midY - gap / 2 - wallW, 12 * C.TILE_SIZE, wallW, false));
+    obstacles.push(...createBrokenWall(C.dims.gw - 12 * C.TILE_SIZE, midY - gap / 2 - wallW, 12 * C.TILE_SIZE, wallW, false));
+    // Bottom wings
+    obstacles.push(...createBrokenWall(0, midY + gap / 2, 12 * C.TILE_SIZE, wallW, false));
+    obstacles.push(...createBrokenWall(C.dims.gw - 12 * C.TILE_SIZE, midY + gap / 2, 12 * C.TILE_SIZE, wallW, false));
+  }
+  return obstacles;
+}
+
+function generateCentralHub(room: DungeonRoom): Obstacle[] {
+  const obstacles: Obstacle[] = [];
+  const midX = C.dims.gw / 2;
+  const midY = C.dims.gh / 2;
+  const hubSize = 9 * C.TILE_SIZE;
+  const wallSize = 4 * C.TILE_SIZE;
+
+  const pos = [
+    { x: midX - hubSize / 2 - wallSize, y: midY - hubSize / 2 - wallSize },
+    { x: midX + hubSize / 2, y: midY - hubSize / 2 - wallSize },
+    { x: midX - hubSize / 2 - wallSize, y: midY + hubSize / 2 },
+    { x: midX + hubSize / 2, y: midY + hubSize / 2 },
+  ];
+
+  for (const p of pos) {
+    obstacles.push({ x: p.x, y: p.y, w: wallSize, h: wallSize });
+    if (Math.random() > 0.5) {
+      obstacles.push({ x: p.x + randomInt(-20, 20), y: p.y + randomInt(-20, 20), w: 16, h: 16 });
+    }
+  }
+
+  return obstacles;
+}
+
+function generateSPath(room: DungeonRoom): Obstacle[] {
+  const obstacles: Obstacle[] = [];
+  const barW = 24 * C.TILE_SIZE;
+  const barH = 3 * C.TILE_SIZE;
+
+  obstacles.push(...createBrokenWall(0, 5 * C.TILE_SIZE, barW, barH, false));
+  obstacles.push(...createBrokenWall(C.dims.gw - barW, 12 * C.TILE_SIZE, barW, barH, false));
+
+  return obstacles;
+}
+
+function generateChokeSplit(room: DungeonRoom): Obstacle[] {
+  const obstacles: Obstacle[] = [];
+  const midX = C.dims.gw / 2;
+  const midY = C.dims.gh / 2;
+  const choke = 5 * C.TILE_SIZE;
+  const wallW = 3 * C.TILE_SIZE;
+
+  if (Math.random() > 0.5) {
+    obstacles.push(...createBrokenWall(midX - wallW / 2, 0, wallW, midY - choke / 2, true));
+    obstacles.push(...createBrokenWall(midX - wallW / 2, midY + choke / 2, wallW, C.dims.gh - (midY + choke / 2), true));
+  } else {
+    obstacles.push(...createBrokenWall(0, midY - wallW / 2, midX - choke / 2, wallW, false));
+    obstacles.push(...createBrokenWall(midX + choke / 2, midY - wallW / 2, C.dims.gw - (midX + choke / 2), wallW, false));
+  }
+  return obstacles;
+}
+
+function generateGauntlet(room: DungeonRoom): Obstacle[] {
+  const obstacles: Obstacle[] = [];
+  const wallW = 3 * C.TILE_SIZE;
+  const wallH = 8 * C.TILE_SIZE;
+
+  for (let i = 0; i < 3; i++) {
+    const x = (7 + i * 9) * C.TILE_SIZE;
+    const y = i % 2 === 0 ? 0 : C.dims.gh - wallH;
+    obstacles.push(...createBrokenWall(x, y, wallW, wallH, true));
+  }
+  return obstacles;
+}
+
+
+
+function generateObstacles(room: DungeonRoom): Obstacle[] {
+  if (room.type === 'vendor') {
+    room.layout = 'none';
+    return [];
+  }
+
+  const safeZones = getRoomSafeZones(room);
+  let attempts = 0;
+  const maxAttempts = 15;
+
+  const layouts: RoomLayout[] = ['dual_wing', 'central_hub', 's_path', 'choke_split', 'gauntlet', 'pillars'];
+
+  if (room.type === 'start') {
+    room.layout = 'pillars';
+    return [
+      { x: C.TILE_SIZE * 3, y: C.TILE_SIZE * 3, w: C.TILE_SIZE * 2, h: C.TILE_SIZE * 2 },
+      { x: C.dims.gw - C.TILE_SIZE * 5, y: C.TILE_SIZE * 3, w: C.TILE_SIZE * 2, h: C.TILE_SIZE * 2 },
+      { x: C.TILE_SIZE * 3, y: C.dims.gh - C.TILE_SIZE * 5, w: C.TILE_SIZE * 2, h: C.TILE_SIZE * 2 },
+      { x: C.dims.gw - C.TILE_SIZE * 5, y: C.dims.gh - C.TILE_SIZE * 5, w: C.TILE_SIZE * 2, h: C.TILE_SIZE * 2 },
+    ];
+  }
+
+  while (attempts < maxAttempts) {
+    attempts++;
+    const chosen = room.isBossRoom ? 'pillars' : layouts[randomInt(0, layouts.length - 1)];
+    room.layout = chosen;
+
+    let raw: Obstacle[] = [];
+    switch (chosen) {
+      case 'pillars': raw = generatePillars(room.isBossRoom); break;
+      case 'dual_wing': raw = generateDualWing(room); break;
+      case 'central_hub': raw = generateCentralHub(room); break;
+      case 's_path': raw = generateSPath(room); break;
+      case 'choke_split': raw = generateChokeSplit(room); break;
+      case 'gauntlet': raw = generateGauntlet(room); break;
+    }
+
+    // Filter by safe zones
+    const filtered = raw.filter(o => !safeZones.some(z => rectIntersect(o, z)));
+
+    // Connectivity check: ensure all doors are connected
+    if (checkConnectivity(room, filtered)) {
+      console.log(`[DUNGEON] Valid structural layout generated after ${attempts} attempts: ${chosen} with ${filtered.length} obstacles.`);
+      return filtered;
+    }
+  }
+
+  console.warn(`[DUNGEON] Failed to find completely clear path after ${maxAttempts} attempts. Using fallback (no obstacles).`);
+  return [];
+}
+
 function generateEnemySpawns(room: DungeonRoom, floor: number): EnemySpawn[] {
   if (room.type === 'start') {
-    // Spawn enemies near the player so they're visible in the light radius
     const spawns: EnemySpawn[] = [];
-    const count = 6 + floor;
+    const count = 4 + floor; // fewer enemies in start room to avoid clutter
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2;
-      const dist = 50 + Math.random() * 60; // within visible light radius
+      const dist = 60 + Math.random() * 40;
       spawns.push({
-        type: i < 3 ? 'chaser' : 'swarm',
+        type: i < 2 ? 'chaser' : 'swarm',
         x: C.dims.gw / 2 + Math.cos(angle) * dist,
         y: C.dims.gh / 2 + Math.sin(angle) * dist,
       });
     }
     return spawns;
   }
+
   if (room.isBossRoom) {
-    const spawns: EnemySpawn[] = [
-      { type: 'boss', x: C.dims.gw / 2, y: C.dims.gh / 3 },
+    const spawns: EnemySpawn[] = [{ type: 'boss', x: C.dims.gw / 2, y: C.dims.gh / 2 }];
+    // Add minions in corners
+    const corners = [
+      { x: C.TILE_SIZE * 3, y: C.TILE_SIZE * 3 },
+      { x: C.dims.gw - C.TILE_SIZE * 3, y: C.TILE_SIZE * 3 },
+      { x: C.TILE_SIZE * 3, y: C.dims.gh - C.TILE_SIZE * 3 },
+      { x: C.dims.gw - C.TILE_SIZE * 3, y: C.dims.gh - C.TILE_SIZE * 3 }
     ];
-    // Add minions around the boss
-    const minionCount = 2 + floor;
-    for (let i = 0; i < minionCount; i++) {
-      const angle = (i / minionCount) * Math.PI * 2;
-      spawns.push({
-        type: 'swarm',
-        x: C.dims.gw / 2 + Math.cos(angle) * 60,
-        y: C.dims.gh / 3 + Math.sin(angle) * 40,
-      });
+    for (const corner of corners) {
+      for (let i = 0; i < 2; i++) {
+        spawns.push({
+          type: 'swarm',
+          x: corner.x + (Math.random() - 0.5) * 20,
+          y: corner.y + (Math.random() - 0.5) * 20
+        });
+      }
     }
     return spawns;
   }
 
-  // More enemies! Base 7-12, scaling with floor
-  const count = randomInt(7, 12) + Math.floor(floor * 2);
   const spawns: EnemySpawn[] = [];
   const types = getEnemyTypes(floor);
+  const count = randomInt(8, 14) + Math.floor(floor * 1.5);
 
-  // Sometimes spawn a swarm wave (cluster of swarm enemies)
-  if (Math.random() < 0.4) {
-    const swarmCount = randomInt(5, 9);
-    const cx = randomInt(4, C.dims.rc - 5) * C.TILE_SIZE;
-    const cy = randomInt(4, C.dims.rr - 5) * C.TILE_SIZE;
-    for (let i = 0; i < swarmCount; i++) {
-      spawns.push({
-        type: 'swarm',
-        x: cx + (Math.random() - 0.5) * 50,
-        y: cy + (Math.random() - 0.5) * 50,
+  // Tactical grouping based on layout
+  const regions: Array<{ x: number, y: number, r: number }> = [];
+
+  if (room.layout === 'dual_wing') {
+    regions.push({ x: C.TILE_SIZE * 6, y: C.TILE_SIZE * 6, r: 80 });
+    regions.push({ x: C.dims.gw - C.TILE_SIZE * 6, y: C.dims.gh - C.TILE_SIZE * 6, r: 80 });
+  } else if (room.layout === 'central_hub') {
+    regions.push({ x: C.dims.gw / 2, y: C.dims.gh / 2, r: 100 });
+  } else if (room.layout === 's_path') {
+    regions.push({ x: C.TILE_SIZE * 5, y: C.TILE_SIZE * 10, r: 70 });
+    regions.push({ x: C.dims.gw - C.TILE_SIZE * 5, y: C.TILE_SIZE * 10, r: 70 });
+  } else if (room.layout === 'choke_split') {
+    regions.push({ x: C.TILE_SIZE * 8, y: C.TILE_SIZE * 8, r: 80 });
+    regions.push({ x: C.dims.gw - C.TILE_SIZE * 8, y: C.dims.gh - C.TILE_SIZE * 8, r: 80 });
+  } else if (room.layout === 'gauntlet') {
+    const midY = C.dims.gh / 2;
+    regions.push({ x: 12 * C.TILE_SIZE, y: midY, r: 60 });
+    regions.push({ x: 22 * C.TILE_SIZE, y: midY, r: 60 });
+  } else {
+    // Default: split into 2-3 random clusters in open spaces
+    const clusterCount = 3;
+    for (let i = 0; i < clusterCount; i++) {
+      regions.push({
+        x: randomInt(6, C.dims.rc - 6) * C.TILE_SIZE,
+        y: randomInt(6, C.dims.rr - 6) * C.TILE_SIZE,
+        r: 80
       });
     }
   }
 
-  for (let i = spawns.length; i < count; i++) {
+  console.log(`[SPAWN] Room Layout: ${room.layout}, Regions: ${regions.length}, Enemy Count: ${count}`);
+
+  let attempts = 0;
+  while (spawns.length < count && attempts < count * 3) {
+    attempts++;
+    const reg = regions[randomInt(0, regions.length - 1)];
     const type = types[randomInt(0, types.length - 1)];
-    // Spawn enemies closer to center so they're visible in the light
     const angle = Math.random() * Math.PI * 2;
-    const dist = 40 + Math.random() * 90;
-    const x = Math.max(C.TILE_SIZE * 2, Math.min(C.dims.gw - C.TILE_SIZE * 2, C.dims.gw / 2 + Math.cos(angle) * dist));
-    const y = Math.max(C.TILE_SIZE * 2, Math.min(C.dims.gh - C.TILE_SIZE * 2, C.dims.gh / 2 + Math.sin(angle) * dist));
-    spawns.push({ type, x, y });
+    const dist = Math.random() * reg.r;
+
+    let x = reg.x + Math.cos(angle) * dist;
+    let y = reg.y + Math.sin(angle) * dist;
+
+    // Clamp
+    x = Math.max(C.TILE_SIZE * 2, Math.min(C.dims.gw - C.TILE_SIZE * 2, x));
+    y = Math.max(C.TILE_SIZE * 2, Math.min(C.dims.gh - C.TILE_SIZE * 2, y));
+
+    // Avoid spawning inside obstacles
+    const inObstacle = room.obstacles.some(o =>
+      x > o.x - 10 && x < o.x + o.w + 10 &&
+      y > o.y - 10 && y < o.y + o.h + 10
+    );
+
+    if (!inObstacle) {
+      spawns.push({ type, x, y });
+    }
   }
+
   return spawns;
 }
 
@@ -176,7 +459,7 @@ export function generateDungeon(floor: number): DungeonMap {
     const isBoss = pos.x === bossPos.x && pos.y === bossPos.y && !isStart;
     const specialType = specialAssign.get(idx);
 
-    let roomType: DungeonRoom['type'] = isStart ? 'start' : isBoss ? 'boss' : specialType || 'normal';
+    const roomType: DungeonRoom['type'] = isStart ? 'start' : isBoss ? 'boss' : specialType || 'normal';
 
     const room: DungeonRoom = {
       gridX: pos.x, gridY: pos.y,
@@ -223,6 +506,9 @@ export function generateDungeon(floor: number): DungeonMap {
     rooms.set(key, room);
   }
 
+  rooms.forEach((r, k) => {
+    if (r.obstacles.length > 0) console.log(`[DUNGEON] Room ${k} generated with ${r.obstacles.length} obstacles.`);
+  });
   return { rooms, currentRoomKey: roomKey(center, center), floor };
 }
 

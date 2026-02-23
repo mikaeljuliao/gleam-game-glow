@@ -112,7 +112,7 @@ export function updateCombatTension(enemyCount: number, closestEnemyDist: number
   } else if (combatDroneOsc && combatDroneGain) {
     combatDroneGain.gain.setTargetAtTime(0, ctx.currentTime, 0.3);
     setTimeout(() => {
-      try { combatDroneOsc?.stop(); } catch { }
+      try { combatDroneOsc?.stop(); } catch (e) { /* ignore already stopped */ }
       combatDroneOsc = null;
       combatDroneGain = null;
     }, 1000);
@@ -271,7 +271,11 @@ export function stopVendorAmbience() {
   vendorMelodyTimer = null;
   setTimeout(() => {
     for (const node of vendorNodes) {
-      try { if ('stop' in node && typeof (node as any).stop === 'function') (node as OscillatorNode).stop(); } catch { }
+      try {
+        if (node instanceof OscillatorNode || node instanceof AudioBufferSourceNode) {
+          node.stop();
+        }
+      } catch (e) { /* ignore */ }
     }
     vendorNodes = [];
   }, 2000);
@@ -296,7 +300,7 @@ export function stopBackgroundMusic() {
   ambienceTimers.forEach(clearTimeout);
   ambienceTimers = [];
   if (combatDroneOsc) {
-    try { combatDroneOsc.stop(); } catch { }
+    try { combatDroneOsc.stop(); } catch (e) { /* ignore */ }
     combatDroneOsc = null;
     combatDroneGain = null;
   }

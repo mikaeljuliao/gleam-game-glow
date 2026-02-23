@@ -148,8 +148,8 @@ export function tryFragSplit(proj: ProjectileState): ProjectileState[] {
     if (proj.projectileKind !== 'boss_frag') return [];
     const ratio = proj.lifetime / proj.maxLifetime;
     // Only split once, exactly when crossing the 60% elapsed mark
-    if (ratio > 0.6 || (proj as any)._split) return [];
-    (proj as any)._split = true;
+    if (ratio > 0.6 || proj._split) return [];
+    proj._split = true;
 
     const speed = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy);
     const baseAngle = Math.atan2(proj.vy, proj.vx);

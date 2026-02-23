@@ -84,7 +84,7 @@ function normalize(dx: number, dy: number): Vec2 {
 function updateBoss1(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy: number, dist: number, dt: number, projectiles: ProjectileState[]) {
   if (e.stateTimer <= 0) {
     const phases: Array<'chase' | 'attack' | 'idle'> = ['chase', 'attack', 'chase', 'idle'];
-    const idx = phases.indexOf(e.aiState as any);
+    const idx = phases.indexOf(e.aiState as 'chase' | 'attack' | 'idle');
     e.aiState = phases[((idx < 0 ? -1 : idx) + 1) % phases.length];
     e.stateTimer = e.aiState === 'attack' ? 2.5 : e.aiState === 'chase' ? 2 : 0.8;
   }
@@ -123,9 +123,9 @@ function updateBoss1(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
 function updateBoss2(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy: number, dist: number, dt: number, projectiles: ProjectileState[]) {
   if (e.stateTimer <= 0) {
     const phases = ['chase', 'charge', 'attack', 'chase', 'charge'] as const;
-    const idx = phases.indexOf(e.aiState as any);
+    const idx = phases.indexOf(e.aiState as 'chase' | 'charge' | 'attack');
     const next = (idx + 1) % phases.length;
-    e.aiState = phases[next] as any;
+    e.aiState = phases[next];
     e.stateTimer = e.aiState === 'charge' ? 0.4 : e.aiState === 'attack' ? 1.5 : 1.2;
 
     if (e.aiState === 'charge') {
@@ -257,9 +257,9 @@ function updateBoss3(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
 function updateBoss4(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy: number, dist: number, dt: number, projectiles: ProjectileState[]) {
   if (e.stateTimer <= 0) {
     const phases = ['teleport', 'attack', 'teleport', 'chase', 'teleport', 'attack'] as const;
-    const idx = phases.indexOf(e.aiState as any);
+    const idx = phases.indexOf(e.aiState as 'teleport' | 'attack' | 'chase');
     const next = (idx + 1) % phases.length;
-    e.aiState = phases[next] as any;
+    e.aiState = phases[next];
     e.stateTimer = e.aiState === 'teleport' ? 0.8 : e.aiState === 'attack' ? 1.5 : 1.0;
 
     if (e.aiState === 'teleport') {
@@ -317,9 +317,9 @@ function updateBoss4(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
 function updateBoss5(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy: number, dist: number, dt: number, projectiles: ProjectileState[]) {
   if (e.stateTimer <= 0) {
     const phases = ['chase', 'attack', 'charge', 'attack', 'chase'] as const;
-    const idx = phases.indexOf(e.aiState as any);
+    const idx = phases.indexOf(e.aiState as 'chase' | 'attack' | 'charge');
     const next = (idx + 1) % phases.length;
-    e.aiState = phases[next] as any;
+    e.aiState = phases[next];
     e.stateTimer = e.aiState === 'charge' ? 0.6 : e.aiState === 'attack' ? 2.0 : 1.5;
 
     if (e.aiState === 'charge') {
@@ -440,7 +440,7 @@ function updateBoss6(e: EnemyState, player: PlayerState, n: Vec2, dx: number, dy
         const a = (i / count) * Math.PI * 2 + e.wobble * 2;
         const explo = i % 3 === 0;
         projectiles.push(makeBossOrbProjectile(e.x, e.y, a, e.damage, C.SHOOTER_PROJ_SPEED * 0.9, 4));
-        if (explo) (projectiles[projectiles.length - 1] as any).explosive = true;
+        if (explo) projectiles[projectiles.length - 1].explosive = true;
       }
       // Aimed piercing void shot
       projectiles.push(makeBossVoidProjectile(e.x, e.y, angle, Math.floor(e.damage * 1.5)));

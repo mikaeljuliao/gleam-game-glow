@@ -1,55 +1,75 @@
 export interface Biome {
     name: string;
-    floor: string;      // Main slab color
-    floorAlt: string;   // Secondary slab variation
-    seam: string;       // Mortar/crack color
-    wall: string;       // Side wall base
-    wallTop: string;    // Top architectural face
-    wallDetail: string; // Bricks/lines on walls
-    accent: string;     // Torches/Glow color
-    accentGlow: string; // Torch light color
+    theme: 'crystal' | 'forest' | 'volcano';
+    floor: string;
+    floorAlt: string;
+    seam: string;
+    wall: string;
+    wallTop: string;
+    wallDetail: string;
+    accent: string;
+    accentGlow: string;
     detail: string;     // Moss/Ash/Rust
+    fog: string;        // Atmospheric fog color
+    rays: string;       // God ray color
+    bgLayer1: string;   // Closest background layer
+    bgLayer2: string;   // Furthest background layer
 }
 
 export const BIOMES: Biome[] = [
     {
         // Floors 1-2
         name: "Cripta Submersa",
-        floor: "#1a1a24",
-        floorAlt: "#1e1e2a",
-        seam: "#0d0d12",
-        wall: "#252538",
-        wallTop: "#32324d",
-        wallDetail: "#181825",
-        accent: "#66ccff",
-        accentGlow: "rgba(80, 180, 255, 0.15)",
-        detail: "rgba(40, 60, 80, 0.3)" // Cold condensation / faint moss
+        theme: 'crystal',
+        floor: "#12121e",
+        floorAlt: "#161628",
+        seam: "#080810",
+        wall: "#1c1c30",
+        wallTop: "#2a2a45",
+        wallDetail: "#0f0f1a",
+        accent: "#4fd1ff",
+        accentGlow: "rgba(79, 209, 255, 0.2)",
+        detail: "rgba(100, 180, 255, 0.4)",
+        fog: "rgba(10, 15, 30, 0.7)",
+        rays: "rgba(100, 220, 255, 0.1)",
+        bgLayer1: "#0a0a1a",
+        bgLayer2: "#050510"
     },
     {
         // Floors 3-4
         name: "Arquivos Esquecidos",
-        floor: "#2a241a",
-        floorAlt: "#2d281e",
-        seam: "#1a160e",
-        wall: "#3d3225",
-        wallTop: "#4d4032",
-        wallDetail: "#251e16",
-        accent: "#aaff44",
-        accentGlow: "rgba(150, 255, 80, 0.15)",
-        detail: "rgba(60, 100, 40, 0.4)" // Overgrown moss / vines
+        theme: 'forest',
+        floor: "#1e1a12",
+        floorAlt: "#252016",
+        seam: "#0f0d08",
+        wall: "#2d251a",
+        wallTop: "#3d3225",
+        wallDetail: "#1a160e",
+        accent: "#99ff55",
+        accentGlow: "rgba(153, 255, 85, 0.2)",
+        detail: "rgba(74, 138, 59, 0.5)",
+        fog: "rgba(15, 20, 10, 0.6)",
+        rays: "rgba(180, 255, 120, 0.08)",
+        bgLayer1: "#141a0e",
+        bgLayer2: "#0a0d07"
     },
     {
         // Floors 5-6
         name: "Abismo de Lava",
-        floor: "#181010",
-        floorAlt: "#1d1212",
-        seam: "#0a0505",
-        wall: "#2a1515",
-        wallTop: "#3a1d1d",
-        wallDetail: "#1a0a0a",
-        accent: "#ff5500",
-        accentGlow: "rgba(255, 80, 0, 0.2)",
-        detail: "rgba(255, 50, 0, 0.1)" // Ash / Heat glow
+        theme: 'volcano',
+        floor: "#120a0a",
+        floorAlt: "#181010",
+        seam: "#050202",
+        wall: "#251212",
+        wallTop: "#351a1a",
+        wallDetail: "#120505",
+        accent: "#ff3300",
+        accentGlow: "rgba(255, 51, 0, 0.3)",
+        detail: "rgba(255, 100, 0, 0.2)",
+        fog: "rgba(25, 10, 5, 0.8)",
+        rays: "rgba(255, 120, 50, 0.12)",
+        bgLayer1: "#1a0808",
+        bgLayer2: "#100404"
     }
 ];
 

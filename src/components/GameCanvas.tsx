@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { GameEngine } from '@/game/engine';
-import { GameCallbacks, Upgrade, Synergy, GameStats, ShopItem } from '@/game/types';
+import { GameCallbacks, Upgrade, Synergy, GameStats, ShopItem, Portal } from '@/game/types';
 import MobileHUD from './MobileHUD';
 
 interface GameCanvasProps {
@@ -17,7 +17,7 @@ interface GameCanvasProps {
   onOpenMap: () => void;
   onSanctuaryOpen: () => void;
   onSanctuaryClose: () => void;
-  onPortalEnter?: (portal: any) => void;
+  onPortalEnter?: (portal: Portal) => void;
   engineRef: React.MutableRefObject<GameEngine | null>;
 }
 

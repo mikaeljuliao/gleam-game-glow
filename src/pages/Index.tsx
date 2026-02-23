@@ -10,7 +10,7 @@ import AmuletReveal from '@/components/AmuletReveal';
 import SanctuaryOverlay from '@/components/SanctuaryOverlay';
 import { GameEngine } from '@/game/engine';
 import { initAudio, SFX } from '@/game/audio';
-import { Upgrade, Synergy, GameStats, ShopItem, DungeonMap } from '@/game/types';
+import { Upgrade, Synergy, GameStats, ShopItem, DungeonMap, Portal } from '@/game/types';
 import { hasSave, clearSave } from '@/game/save';
 import { AmuletInventory, createAmuletInventory, addAmulet, toggleEquip, getAmuletDef, isAmuletEquipped, addConsumable, toggleEquipConsumable } from '@/game/amulets';
 
@@ -68,8 +68,8 @@ const Index = () => {
   const handleUpgradeSelect = useCallback((upgrade: Upgrade) => {
     engineRef.current?.applyUpgrade(upgrade);
     // If boss room was just cleared, spawn exit portal after upgrade selection
-    if (engineRef.current && (engineRef.current as any).pendingNextFloor) {
-      (engineRef.current as any).spawnExitPortal();
+    if (engineRef.current && engineRef.current.pendingNextFloor) {
+      engineRef.current.spawnExitPortal();
     }
     setGameState('playing');
   }, []);
@@ -136,7 +136,7 @@ const Index = () => {
       setAmuletNotif(`🔮 Amuleto obtido: ${def.icon} ${def.name}`);
       setTimeout(() => setAmuletNotif(null), 4000);
     }
-  }, []);
+  }, [syncInventoryFromEngine]);
 
   // Boss kill amulet reveal sequence
   const handleAmuletReveal = useCallback((amuletId: string) => {
@@ -150,7 +150,7 @@ const Index = () => {
     // Sync amulet inventory from engine → React state
     syncInventoryFromEngine();
     if (engineRef.current) {
-      (engineRef.current as any).handleBossLevelUp();
+      engineRef.current.handleBossLevelUp();
     }
   }, [syncInventoryFromEngine]);
 
@@ -220,7 +220,7 @@ const Index = () => {
     engineRef.current?.closeSanctuary();
   }, []);
 
-  const handlePortalEnter = useCallback((portal: any) => {
+  const handlePortalEnter = useCallback((portal: Portal) => {
     // Add any global UI effects or narrations here if needed
     console.log(`[INDEX] Player entered portal: ${portal.id}`);
   }, []);
@@ -244,15 +244,17 @@ const Index = () => {
   useEffect(() => {
     if (loadSave && engineRef.current) {
       engineRef.current.loadFromSave();
+      syncInventoryFromEngine();
       setLoadSave(false);
     } else if (devFloor && engineRef.current) {
       engineRef.current.startAtFloor(devFloor);
+      syncInventoryFromEngine();
       setDevFloor(null);
     } else if (engineRef.current && !loadSave && !devFloor) {
       // It's a fresh New Game
       engineRef.current.startNewGame();
     }
-  }, [loadSave, devFloor, gameKey]);
+  }, [loadSave, devFloor, gameKey, syncInventoryFromEngine]);
 
   // Keyboard shortcut for inventory and cartographer map
   useEffect(() => {
