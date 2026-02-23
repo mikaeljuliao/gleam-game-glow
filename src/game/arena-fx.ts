@@ -1,5 +1,6 @@
 // Arena visual effects — ambient particles, combat marks, enhanced atmosphere
 import * as C from './constants';
+import { getBiome } from './biomes';
 
 // ============ AMBIENT PARTICLES ============
 // Dust motes, torch embers, ground fog
@@ -95,19 +96,21 @@ export function resetArenaFX() {
 
 // ============ UPDATE ============
 
-export function updateArenaFX(dt: number, time: number, playerX: number, playerY: number, torchPositions: { x: number; y: number }[]) {
+export function updateArenaFX(dt: number, time: number, playerX: number, playerY: number, torchPositions: { x: number; y: number }[], floor = 1) {
   if (!initialized) initArenaFX();
+  const biome = getBiome(floor);
 
-  // --- Dust motes ---
-  if (dustMotes.length < MAX_DUST && Math.random() < 0.15) {
+  // --- Dust motes / Snowflakes ---
+  if (dustMotes.length < MAX_DUST && Math.random() < 0.2) {
+    const isCrystal = biome.theme === 'crystal';
     dustMotes.push({
       x: rng(C.TILE_SIZE, C.dims.gw - C.TILE_SIZE),
       y: rng(C.TILE_SIZE, C.dims.gh - C.TILE_SIZE),
       vx: rng(-4, 4),
-      vy: rng(-6, -1),
-      size: rng(0.5, 1.5),
-      alpha: rng(0.1, 0.3),
-      life: rng(3, 7),
+      vy: isCrystal ? rng(10, 30) : rng(-6, -1), // Snow falls down
+      size: isCrystal ? rng(1, 2) : rng(0.5, 1.5),
+      alpha: rng(0.1, 0.4),
+      life: isCrystal ? rng(4, 8) : rng(3, 7),
       maxLife: 0,
     });
     dustMotes[dustMotes.length - 1].maxLife = dustMotes[dustMotes.length - 1].life;
@@ -119,19 +122,20 @@ export function updateArenaFX(dt: number, time: number, playerX: number, playerY
     d.y += d.vy * dt;
     d.vx += Math.sin(time * 2 + d.y * 0.1) * 0.5 * dt;
     d.life -= dt;
-    if (d.life <= 0 || d.x < 0 || d.x > C.dims.gw || d.y < 0) {
+    if (d.life <= 0 || d.x < 0 || d.x > C.dims.gw || d.y > C.dims.gh) {
       dustMotes.splice(i, 1);
     }
   }
 
-  // --- Embers from torches ---
+  // --- Embers / Frost Sparkles from torches ---
   if (embers.length < MAX_EMBERS && torchPositions.length > 0 && Math.random() < 0.2) {
     const torch = torchPositions[Math.floor(Math.random() * torchPositions.length)];
+    const isCrystal = biome.theme === 'crystal';
     embers.push({
       x: torch.x + rng(-3, 3),
       y: torch.y - 5,
       vx: rng(-8, 8),
-      vy: rng(-20, -8),
+      vy: isCrystal ? rng(5, 15) : rng(-20, -8), // Frost sinks, embers rise
       size: rng(0.5, 1.8),
       alpha: rng(0.4, 0.9),
       life: rng(1, 3),
@@ -145,7 +149,11 @@ export function updateArenaFX(dt: number, time: number, playerX: number, playerY
     const e = embers[i];
     e.x += e.vx * dt;
     e.y += e.vy * dt;
-    e.vy += 5 * dt; // slight gravity pull back
+    if (biome.theme === 'crystal') {
+      e.vy += 15 * dt; // sink faster
+    } else {
+      e.vy += 5 * dt; // slight gravity pull back
+    }
     e.vx += Math.sin(time * 5 + e.x) * 2 * dt;
     e.life -= dt;
     e.bright *= 0.98;
@@ -156,22 +164,26 @@ export function updateArenaFX(dt: number, time: number, playerX: number, playerY
 
   // --- Ground fog drift ---
   for (const f of groundFog) {
+    if (biome.theme === 'crystal') {
+      f.radius = rng(30, 70); // Wider cold mist
+    }
     f.x += f.drift * dt;
     if (f.x < -f.radius) f.x = C.dims.gw + f.radius;
     if (f.x > C.dims.gw + f.radius) f.x = -f.radius;
   }
 
-  // --- Torch smoke ---
-  if (torchSmoke.length < MAX_SMOKE && torchPositions.length > 0 && Math.random() < 0.12) {
+  // --- Torch smoke / Cold Breath ---
+  if (torchSmoke.length < MAX_SMOKE && torchPositions.length > 0 && Math.random() < 0.15) {
     const torch = torchPositions[Math.floor(Math.random() * torchPositions.length)];
+    const isCrystal = biome.theme === 'crystal';
     torchSmoke.push({
       x: torch.x + rng(-2, 2),
       y: torch.y - 6,
-      vx: rng(-3, 3),
-      vy: rng(-12, -5),
-      size: rng(3, 6),
-      alpha: rng(0.03, 0.08),
-      life: rng(1.5, 3),
+      vx: rng(-2, 2),
+      vy: isCrystal ? rng(1, 4) : rng(-12, -5), // Cold breath sinks
+      size: isCrystal ? rng(4, 8) : rng(3, 6),
+      alpha: isCrystal ? rng(0.1, 0.2) : rng(0.03, 0.08),
+      life: rng(2, 4),
     });
   }
 
@@ -179,8 +191,8 @@ export function updateArenaFX(dt: number, time: number, playerX: number, playerY
     const s = torchSmoke[i];
     s.x += s.vx * dt;
     s.y += s.vy * dt;
-    s.size += 3 * dt;
-    s.alpha *= 0.97;
+    s.size += 2 * dt;
+    s.alpha *= 0.98;
     s.life -= dt;
     if (s.life <= 0 || s.alpha < 0.005) {
       torchSmoke.splice(i, 1);
@@ -238,9 +250,9 @@ export function spawnImpactMark(_x: number, _y: number) {
 
 // ============ RENDER — FLOOR LAYER (before entities) ============
 
-export function renderArenaFloorFX(ctx: CanvasRenderingContext2D, time: number) {
+export function renderArenaFloorFX(ctx: CanvasRenderingContext2D, time: number, floor = 1) {
   // --- Enhanced floor decorations ---
-  renderFloorDecorations(ctx, time);
+  renderFloorDecorations(ctx, time, floor);
 
   // --- Combat marks on floor (only blood) ---
   for (const m of combatMarks) {
@@ -262,12 +274,21 @@ export function renderArenaFloorFX(ctx: CanvasRenderingContext2D, time: number) 
   }
 
   // --- Ground fog ---
+  const biome = getBiome(floor);
   for (const f of groundFog) {
     const pulse = Math.sin(time * 0.8 + f.phase) * 0.3 + 0.7;
     const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.radius);
-    grad.addColorStop(0, `rgba(25, 22, 40, ${f.alpha * pulse})`);
-    grad.addColorStop(0.5, `rgba(20, 18, 35, ${f.alpha * pulse * 0.4})`);
-    grad.addColorStop(1, 'rgba(15, 12, 25, 0)');
+
+    if (biome.theme === 'crystal') {
+      // Cold frozen mist
+      grad.addColorStop(0, `rgba(200, 230, 255, ${f.alpha * pulse * 1.5})`);
+      grad.addColorStop(0.5, `rgba(150, 200, 255, ${f.alpha * pulse * 0.6})`);
+      grad.addColorStop(1, 'rgba(100, 150, 255, 0)');
+    } else {
+      grad.addColorStop(0, `rgba(25, 22, 40, ${f.alpha * pulse})`);
+      grad.addColorStop(0.5, `rgba(20, 18, 35, ${f.alpha * pulse * 0.4})`);
+      grad.addColorStop(1, 'rgba(15, 12, 25, 0)');
+    }
     ctx.fillStyle = grad;
     ctx.fillRect(f.x - f.radius, f.y - f.radius, f.radius * 2, f.radius * 2);
   }
@@ -275,14 +296,22 @@ export function renderArenaFloorFX(ctx: CanvasRenderingContext2D, time: number) 
 
 // ============ RENDER — OVERLAY LAYER (after entities, before lighting) ============
 
-export function renderArenaOverlayFX(ctx: CanvasRenderingContext2D, time: number) {
+export function renderArenaOverlayFX(ctx: CanvasRenderingContext2D, time: number, floor = 1) {
+  const biome = getBiome(floor);
   // --- Dust motes (glow when in light) ---
   for (const d of dustMotes) {
     const fadeIn = Math.min(1, (d.maxLife - d.life) / 0.5);
     const fadeOut = Math.min(1, d.life / 1);
     const alpha = d.alpha * fadeIn * fadeOut;
     const pulse = Math.sin(time * 3 + d.x) * 0.3 + 0.7;
-    ctx.fillStyle = `rgba(200, 190, 170, ${alpha * pulse})`;
+
+    if (biome.theme === 'crystal') {
+      // Snowflakes / Frost motes
+      ctx.fillStyle = `rgba(220, 240, 255, ${alpha * pulse * 1.5})`;
+    } else {
+      ctx.fillStyle = `rgba(200, 190, 170, ${alpha * pulse})`;
+    }
+
     ctx.beginPath();
     ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2);
     ctx.fill();
@@ -319,7 +348,8 @@ export function renderArenaOverlayFX(ctx: CanvasRenderingContext2D, time: number
 
 // ============ ENHANCED FLOOR DECORATIONS ============
 
-function renderFloorDecorations(ctx: CanvasRenderingContext2D, time: number) {
+function renderFloorDecorations(ctx: CanvasRenderingContext2D, time: number, floor = 1) {
+  const biome = getBiome(floor);
   const gw = C.dims.gw;
   const gh = C.dims.gh;
   const cx = gw / 2;
@@ -362,6 +392,15 @@ function renderFloorDecorations(ctx: CanvasRenderingContext2D, time: number) {
   ctx.lineTo(cx - diag, cy + diag);
   ctx.stroke();
 
+  if (biome.theme === 'crystal') {
+    // FROZEN RUNE GLOW
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = biome.accent;
+    ctx.strokeStyle = `rgba(180, 240, 255, ${runeAlpha * 2})`;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
   // --- Large floor cracks (organic, spanning multiple tiles) ---
   ctx.strokeStyle = 'rgba(20, 18, 30, 0.25)';
   ctx.lineWidth = 0.8;
@@ -383,36 +422,60 @@ function renderFloorDecorations(ctx: CanvasRenderingContext2D, time: number) {
   ctx.stroke();
 
   // --- Moisture patches (darker, subtle wet spots) ---
-  const moistureSpots = [
-    { x: gw * 0.12, y: gh * 0.7, r: 12 },
-    { x: gw * 0.85, y: gh * 0.3, r: 10 },
-    { x: gw * 0.4, y: gh * 0.85, r: 14 },
-    { x: gw * 0.7, y: gh * 0.15, r: 8 },
-  ];
-  for (const m of moistureSpots) {
-    const grad = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r);
-    grad.addColorStop(0, 'rgba(15, 18, 25, 0.15)');
-    grad.addColorStop(0.6, 'rgba(15, 18, 25, 0.06)');
-    grad.addColorStop(1, 'rgba(15, 18, 25, 0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(m.x - m.r, m.y - m.r, m.r * 2, m.r * 2);
+  if (biome.theme !== 'crystal') {
+    const moistureSpots = [
+      { x: gw * 0.12, y: gh * 0.7, r: 12 },
+      { x: gw * 0.85, y: gh * 0.3, r: 10 },
+      { x: gw * 0.4, y: gh * 0.85, r: 14 },
+      { x: gw * 0.7, y: gh * 0.15, r: 8 },
+    ];
+    for (const m of moistureSpots) {
+      const grad = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r);
+      grad.addColorStop(0, 'rgba(15, 18, 25, 0.15)');
+      grad.addColorStop(0.6, 'rgba(15, 18, 25, 0.06)');
+      grad.addColorStop(1, 'rgba(15, 18, 25, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(m.x - m.r, m.y - m.r, m.r * 2, m.r * 2);
+    }
+  } else {
+    // ICE PATCHES (Slippery looking white gradients)
+    const iceSpots = [
+      { x: gw * 0.15, y: gh * 0.2, r: 20 },
+      { x: gw * 0.75, y: gh * 0.8, r: 25 },
+      { x: gw * 0.3, y: gh * 0.6, r: 15 },
+    ];
+    for (const m of iceSpots) {
+      const grad = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 0.12)');
+      grad.addColorStop(0.7, 'rgba(200, 240, 255, 0.05)');
+      grad.addColorStop(1, 'rgba(200, 240, 255, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(m.x - m.r, m.y - m.r, m.r * 2, m.r * 2);
+    }
   }
 
   // --- Moss/lichen patches along walls ---
-  const wallMoss = [
-    { x: C.TILE_SIZE * 3, y: C.TILE_SIZE + 2, w: 15, h: 4 },
-    { x: C.TILE_SIZE * 8, y: gh - C.TILE_SIZE - 3, w: 12, h: 3 },
-    { x: C.TILE_SIZE + 2, y: C.TILE_SIZE * 5, w: 4, h: 10 },
-    { x: gw - C.TILE_SIZE - 3, y: C.TILE_SIZE * 8, w: 3, h: 12 },
-    { x: C.TILE_SIZE * 14, y: C.TILE_SIZE + 1, w: 18, h: 3 },
-    { x: C.TILE_SIZE * 20, y: gh - C.TILE_SIZE - 2, w: 10, h: 3 },
-  ];
-  for (const m of wallMoss) {
-    ctx.fillStyle = 'rgba(20, 45, 25, 0.12)';
-    ctx.fillRect(m.x, m.y, m.w, m.h);
-    // Slightly brighter spots
-    ctx.fillStyle = 'rgba(30, 55, 30, 0.07)';
-    ctx.fillRect(m.x + 2, m.y, m.w * 0.5, m.h * 0.6);
+  if (biome.theme !== 'crystal') {
+    const wallMoss = [
+      { x: C.TILE_SIZE * 3, y: C.TILE_SIZE + 2, w: 15, h: 4 },
+      { x: C.TILE_SIZE * 8, y: gh - C.TILE_SIZE - 3, w: 12, h: 3 },
+      { x: C.TILE_SIZE + 2, y: C.TILE_SIZE * 5, w: 4, h: 10 },
+      { x: gw - C.TILE_SIZE - 3, y: C.TILE_SIZE * 8, w: 3, h: 12 },
+      { x: C.TILE_SIZE * 14, y: C.TILE_SIZE + 1, w: 18, h: 3 },
+      { x: C.TILE_SIZE * 20, y: gh - C.TILE_SIZE - 2, w: 10, h: 3 },
+    ];
+    for (const m of wallMoss) {
+      ctx.fillStyle = 'rgba(20, 45, 25, 0.12)';
+      ctx.fillRect(m.x, m.y, m.w, m.h);
+      // Slightly brighter spots
+      ctx.fillStyle = 'rgba(30, 55, 30, 0.07)';
+      ctx.fillRect(m.x + 2, m.y, m.w * 0.5, m.h * 0.6);
+    }
+  } else {
+    // FROZEN EDGES
+    ctx.fillStyle = 'rgba(200, 240, 255, 0.15)';
+    ctx.fillRect(0, C.TILE_SIZE, gw, 2);
+    ctx.fillRect(0, gh - C.TILE_SIZE - 2, gw, 2);
   }
 
   // --- Scattered stone chips (away from center) ---

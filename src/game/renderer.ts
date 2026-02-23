@@ -54,12 +54,18 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
   for (let i = -1; i < Math.ceil(rw / 400) + 1; i++) {
     const x = i * 400 + p2x - gox;
     if (biome.theme === 'crystal') {
-      // Distant icy peaks
-      ctx.beginPath();
-      ctx.moveTo(x, rh - goy);
-      ctx.lineTo(x + 200, rh - goy - 150);
-      ctx.lineTo(x + 400, rh - goy);
-      ctx.fill();
+      // Sharp ice stalagmite silhouettes — NOT water, but frozen spires
+      for (let s = 0; s < 6; s++) {
+        const sx = x + s * 68 + ((s * 31) % 40);
+        const sh = 60 + (s * 47) % 80;
+        ctx.beginPath();
+        ctx.moveTo(sx, rh - goy);
+        ctx.lineTo(sx + 14, rh - goy - sh);
+        ctx.lineTo(sx + 6, rh - goy - sh + 10);
+        ctx.lineTo(sx + 26, rh - goy - sh);
+        ctx.lineTo(sx + 34, rh - goy);
+        ctx.fill();
+      }
     } else if (biome.theme === 'volcano') {
       // Volcanic ridges
       ctx.beginPath();
@@ -112,6 +118,17 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
         ctx.arc(x + ts / 2, y + ts / 2, 8, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 1.0;
+      }
+
+      // ICE BIOME: Stalactite sprite on top-border wall rows
+      if (biome.theme === 'crystal' && row < 0 && hash % 4 === 0) {
+        const icicle = getSprite('/sprits-cenario-6.png');
+        if (icicle.complete && icicle.naturalWidth > 0) {
+          ctx.save();
+          ctx.globalAlpha = 0.25 + (hash % 10) * 0.03;
+          ctx.drawImage(icicle, x - 2, y, ts + 4, ts * 1.5);
+          ctx.restore();
+        }
       }
     }
   }
@@ -208,6 +225,92 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
           ctx.fillRect(x + 2, y + ts - 6, ts - 4, 4);
           ctx.globalAlpha = 1.0;
         }
+
+        // --- ENHANCED PROCEDURAL FLOOR DETAILS ---
+        if (biome.theme === 'crystal' && slabID % 7 === 0) {
+          // ICE FROST CRACKS — glowing frozen veins in the stone
+          const crackPulse = 0.5 + Math.sin(time * 0.8 + slabID * 0.7) * 0.5;
+          const crackAlpha = 0.15 + crackPulse * 0.25;
+          ctx.save();
+          ctx.shadowBlur = 6 * crackPulse;
+          ctx.shadowColor = `rgba(140, 240, 255, 0.9)`;
+          ctx.strokeStyle = `rgba(200, 250, 255, ${crackAlpha})`;
+          ctx.lineWidth = 1.0;
+          // branching frost pattern
+          const cx2 = x + (slabID % ts);
+          const cy2 = y + ((slabID * 3) % ts);
+          ctx.beginPath();
+          ctx.moveTo(cx2, cy2);
+          ctx.lineTo(cx2 + 8 * (slabID % 2 === 0 ? 1 : -1), cy2 - 10);
+          ctx.moveTo(cx2, cy2);
+          ctx.lineTo(cx2 + 5, cy2 + 7);
+          ctx.stroke();
+          // Crystalline sparkle point
+          if (slabID % 21 === 0) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + crackPulse * 0.5})`;
+            ctx.fillRect(cx2 - 1, cy2 - 1, 2, 2);
+          }
+          ctx.restore();
+        } else if (biome.theme === 'crystal' && slabID % 13 === 0) {
+          // FROZEN SLICKS — Shiny, slippery patches of ice
+          const slickAlpha = 0.1 + Math.sin(time * 0.4 + slabID) * 0.05;
+          const g = ctx.createLinearGradient(x, y, x + ts, y + ts);
+          g.addColorStop(0, `rgba(200, 240, 255, ${slickAlpha})`);
+          g.addColorStop(0.5, `rgba(255, 255, 255, ${slickAlpha * 1.5})`);
+          g.addColorStop(1, `rgba(150, 200, 255, ${slickAlpha})`);
+          ctx.fillStyle = g;
+          ctx.fillRect(x + 1, y + 1, ts - 2, ts - 2);
+        } else if (biome.theme === 'crystal' && slabID % 31 === 0) {
+          // Scattered ice shards on the floor
+          const shardAlpha = 0.25 + Math.sin(time * 0.5 + slabID) * 0.1;
+          ctx.save();
+          ctx.globalAlpha = shardAlpha;
+          const iceShard = getSprite('/sprits-cenario-2.png');
+          if (iceShard.complete && iceShard.naturalWidth > 0) {
+            ctx.drawImage(iceShard, x + 2, y + 2, ts - 4, ts - 4);
+          } else {
+            // Procedural shard fallback
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.moveTo(x + 5, y + 5);
+            ctx.lineTo(x + 15, y + 2);
+            ctx.lineTo(x + 10, y + 15);
+            ctx.fill();
+          }
+          ctx.restore();
+        } else if (biome.theme === 'crystal' && slabID % 53 === 0) {
+          // Ancient frozen rune plate
+          const runeAlpha = 0.3 + Math.sin(time * 1.5 + slabID * 1.5) * 0.15;
+          ctx.save();
+          ctx.globalAlpha = runeAlpha;
+          const runePlate = getSprite('/sprits-cenario-3.png');
+          if (runePlate.complete && runePlate.naturalWidth > 0) {
+            ctx.drawImage(runePlate, x, y, ts, ts);
+          }
+          ctx.restore();
+        } else if (biome.theme === 'forest') {
+          // Fallen Leaves
+          if (slabID % 11 === 0) {
+            ctx.fillStyle = (slabID % 3 === 0) ? '#1a3a1a' : '#2a5a27';
+            ctx.beginPath();
+            ctx.ellipse(x + ts / 2, y + ts / 2, 4, 2, Math.PI / 4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else if (biome.theme === 'volcano' && slabID % 17 === 0) {
+          // Dynamic Lava Cracks
+          const glow = (Math.sin(time * 3 + slabID) * 0.5 + 0.5);
+          ctx.shadowBlur = 4 * glow;
+          ctx.shadowColor = '#ff3300';
+          ctx.strokeStyle = `rgba(255, 100, 0, ${0.4 + glow * 0.4})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(x + 2, y + 2);
+          ctx.lineTo(x + ts - 2, y + ts - 2);
+          ctx.stroke();
+          ctx.fillStyle = `rgba(255, 230, 200, ${glow * 0.6})`;
+          ctx.fillRect(x + ts / 2 - 1, y + ts / 2 - 1, 2, 2);
+          ctx.shadowBlur = 0;
+        }
       }
     }
   }
@@ -224,31 +327,54 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
   }
 
   const flicker = Math.sin(time * 8) * 0.1 + 0.9;
+  const torchSprite = biome.theme === 'crystal' ? getSprite('/sprits-cenario-11.png') : null;
+
   for (let ti = 0; ti < torchPositions.length; ti++) {
     const t = torchPositions[ti];
     const localFlicker = flicker * (1 + Math.sin(time * 10 + ti) * 0.1);
 
-    // Glow pool
-    const floorGlow = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 70);
-    floorGlow.addColorStop(0, biome.accentGlow.replace('0.2', (0.15 * localFlicker).toString()));
+    // Glow pool — icy blue for crystal biome
+    const glowR = biome.theme === 'crystal' ? 90 : 70;
+    const floorGlow = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, glowR);
+    const glowIntensity = (0.1 + 0.08 * localFlicker).toFixed(3);
+    floorGlow.addColorStop(0, biome.accentGlow.replace(/[\d.]+\)$/, `${glowIntensity})`));
     floorGlow.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = floorGlow;
-    ctx.fillRect(t.x - 70, t.y - 70, 140, 140);
+    ctx.fillRect(t.x - glowR, t.y - glowR, glowR * 2, glowR * 2);
 
-    // Flame Core
-    ctx.fillStyle = biome.accent;
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = biome.accent;
-    ctx.beginPath();
-    const fSway = Math.sin(time * 12 + ti) * 2;
-    ctx.moveTo(t.x - 2 + fSway * 0.5, t.y);
-    ctx.quadraticCurveTo(t.x + fSway, t.y - 10, t.x + fSway * 0.2, t.y);
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    if (torchSprite && torchSprite.complete && torchSprite.naturalWidth > 0) {
+      // SPRITE TORCH for ice biome
+      const tw = 22;
+      const th = 34;
+      ctx.save();
+      // Extra glow halo behind sprite
+      ctx.shadowBlur = 12 * localFlicker;
+      ctx.shadowColor = biome.accent;
+      ctx.drawImage(torchSprite, t.x - tw / 2, t.y - th + 4, tw, th);
+      ctx.restore();
 
-    // Handle
-    ctx.fillStyle = biome.wallDetail;
-    ctx.fillRect(t.x - 1, t.y - 2, 2, 10);
+      // Animated frost ember particles rising from flame
+      const emberY = t.y - th * 0.7 + Math.sin(time * 6 + ti) * 3;
+      const emberAlpha = 0.5 + Math.sin(time * 9 + ti * 1.3) * 0.4;
+      ctx.fillStyle = `rgba(180, 240, 255, ${emberAlpha})`;
+      ctx.beginPath();
+      ctx.arc(t.x + Math.sin(time * 5 + ti) * 3, emberY - 4, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // FALLBACK procedural torch for other biomes
+      ctx.fillStyle = biome.accent;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = biome.accent;
+      ctx.beginPath();
+      const fSway = Math.sin(time * 12 + ti) * 2;
+      ctx.moveTo(t.x - 2 + fSway * 0.5, t.y);
+      ctx.quadraticCurveTo(t.x + fSway, t.y - 10, t.x + fSway * 0.2, t.y);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      // Handle
+      ctx.fillStyle = biome.wallDetail;
+      ctx.fillRect(t.x - 1, t.y - 2, 2, 10);
+    }
   }
 }
 
@@ -398,47 +524,67 @@ export function renderObstacles(ctx: CanvasRenderingContext2D, obstacles: Obstac
     ctx.fillStyle = aoGrad;
     ctx.fillRect(o.x - 10, o.y - 10, o.w + 20, o.h + 20);
 
-    // 1. BIOME HERO SILHOUETTE
+    // 1. SPRITE or BIOME HERO SILHOUETTE
     ctx.save();
-    ctx.beginPath();
+    let spriteUsed = false;
 
-    if (biome.theme === 'forest') {
-      const steps = 16;
-      for (let i = 0; i <= steps; i++) {
-        const angle = (i / steps) * Math.PI * 2;
-        const drift = Math.sin(angle * 4 + hash) * 6;
-        const r = o.w / 2 + drift;
-        const px = o.x + o.w / 2 + Math.cos(angle) * r;
-        const py = o.y + o.h / 2 + Math.sin(angle) * r;
-        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    if (biome.obstacleSprites && biome.obstacleSprites.length > 0) {
+      const spriteIdx = hash % biome.obstacleSprites.length;
+      const spritePath = biome.obstacleSprites[spriteIdx];
+      const sprite = getSprite(spritePath);
+
+      if (sprite.complete && sprite.naturalWidth > 0) {
+        // Draw the sprite centered and scaled to fit obstacle size
+        ctx.translate(o.x + o.w / 2, o.y + o.h / 2);
+        // Subtle sway for forest obstacles
+        if (biome.theme === 'forest') {
+          ctx.rotate(Math.sin(time * 2 + hash) * 0.05);
+        }
+        ctx.drawImage(sprite, -o.w / 2 - 4, -o.h / 2 - 4, o.w + 8, o.h + 8);
+        spriteUsed = true;
       }
-    } else if (biome.theme === 'crystal') {
-      const pts = [
-        [o.x + 4, o.y - 4], [o.x + o.w - 2, o.y + 2],
-        [o.x + o.w + 6, o.y + o.h * 0.4], [o.x + o.w + 2, o.y + o.h + 4],
-        [o.x + 2, o.y + o.h], [o.x - 4, o.y + o.h * 0.5]
-      ];
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      pts.forEach(p => ctx.lineTo(p[0], p[1]));
-    } else {
-      ctx.moveTo(o.x, o.y);
-      ctx.lineTo(o.x + o.w + 4, o.y - 2);
-      ctx.lineTo(o.x + o.w + 2, o.y + o.h + 4);
-      ctx.lineTo(o.x - 4, o.y + o.h + 2);
     }
-    ctx.closePath();
-    ctx.clip();
 
-    // 2. PAINTERLY BASE LAYERING
-    ctx.fillStyle = biome.wall;
-    ctx.fillRect(o.x - 10, o.y - 10, o.w + 20, o.h + 20);
+    if (!spriteUsed) {
+      ctx.beginPath();
+      if (biome.theme === 'forest') {
+        const steps = 16;
+        for (let i = 0; i <= steps; i++) {
+          const angle = (i / steps) * Math.PI * 2;
+          const drift = Math.sin(angle * 4 + hash) * 6;
+          const r = o.w / 2 + drift;
+          const px = o.x + o.w / 2 + Math.cos(angle) * r;
+          const py = o.y + o.h / 2 + Math.sin(angle) * r;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+      } else if (biome.theme === 'crystal') {
+        const pts = [
+          [o.x + 4, o.y - 4], [o.x + o.w - 2, o.y + 2],
+          [o.x + o.w + 6, o.y + o.h * 0.4], [o.x + o.w + 2, o.y + o.h + 4],
+          [o.x + 2, o.y + o.h], [o.x - 4, o.y + o.h * 0.5]
+        ];
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        pts.forEach(p => ctx.lineTo(p[0], p[1]));
+      } else {
+        ctx.moveTo(o.x, o.y);
+        ctx.lineTo(o.x + o.w + 4, o.y - 2);
+        ctx.lineTo(o.x + o.w + 2, o.y + o.h + 4);
+        ctx.lineTo(o.x - 4, o.y + o.h + 2);
+      }
+      ctx.closePath();
+      ctx.clip();
 
-    // Layered texture noise
-    for (let i = 0; i < 3; i++) {
-      ctx.fillStyle = i % 2 === 0 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.05)';
-      const tx = o.x + (hash * (i + 1)) % o.w;
-      const ty = o.y + (hash * (i + 2)) % o.h;
-      ctx.fillRect(tx, ty, 20, 20);
+      // 2. PAINTERLY BASE LAYERING (Only if no sprite used)
+      ctx.fillStyle = biome.wall;
+      ctx.fillRect(o.x - 10, o.y - 10, o.w + 20, o.h + 20);
+
+      // Layered texture noise
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.05)';
+        const tx = o.x + (hash * (i + 1)) % o.w;
+        const ty = o.y + (hash * (i + 2)) % o.h;
+        ctx.fillRect(tx, ty, 20, 20);
+      }
     }
 
     // 3. SPECIALIZED BIOME ELEMENTS
@@ -5242,55 +5388,112 @@ export function renderBiomeAmbientFX(ctx: CanvasRenderingContext2D, time: number
   const biome = getBiome(floor);
   const { rw, rh, gox, goy } = vp;
 
-  // We render relative to screen space, so we use absolute viewport sizes
-  // but we need to offset back from the global arena transform if we are inside a save/translate
-  // However, calling this after all arena elements is best.
-
   ctx.save();
-  // Ensure we are in screen coordinates (undoing the gox/goy translate if needed)
-  // But usually called outside the shake/translate.
 
   if (biome.theme === 'crystal') {
-    // 1. FROST VIGNETTE
-    const fGrad = ctx.createRadialGradient(rw / 2, rh / 2, rh / 3, rw / 2, rh / 2, rh / 1.2);
+    // 1. FROST VIGNETTE / COLD MIST
+    const fGrad = ctx.createRadialGradient(rw / 2, rh / 2, rh / 4, rw / 2, rh / 2, rh / 0.8);
     fGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    fGrad.addColorStop(1, 'rgba(200, 240, 255, 0.15)');
+    fGrad.addColorStop(0.7, 'rgba(150, 220, 255, 0.05)');
+    fGrad.addColorStop(1, 'rgba(200, 240, 255, 0.22)');
     ctx.fillStyle = fGrad;
     ctx.fillRect(-gox, -goy, rw, rh);
 
-    // 2. FLOATING ICE SHARDS
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    for (let i = 0; i < 15; i++) {
-      const h = (i * 137 + time * 15) % rw - gox;
-      const v = (i * 253 + time * 10) % rh - goy;
-      ctx.fillRect(h, v, 2, 2);
+    // 2. FALLING SNOW / ICE CRYSTALS
+    for (let i = 0; i < 25; i++) {
+      const timeOffset = time * (0.4 + (i % 5) * 0.1);
+      const drift = Math.sin(timeOffset + i) * 20;
+      const x = (i * 137 + drift) % rw - gox;
+      const y = ((time * 35 + i * 45) % (rh + 60)) - goy - 30;
+      const size = 1 + (i % 3) * 0.8;
+
+      ctx.fillStyle = i % 4 === 0 ? 'rgba(255, 255, 255, 0.6)' : 'rgba(180, 235, 255, 0.4)';
+      ctx.beginPath();
+      if (i % 2 === 0) {
+        // Hexagonal snowflake-ish shape (simple cross)
+        ctx.moveTo(x - size, y);
+        ctx.lineTo(x + size, y);
+        ctx.moveTo(x, y - size);
+        ctx.lineTo(x, y + size);
+        ctx.stroke();
+      } else {
+        ctx.arc(x, y, size * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // 3. FROST ON EDGES (Slightly opaque frozen patterns)
+    ctx.strokeStyle = 'rgba(220, 245, 255, 0.1)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      const edgeX = i % 2 === 0 ? -gox : rw - gox - 20;
+      const edgeY = i < 2 ? -goy : rh - goy - 20;
+      ctx.beginPath();
+      ctx.moveTo(edgeX, edgeY);
+      ctx.lineTo(edgeX + 20, edgeY + 20);
+      ctx.stroke();
     }
   }
   else if (biome.theme === 'forest') {
-    // 1. GLOWING SPORES
-    ctx.fillStyle = biome.accentGlow.replace(/[\d.]+\)$/, '0.4)');
-    for (let i = 0; i < 20; i++) {
-      const h = (i * 91 + Math.sin(time * 0.5 + i) * 20) % rw - gox;
-      const v = (i * 123 - time * 12) % rh - goy;
-      const s = 1 + (i % 2);
+    // 1. FALLING LEAVES (Slow & Drifting)
+    for (let i = 0; i < 10; i++) {
+      const drift = Math.sin(time * 0.8 + i) * 40;
+      const x = (i * 233 + drift) % rw - gox;
+      const y = ((time * 25 + i * 80) % (rh + 40)) - goy - 20;
+
+      ctx.fillStyle = (i % 2 === 0) ? '#4a8a3b' : '#2a5a27';
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(time + i);
       ctx.beginPath();
-      ctx.arc(h, v, s, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, 4, 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 2. MAGICAL FIREFLIES (Moving in arcs)
+    ctx.shadowBlur = 4;
+    for (let i = 0; i < 8; i++) {
+      const arcX = Math.cos(time * 0.3 + i) * 50;
+      const arcY = Math.sin(time * 0.5 + i * 2) * 30;
+      const x = (i * 300 + arcX) % rw - gox;
+      const y = (i * 150 + arcY) % rh - goy;
+
+      ctx.shadowColor = biome.accent;
+      ctx.fillStyle = biome.accent;
+      ctx.beginPath();
+      ctx.arc(x, y, 1.5 + Math.sin(time * 2 + i) * 0.5, 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.shadowBlur = 0;
   }
   else if (biome.theme === 'volcano') {
-    // 1. HEAT PULSE
-    const heatAlpha = 0.04 + Math.sin(time * 3) * 0.02;
-    ctx.fillStyle = `rgba(255, 80, 0, ${heatAlpha})`;
-    ctx.fillRect(-gox, -goy, rw, rh);
+    // 1. HEAT DISTORTION WAVES (Semi-transparent overlay bands)
+    ctx.globalCompositeOperation = 'overlay';
+    for (let i = 0; i < 3; i++) {
+      const vPos = (time * 40 + i * 150) % rh;
+      const hShift = Math.sin(time * 2 + i) * 10;
+      ctx.fillStyle = 'rgba(255, 100, 0, 0.03)';
+      ctx.fillRect(-gox + hShift, vPos - goy, rw, 40);
+    }
+    ctx.globalCompositeOperation = 'source-over';
 
-    // 2. RISING ASH EMBERS
-    for (let i = 0; i < 25; i++) {
-      const h = (i * 157 + Math.sin(time + i) * 15) % rw - gox;
-      const v = (i * 211 - time * 60) % rh - goy;
-      const glow = 0.5 + Math.random() * 0.5;
-      ctx.fillStyle = `rgba(255, 180, 50, ${glow})`;
-      ctx.fillRect(h, v, 1.5, 1.5);
+    // 2. DENSE ASH & EMBERS
+    for (let i = 0; i < 30; i++) {
+      const h = (i * 131 + Math.sin(time * 1.2 + i) * 20) % rw - gox;
+      const v = (rh - (time * 45 + i * 90) % (rh + 40)) - goy;
+
+      const isRed = i % 3 === 0;
+      ctx.fillStyle = isRed ? `rgba(255, 60, 0, ${0.4 + Math.random() * 0.4})` : 'rgba(80, 80, 80, 0.3)';
+      const size = isRed ? 1.5 : 2.5;
+      ctx.fillRect(h, v, size, size);
+
+      if (isRed && Math.random() > 0.8) {
+        ctx.shadowBlur = 3;
+        ctx.shadowColor = '#ff3300';
+        ctx.fillRect(h, v, 1, 1);
+        ctx.shadowBlur = 0;
+      }
     }
   }
 

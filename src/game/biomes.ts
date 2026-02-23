@@ -14,26 +14,34 @@ export interface Biome {
     rays: string;       // God ray color
     bgLayer1: string;   // Closest background layer
     bgLayer2: string;   // Furthest background layer
+    obstacleSprites?: string[]; // New paths for obstacle sprites
 }
 
 export const BIOMES: Biome[] = [
     {
-        // Floors 1-2
-        name: "Cripta Submersa",
+        // Floors 1-2 — GLACIAL ABYSS
+        name: "Abismo Glacial",
         theme: 'crystal',
-        floor: "#12121e",
-        floorAlt: "#161628",
-        seam: "#080810",
-        wall: "#1c1c30",
-        wallTop: "#2a2a45",
-        wallDetail: "#0f0f1a",
-        accent: "#4fd1ff",
-        accentGlow: "rgba(79, 209, 255, 0.2)",
-        detail: "rgba(100, 180, 255, 0.4)",
-        fog: "rgba(10, 15, 30, 0.7)",
-        rays: "rgba(100, 220, 255, 0.1)",
-        bgLayer1: "#0a0a1a",
-        bgLayer2: "#050510"
+        floor: "#08121d",
+        floorAlt: "#0a1624",
+        seam: "#040810",
+        wall: "#12253a",
+        wallTop: "#1c3858",
+        wallDetail: "#06101e",
+        accent: "#00f2ff",
+        accentGlow: "rgba(0, 242, 255, 0.3)",
+        detail: "rgba(180, 240, 255, 0.4)",
+        fog: "rgba(4, 10, 20, 0.75)",
+        rays: "rgba(160, 245, 255, 0.12)",
+        bgLayer1: "#050c16",
+        bgLayer2: "#02050b",
+        obstacleSprites: [
+            "/sprits-cenario-4.png",
+            "/sprits-cenario-8.png",
+            "/sprits-cenario-5.png",
+            "/sprits-cenario-9.png",
+            "/sprits-cenario-10.png",
+        ]
     },
     {
         // Floors 3-4
@@ -51,7 +59,8 @@ export const BIOMES: Biome[] = [
         fog: "rgba(15, 20, 10, 0.6)",
         rays: "rgba(180, 255, 120, 0.08)",
         bgLayer1: "#141a0e",
-        bgLayer2: "#0a0d07"
+        bgLayer2: "#0a0d07",
+        obstacleSprites: ["/obstacles/ancient_shelf.png", "/obstacles/ivy_statue.png"]
     },
     {
         // Floors 5-6
@@ -69,7 +78,8 @@ export const BIOMES: Biome[] = [
         fog: "rgba(25, 10, 5, 0.8)",
         rays: "rgba(255, 120, 50, 0.12)",
         bgLayer1: "#1a0808",
-        bgLayer2: "#100404"
+        bgLayer2: "#100404",
+        obstacleSprites: ["/obstacles/lava_pillar.png", "/obstacles/burnt_debris.png"]
     }
 ];
 

@@ -1419,7 +1419,7 @@ export class GameEngine {
     this.particles = updateParticles(this.particles, dt);
 
     // Arena ambient FX
-    updateArenaFX(dt, this.gameTime, this.player.x, this.player.y, getTorchPositions());
+    updateArenaFX(dt, this.gameTime, this.player.x, this.player.y, getTorchPositions(), this.dungeon.floor);
 
     // Ambient effects
     this.dustTimer -= dt;
@@ -2588,7 +2588,7 @@ export class GameEngine {
     // Render dungeon atmosphere in viewport margins (fills black bars with stone textures)
     renderViewportMargins(ctx, this.gameTime, vp, this.dungeon.floor);
     renderFloor(ctx, this.gameTime, this.dungeon.floor);
-    renderArenaFloorFX(ctx, this.gameTime);
+    renderArenaFloorFX(ctx, this.gameTime, this.dungeon.floor);
     if (room.hiddenTraps) {
       renderHiddenTraps(ctx, room.hiddenTraps, this.gameTime);
     }
@@ -2609,7 +2609,7 @@ export class GameEngine {
 
     // render effects BEFORE player as requested
     renderParticles(ctx, this.particles);
-    renderArenaOverlayFX(ctx, this.gameTime);
+    renderArenaOverlayFX(ctx, this.gameTime, this.dungeon.floor);
 
     renderPlayer(ctx, this.player, this.gameTime);
 
