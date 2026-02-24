@@ -176,7 +176,7 @@ getFloorTile('/title-de-gelo.png');
 getFloorTile('/title-de-gelo-2.png');
 getFloorTile('/title-de-lava.png');
 getFloorTile('/title-de-planta.png');
-getFloorTile('/title-de-planta-3.png');
+getFloorTile('/title-de-gelo-3.png');
 
 export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor = 1) {
   const biome = getBiome(floor);
@@ -189,7 +189,7 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
     tileSet = [
       getFloorTile('/title-de-gelo.png'),
       getFloorTile('/title-de-gelo-2.png'),
-      getFloorTile('/title-de-planta-3.png') // This is actually ice tile 3
+      getFloorTile('/title-de-gelo-3.png') // This is actually ice tile 3
     ];
   } else if (biome.theme === 'volcano') {
     tileSet = [getFloorTile('/title-de-lava.png')];
