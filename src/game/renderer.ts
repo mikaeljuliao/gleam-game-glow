@@ -226,69 +226,8 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
           ctx.globalAlpha = 1.0;
         }
 
-        // --- ENHANCED PROCEDURAL FLOOR DETAILS ---
-        if (biome.theme === 'crystal' && slabID % 7 === 0) {
-          // ICE FROST CRACKS — glowing frozen veins in the stone
-          const crackPulse = 0.5 + Math.sin(time * 0.8 + slabID * 0.7) * 0.5;
-          const crackAlpha = 0.15 + crackPulse * 0.25;
-          ctx.save();
-          ctx.shadowBlur = 6 * crackPulse;
-          ctx.shadowColor = `rgba(140, 240, 255, 0.9)`;
-          ctx.strokeStyle = `rgba(200, 250, 255, ${crackAlpha})`;
-          ctx.lineWidth = 1.0;
-          // branching frost pattern
-          const cx2 = x + (slabID % ts);
-          const cy2 = y + ((slabID * 3) % ts);
-          ctx.beginPath();
-          ctx.moveTo(cx2, cy2);
-          ctx.lineTo(cx2 + 8 * (slabID % 2 === 0 ? 1 : -1), cy2 - 10);
-          ctx.moveTo(cx2, cy2);
-          ctx.lineTo(cx2 + 5, cy2 + 7);
-          ctx.stroke();
-          // Crystalline sparkle point
-          if (slabID % 21 === 0) {
-            ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + crackPulse * 0.5})`;
-            ctx.fillRect(cx2 - 1, cy2 - 1, 2, 2);
-          }
-          ctx.restore();
-        } else if (biome.theme === 'crystal' && slabID % 13 === 0) {
-          // FROZEN SLICKS — Shiny, slippery patches of ice
-          const slickAlpha = 0.1 + Math.sin(time * 0.4 + slabID) * 0.05;
-          const g = ctx.createLinearGradient(x, y, x + ts, y + ts);
-          g.addColorStop(0, `rgba(200, 240, 255, ${slickAlpha})`);
-          g.addColorStop(0.5, `rgba(255, 255, 255, ${slickAlpha * 1.5})`);
-          g.addColorStop(1, `rgba(150, 200, 255, ${slickAlpha})`);
-          ctx.fillStyle = g;
-          ctx.fillRect(x + 1, y + 1, ts - 2, ts - 2);
-        } else if (biome.theme === 'crystal' && slabID % 31 === 0) {
-          // Scattered ice shards on the floor
-          const shardAlpha = 0.25 + Math.sin(time * 0.5 + slabID) * 0.1;
-          ctx.save();
-          ctx.globalAlpha = shardAlpha;
-          const iceShard = getSprite('/sprits-cenario-2.png');
-          if (iceShard.complete && iceShard.naturalWidth > 0) {
-            ctx.drawImage(iceShard, x + 2, y + 2, ts - 4, ts - 4);
-          } else {
-            // Procedural shard fallback
-            ctx.fillStyle = "#ffffff";
-            ctx.beginPath();
-            ctx.moveTo(x + 5, y + 5);
-            ctx.lineTo(x + 15, y + 2);
-            ctx.lineTo(x + 10, y + 15);
-            ctx.fill();
-          }
-          ctx.restore();
-        } else if (biome.theme === 'crystal' && slabID % 53 === 0) {
-          // Ancient frozen rune plate
-          const runeAlpha = 0.3 + Math.sin(time * 1.5 + slabID * 1.5) * 0.15;
-          ctx.save();
-          ctx.globalAlpha = runeAlpha;
-          const runePlate = getSprite('/sprits-cenario-3.png');
-          if (runePlate.complete && runePlate.naturalWidth > 0) {
-            ctx.drawImage(runePlate, x, y, ts, ts);
-          }
-          ctx.restore();
-        } else if (biome.theme === 'forest') {
+        // --- FLOOR DETAILS ---
+        if (biome.theme === 'forest') {
           // Fallen Leaves
           if (slabID % 11 === 0) {
             ctx.fillStyle = (slabID % 3 === 0) ? '#1a3a1a' : '#2a5a27';
@@ -327,14 +266,12 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
   }
 
   const flicker = Math.sin(time * 8) * 0.1 + 0.9;
-  const torchSprite = biome.theme === 'crystal' ? getSprite('/sprits-cenario-11.png') : null;
-
   for (let ti = 0; ti < torchPositions.length; ti++) {
     const t = torchPositions[ti];
     const localFlicker = flicker * (1 + Math.sin(time * 10 + ti) * 0.1);
 
-    // Glow pool — icy blue for crystal biome
-    const glowR = biome.theme === 'crystal' ? 90 : 70;
+    // Glow pool
+    const glowR = 70;
     const floorGlow = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, glowR);
     const glowIntensity = (0.1 + 0.08 * localFlicker).toFixed(3);
     floorGlow.addColorStop(0, biome.accentGlow.replace(/[\d.]+\)$/, `${glowIntensity})`));
@@ -342,39 +279,19 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
     ctx.fillStyle = floorGlow;
     ctx.fillRect(t.x - glowR, t.y - glowR, glowR * 2, glowR * 2);
 
-    if (torchSprite && torchSprite.complete && torchSprite.naturalWidth > 0) {
-      // SPRITE TORCH for ice biome
-      const tw = 22;
-      const th = 34;
-      ctx.save();
-      // Extra glow halo behind sprite
-      ctx.shadowBlur = 12 * localFlicker;
-      ctx.shadowColor = biome.accent;
-      ctx.drawImage(torchSprite, t.x - tw / 2, t.y - th + 4, tw, th);
-      ctx.restore();
-
-      // Animated frost ember particles rising from flame
-      const emberY = t.y - th * 0.7 + Math.sin(time * 6 + ti) * 3;
-      const emberAlpha = 0.5 + Math.sin(time * 9 + ti * 1.3) * 0.4;
-      ctx.fillStyle = `rgba(180, 240, 255, ${emberAlpha})`;
-      ctx.beginPath();
-      ctx.arc(t.x + Math.sin(time * 5 + ti) * 3, emberY - 4, 1.2, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      // FALLBACK procedural torch for other biomes
-      ctx.fillStyle = biome.accent;
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = biome.accent;
-      ctx.beginPath();
-      const fSway = Math.sin(time * 12 + ti) * 2;
-      ctx.moveTo(t.x - 2 + fSway * 0.5, t.y);
-      ctx.quadraticCurveTo(t.x + fSway, t.y - 10, t.x + fSway * 0.2, t.y);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      // Handle
-      ctx.fillStyle = biome.wallDetail;
-      ctx.fillRect(t.x - 1, t.y - 2, 2, 10);
-    }
+    // Procedural torch
+    ctx.fillStyle = biome.accent;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = biome.accent;
+    ctx.beginPath();
+    const fSway = Math.sin(time * 12 + ti) * 2;
+    ctx.moveTo(t.x - 2 + fSway * 0.5, t.y);
+    ctx.quadraticCurveTo(t.x + fSway, t.y - 10, t.x + fSway * 0.2, t.y);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Handle
+    ctx.fillStyle = biome.wallDetail;
+    ctx.fillRect(t.x - 1, t.y - 2, 2, 10);
   }
 }
 

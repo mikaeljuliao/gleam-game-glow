@@ -5,7 +5,6 @@ import { HorrorEvent, Particle, Viewport } from './types';
 import * as C from './constants';
 import { renderAlchemist } from './renderer';
 import { getBiome } from './biomes';
-import { DRUMS } from './audio';
 
 // ============ AUDIO CONTEXT ============
 
@@ -74,19 +73,6 @@ let combatIntensity = 0; // 0 = calm, 1 = max tension
 let combatDroneOsc: OscillatorNode | null = null;
 let combatDroneGain: GainNode | null = null;
 let combatPulseTimer = 0;
-let combatMusicTimer = 0;
-let combatMusicStep = 0;
-let combatMusicRoot = 440; // A4
-let combatMusicActive = false;
-let combatMusicNodes: (OscillatorNode | GainNode)[] = [];
-
-// Music Scales & Patterns
-const PHRYGIAN_SCALE = [1, 1.059, 1.189, 1.335, 1.498, 1.587, 1.782]; // Root, b2, b3, 4, 5, b6, b7
-const BASS_PATTERN = [1, 1, 1.189, 1]; // Root, Root, b3, Root (pulsing 8th notes)
-const ARP_PATTERN = [1, 1.189, 1.498, 1.782, 2, 1.782, 1.498, 1.189]; // 16th note climb
-
-const COMBAT_RHYTHM_KICK = [1, 0, 0, 1, 1, 0, 0, 0];
-const COMBAT_RHYTHM_SNARE = [0, 0, 1, 0, 0, 0, 1, 0];
 
 export function updateCombatTension(enemyCount: number, closestEnemyDist: number, dt: number) {
   // Calculate target intensity based on enemies and proximity
@@ -149,98 +135,6 @@ export function updateCombatTension(enemyCount: number, closestEnemyDist: number
     osc.start();
     osc.stop(ctx.currentTime + 0.4);
   }
-
-  // --- Layered PROFESSIONAL Combat Music ---
-  if (combatIntensity > 0.1) {
-    combatMusicActive = true;
-    // Dynamic BPM: 115 at low tension -> 155 at high tension
-    const bpm = 115 + (combatIntensity * 40);
-    const stepDuration = 60 / bpm / 4; // 16th notes
-
-    combatMusicTimer -= dt;
-    if (combatMusicTimer <= 0) {
-      combatMusicTimer = stepDuration;
-      const step = combatMusicStep % 32;
-      const vol = 0.04 + (combatIntensity * 0.12);
-
-      // 1. Driving Bassline (every 8th note)
-      if (step % 2 === 0) {
-        const bassIdx = (step / 2) % BASS_PATTERN.length;
-        const freq = (combatMusicRoot / 8) * BASS_PATTERN[bassIdx];
-        playCombatSynth(freq, stepDuration * 1.8, 'sawtooth', vol * 0.8, 300 + (combatIntensity * 400), ctx);
-        // Add a subtle 5th for harmonic richness
-        if (combatIntensity > 0.4) {
-          playCombatSynth(freq * 1.5, stepDuration * 1.8, 'sine', vol * 0.3, 800, ctx);
-        }
-      }
-
-      // 2. Aggressive Arpeggio (every 16th note, kicks in above 0.3 intensity)
-      if (combatIntensity > 0.3) {
-        const arpIdx = step % ARP_PATTERN.length;
-        // Shift root occasionally for progression (Phrygian feel)
-        const chordShift = (step % 32 > 16) ? 1.059 : 1.0; // Shift to Bb
-        const freq = (combatMusicRoot / 2) * ARP_PATTERN[arpIdx] * chordShift;
-        const arpVol = vol * (0.25 + Math.sin(time * 2) * 0.05);
-        playCombatSynth(freq, stepDuration * 0.9, 'triangle', arpVol, 1200 + combatIntensity * 1200, ctx);
-      }
-
-      // 3. Percussion Layer
-      const percStep = step % 8;
-      if (COMBAT_RHYTHM_KICK[percStep]) DRUMS.kick(vol * 1.3);
-      if (COMBAT_RHYTHM_SNARE[percStep]) DRUMS.snare(vol * 0.8);
-
-      // Energy hi-hats
-      if (combatIntensity > 0.5 && step % 2 === 1) DRUMS.hihat(vol * 0.4);
-      if (step % 4 === 3) DRUMS.tribal(vol * 0.6);
-
-      // 4. Combat Danger Motif (High Pitched "Warnings")
-      if (combatIntensity > 0.7 && step % 32 === 24) {
-        const notes = [2, 1.5, 1]; // Octave, 5th, Root
-        notes.forEach((n, i) => {
-          setTimeout(() => {
-            if (!combatMusicActive) return;
-            playCombatSynth(combatMusicRoot * 2 * n, 0.1, 'sine', vol * 0.35, 4000, ctx);
-          }, i * 100);
-        });
-      }
-
-      combatMusicStep++;
-    }
-  } else if (combatMusicActive) {
-    stopCombatMusic();
-  }
-}
-
-function playCombatSynth(freq: number, dur: number, type: OscillatorType, vol: number, filterFreq: number, ctx: AudioContext) {
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  const filter = ctx.createBiquadFilter();
-
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, ctx.currentTime);
-
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(filterFreq, ctx.currentTime);
-  filter.Q.setValueAtTime(2, ctx.currentTime);
-
-  gain.gain.setValueAtTime(0, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-
-  osc.connect(filter);
-  filter.connect(gain);
-  gain.connect(ctx.destination);
-
-  osc.start();
-  osc.stop(ctx.currentTime + dur);
-
-  // Track nodes for cleanup if necessary (though they stop automatically)
-}
-
-function stopCombatMusic() {
-  combatMusicActive = false;
-  combatMusicStep = 0;
-  combatMusicTimer = 0;
 }
 
 export function getCombatIntensity(): number {

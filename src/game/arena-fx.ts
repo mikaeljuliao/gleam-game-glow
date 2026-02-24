@@ -392,14 +392,7 @@ function renderFloorDecorations(ctx: CanvasRenderingContext2D, time: number, flo
   ctx.lineTo(cx - diag, cy + diag);
   ctx.stroke();
 
-  if (biome.theme === 'crystal') {
-    // FROZEN RUNE GLOW
-    ctx.shadowBlur = 4;
-    ctx.shadowColor = biome.accent;
-    ctx.strokeStyle = `rgba(180, 240, 255, ${runeAlpha * 2})`;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-  }
+
 
   // --- Large floor cracks (organic, spanning multiple tiles) ---
   ctx.strokeStyle = 'rgba(20, 18, 30, 0.25)';
@@ -421,7 +414,7 @@ function renderFloorDecorations(ctx: CanvasRenderingContext2D, time: number, flo
   ctx.quadraticCurveTo(gw * 0.6, gh * 0.78, gw * 0.68, gh * 0.82);
   ctx.stroke();
 
-  // --- Moisture patches (darker, subtle wet spots) ---
+  // --- Moisture patches (darker, subtle wet spots) --- only non-crystal biomes
   if (biome.theme !== 'crystal') {
     const moistureSpots = [
       { x: gw * 0.12, y: gh * 0.7, r: 12 },
@@ -437,25 +430,8 @@ function renderFloorDecorations(ctx: CanvasRenderingContext2D, time: number, flo
       ctx.fillStyle = grad;
       ctx.fillRect(m.x - m.r, m.y - m.r, m.r * 2, m.r * 2);
     }
-  } else {
-    // ICE PATCHES (Slippery looking white gradients)
-    const iceSpots = [
-      { x: gw * 0.15, y: gh * 0.2, r: 20 },
-      { x: gw * 0.75, y: gh * 0.8, r: 25 },
-      { x: gw * 0.3, y: gh * 0.6, r: 15 },
-    ];
-    for (const m of iceSpots) {
-      const grad = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r);
-      grad.addColorStop(0, 'rgba(255, 255, 255, 0.12)');
-      grad.addColorStop(0.7, 'rgba(200, 240, 255, 0.05)');
-      grad.addColorStop(1, 'rgba(200, 240, 255, 0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(m.x - m.r, m.y - m.r, m.r * 2, m.r * 2);
-    }
-  }
 
-  // --- Moss/lichen patches along walls ---
-  if (biome.theme !== 'crystal') {
+    // --- Moss/lichen patches along walls ---
     const wallMoss = [
       { x: C.TILE_SIZE * 3, y: C.TILE_SIZE + 2, w: 15, h: 4 },
       { x: C.TILE_SIZE * 8, y: gh - C.TILE_SIZE - 3, w: 12, h: 3 },
@@ -467,15 +443,9 @@ function renderFloorDecorations(ctx: CanvasRenderingContext2D, time: number, flo
     for (const m of wallMoss) {
       ctx.fillStyle = 'rgba(20, 45, 25, 0.12)';
       ctx.fillRect(m.x, m.y, m.w, m.h);
-      // Slightly brighter spots
       ctx.fillStyle = 'rgba(30, 55, 30, 0.07)';
       ctx.fillRect(m.x + 2, m.y, m.w * 0.5, m.h * 0.6);
     }
-  } else {
-    // FROZEN EDGES
-    ctx.fillStyle = 'rgba(200, 240, 255, 0.15)';
-    ctx.fillRect(0, C.TILE_SIZE, gw, 2);
-    ctx.fillRect(0, gh - C.TILE_SIZE - 2, gw, 2);
   }
 
   // --- Scattered stone chips (away from center) ---
