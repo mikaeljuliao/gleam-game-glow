@@ -242,35 +242,35 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
         }
 
       } else {
-        // ── FLOOR TILES (biome-specific, high unification) ─────
+        // ── FLOOR TILES (Direct Sprite Rendering) ──────────────
+        // Seamless high-quality tiles from public folder
         const hash = (col * 17 + row * 31 + col * row * 7) % 100;
 
         // 1) Pick tile from the biome set
         const tileIdx = hash % tileSet.length;
         const tile = tileSet[tileIdx];
 
-        // Draw sprite at low opacity — native 64x64 scaled to 20x20
+        // 2) Direct Base — Draw sprite with full visibility
+        //    (Background is already cleared with biome.bg color)
         if (tile.complete && tile.naturalWidth > 0) {
           ctx.save();
-          // Lower opacity for sprites to keep them as "textures" rather than "foreground"
-          ctx.globalAlpha = 0.35;
+          // High opacity to show the full detail of the seamless tile
+          // Very slight alpha to let the dark background bleed through if needed
+          // but mostly relying on tile's internal values.
+          ctx.globalAlpha = 0.95;
           ctx.drawImage(tile, x, y, ts, ts);
           ctx.restore();
+        } else {
+          // Fallback while loading
+          ctx.fillStyle = biome.floor;
+          ctx.fillRect(x, y, ts, ts);
         }
 
-        // 2) Solid biome-color wash — unifies the tiles and kills the grid
-        //    High enough to dominate, low enough to let texture breathe
-        ctx.fillStyle = biome.floor;
-        ctx.globalAlpha = 0.65;
-        ctx.fillRect(x, y, ts, ts);
-        ctx.globalAlpha = 1.0;
-
         // 3) Micro-noise variation — breaks up the checkerboard feel
-        //    Applied as a barely visible brightness push on ~1/3 of tiles
         if (hash % 3 === 0) {
           ctx.fillStyle = hash % 6 === 0
-            ? 'rgba(255,255,255,0.018)'
-            : 'rgba(0,0,0,0.025)';
+            ? 'rgba(255,255,255,0.012)'
+            : 'rgba(0,0,0,0.015)';
           ctx.fillRect(x, y, ts, ts);
         }
 
