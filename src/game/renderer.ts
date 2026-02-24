@@ -165,42 +165,44 @@ const _floorTileCache: Record<string, HTMLImageElement> = {};
 function getFloorTile(src: string): HTMLImageElement {
   if (!_floorTileCache[src]) {
     const img = new Image();
-    img.src = src;
+    img.src = src ? src : '/placeholder.svg';
     _floorTileCache[src] = img;
   }
   return _floorTileCache[src];
 }
 
-// Pre-load all floor tiles on module init
-getFloorTile('/title.png');
-getFloorTile('/title-2.png');
-getFloorTile('/title-gelo.png');
-getFloorTile('/title-gelo-3.png');
-getFloorTile('/title-gelo-4.png');
-getFloorTile('/title-gelo-5.png');
+// Pre-load new biome-specific floor tiles
+getFloorTile('/title-de-gelo.png');
+getFloorTile('/title-de-gelo-2.png');
+getFloorTile('/title-de-lava.png');
+getFloorTile('/title-de-planta.png');
+getFloorTile('/title-de-planta-3.png');
 
 export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor = 1) {
   const biome = getBiome(floor);
   const ts = C.TILE_SIZE;
 
-  // ── Tile sets ────────────────────────────────────────────────
-  // Non-ice: title.png (main) + title-2.png (alt variation)
-  // Ice:     title-gelo-4.png (dominant base) + title-gelo.png / title-gelo-3.png / title-gelo-5.png (accents)
-  const iceTiles = [
-    getFloorTile('/title-gelo-4.png'), // 0 — dominant: seamless blue-grey stone (best for floor)
-    getFloorTile('/title-gelo-4.png'), // 1 — repeated to increase its weight
-    getFloorTile('/title-gelo-4.png'), // 2 — repeated again
-    getFloorTile('/title-gelo.png'),   // 3 — icicle wall accent (rare)
-    getFloorTile('/title-gelo-3.png'), // 4 — isometric ice block (rare)
-    getFloorTile('/title-gelo-5.png'), // 5 — icicle stone (rare)
-  ];
-  const genericTiles = [
-    getFloorTile('/title.png'),        // 0 — main dark dungeon stone
-    getFloorTile('/title.png'),        // 1 — repeated to increase weight
-    getFloorTile('/title-2.png'),      // 2 — alt flat dungeon tile
-    getFloorTile('/title.png'),        // 3 — main again
-    getFloorTile('/title-2.png'),      // 4 — alt
-  ];
+  // ── Tile sets by Biome ──────────────────────────────────────────
+  let tileSet: HTMLImageElement[] = [];
+
+  if (biome.theme === 'crystal') {
+    tileSet = [
+      getFloorTile('/title-de-gelo.png'),
+      getFloorTile('/title-de-gelo-2.png'),
+      // Fallback if 3 is missing, using 1 again for variety
+      getFloorTile('/title-de-gelo.png')
+    ];
+  } else if (biome.theme === 'volcano') {
+    tileSet = [getFloorTile('/title-de-lava.png')];
+  } else if (biome.theme === 'forest') {
+    tileSet = [
+      getFloorTile('/title-de-planta.png'),
+      getFloorTile('/title-de-planta-3.png')
+    ];
+  } else {
+    // Default fallback set
+    tileSet = [getFloorTile('/title-de-gelo.png')];
+  }
 
   for (let row = 0; row < C.dims.rr; row++) {
     for (let col = 0; col < C.dims.rc; col++) {
@@ -240,19 +242,18 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
         }
 
       } else {
-        // ── FLOOR TILES (sprite-based, muted) ──────────────────
+        // ── FLOOR TILES (biome-specific, high unification) ─────
         const hash = (col * 17 + row * 31 + col * row * 7) % 100;
 
-        // 1) Pick tile from the appropriate set using hash as index
-        const isIce = biome.theme === 'crystal';
-        const tileSet = isIce ? iceTiles : genericTiles;
+        // 1) Pick tile from the biome set
         const tileIdx = hash % tileSet.length;
         const tile = tileSet[tileIdx];
 
-        // Draw sprite at low opacity — organic texture without dominant grid
+        // Draw sprite at low opacity — native 64x64 scaled to 20x20
         if (tile.complete && tile.naturalWidth > 0) {
           ctx.save();
-          ctx.globalAlpha = isIce ? 0.30 : 0.35;
+          // Lower opacity for sprites to keep them as "textures" rather than "foreground"
+          ctx.globalAlpha = 0.35;
           ctx.drawImage(tile, x, y, ts, ts);
           ctx.restore();
         }
