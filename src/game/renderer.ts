@@ -226,53 +226,58 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
         }
 
       } else {
-        // ── FLOOR TILES (sprite-based) ─────────────────────────
-        // Deterministic variation: creates a pseudo-random but stable pattern
+        // ── FLOOR TILES (sprite-based, muted) ──────────────────
         const hash = (col * 17 + row * 31 + col * row * 7) % 100;
 
-        // Choose tile variant — ~25% chance of alt tile for subtle variation
-        const useAltTile = (!isIce) && (hash < 25);
+        // 1) Draw sprite texture at LOW opacity — gives organic surface noise
+        //    without the tile grid becoming dominant
+        const useAltTile = (!isIce) && (hash < 30);
         const tile = useAltTile ? tileB : tileA;
 
         if (tile.complete && tile.naturalWidth > 0) {
-          // Draw tile sprite — each tile covers exactly TILE_SIZE px
-          // Slight alpha darkening toward center for fake depth
-          const distFromEdge = Math.min(row, col, C.dims.rr - 1 - row, C.dims.rc - 1 - col);
-          const depthAlpha = Math.max(0, 1 - distFromEdge * 0.012);
-
           ctx.save();
-          // Very subtle alpha variation for depth (outermost tiles = slightly darker)
-          if (depthAlpha < 0.95) {
-            ctx.globalAlpha = 0.88 + depthAlpha * 0.12;
-          }
+          ctx.globalAlpha = isIce ? 0.28 : 0.35; // ice tiles are lighter so need lower alpha
           ctx.drawImage(tile, x, y, ts, ts);
           ctx.restore();
-        } else {
-          // Fallback while sprites load
-          ctx.fillStyle = biome.floor;
+        }
+
+        // 2) Solid biome-color wash — unifies the tiles and kills the grid
+        //    High enough to dominate, low enough to let texture breathe
+        ctx.fillStyle = biome.floor;
+        ctx.globalAlpha = 0.65;
+        ctx.fillRect(x, y, ts, ts);
+        ctx.globalAlpha = 1.0;
+
+        // 3) Micro-noise variation — breaks up the checkerboard feel
+        //    Applied as a barely visible brightness push on ~1/3 of tiles
+        if (hash % 3 === 0) {
+          ctx.fillStyle = hash % 6 === 0
+            ? 'rgba(255,255,255,0.018)'
+            : 'rgba(0,0,0,0.025)';
           ctx.fillRect(x, y, ts, ts);
         }
 
-        // Volcano biome: animated lava crack overlay on top of tile
+        // 4) Biome overlays ─────────────────────────────────────
+        // Volcano: animated lava crack
         if (biome.theme === 'volcano' && hash % 17 === 0) {
-          const glow = (Math.sin(time * 3 + hash) * 0.5 + 0.5);
+          const glow = Math.sin(time * 3 + hash) * 0.5 + 0.5;
           ctx.save();
-          ctx.globalAlpha = 0.6;
-          ctx.shadowBlur = 4 * glow;
+          ctx.globalAlpha = 0.45;
+          ctx.shadowBlur = 3 * glow;
           ctx.shadowColor = '#ff3300';
-          ctx.strokeStyle = `rgba(255, 80, 0, ${0.3 + glow * 0.35})`;
+          ctx.strokeStyle = `rgba(255, 70, 0, ${0.25 + glow * 0.3})`;
           ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.moveTo(x + 2, y + 3);
-          ctx.lineTo(x + ts - 3, y + ts - 2);
+          ctx.moveTo(x + 2, y + 4);
+          ctx.lineTo(x + ts - 3, y + ts - 3);
           ctx.stroke();
           ctx.restore();
         }
 
-        // Forest biome: subtle fallen leaf overlay
-        if (biome.theme === 'forest' && hash % 11 === 0) {
+        // Forest: subtle fallen leaf
+        if (biome.theme === 'forest' && hash % 13 === 0) {
           ctx.save();
-          ctx.globalAlpha = 0.25;
+          ctx.globalAlpha = 0.18;
           ctx.fillStyle = hash % 3 === 0 ? '#1a3a1a' : '#2a5a27';
           ctx.beginPath();
           ctx.ellipse(x + ts / 2, y + ts / 2, 4, 2, Math.PI / 4, 0, Math.PI * 2);
