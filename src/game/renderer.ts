@@ -189,20 +189,22 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
     tileSet = [
       getFloorTile('/title-de-gelo.png'),
       getFloorTile('/title-de-gelo-2.png'),
-      // Fallback if 3 is missing, using 1 again for variety
-      getFloorTile('/title-de-gelo.png')
+      getFloorTile('/title-de-planta-3.png') // This is actually ice tile 3
     ];
   } else if (biome.theme === 'volcano') {
     tileSet = [getFloorTile('/title-de-lava.png')];
   } else if (biome.theme === 'forest') {
     tileSet = [
-      getFloorTile('/title-de-planta.png'),
-      getFloorTile('/title-de-planta-3.png')
+      getFloorTile('/title-de-planta.png')
     ];
   } else {
     // Default fallback set
     tileSet = [getFloorTile('/title-de-gelo.png')];
   }
+
+  // --- Disable image smoothing for crisp pixel-art appearance ---
+  ctx.imageSmoothingEnabled = false;
+
 
   for (let row = 0; row < C.dims.rr; row++) {
     for (let col = 0; col < C.dims.rc; col++) {
@@ -242,23 +244,23 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
         }
 
       } else {
-        // ── FLOOR TILES (Direct Sprite Rendering) ──────────────
+        // ── FLOOR TILES (Direct Sprite Rendering @ 32px) ──────
         // Seamless high-quality tiles from public folder
-        const hash = (col * 17 + row * 31 + col * row * 7) % 100;
+        const hash = (col * 17 + row * 31 + col * row * 7) % 700;
 
         // 1) Pick tile from the biome set
         const tileIdx = hash % tileSet.length;
         const tile = tileSet[tileIdx];
 
-        // 2) Direct Base — Draw sprite with full visibility
-        //    (Background is already cleared with biome.bg color)
+        // 2) Direct Base — Draw sprite with full 100% visibility
         if (tile.complete && tile.naturalWidth > 0) {
           ctx.save();
-          // High opacity to show the full detail of the seamless tile
-          // Very slight alpha to let the dark background bleed through if needed
-          // but mostly relying on tile's internal values.
-          ctx.globalAlpha = 0.95;
-          ctx.drawImage(tile, x, y, ts, ts);
+          // Subtle procedural brightness variation (0.97 to 1.03)
+          const brightness = 0.97 + (hash % 7) * 0.01;
+          ctx.filter = `brightness(${brightness})`;
+
+          ctx.globalAlpha = 1.0;
+          ctx.drawImage(tile, x, y, ts, ts); // ts is now 32px
           ctx.restore();
         } else {
           // Fallback while loading

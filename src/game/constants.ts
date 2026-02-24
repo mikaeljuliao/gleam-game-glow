@@ -1,9 +1,9 @@
 export const GAME_WIDTH = 640;
 export const HUD_FONT = "'Montserrat', sans-serif";
-export const GAME_HEIGHT = 400;
-export const TILE_SIZE = 20;
-export const ROOM_COLS = 32;
-export const ROOM_ROWS = 20;
+export const GAME_HEIGHT = 416; // Adjusted from 400 to fit 13 tiles of 32px perfectly
+export const TILE_SIZE = 32;    // Updated from 20 to 32 as requested
+export const ROOM_COLS = 20;    // 640 / 32 = 20
+export const ROOM_ROWS = 13;    // 416 / 32 = 13
 
 // Player
 export const PLAYER_SIZE = 16;
