@@ -5,6 +5,7 @@ import { HorrorEvent, Particle, Viewport } from './types';
 import * as C from './constants';
 import { renderAlchemist } from './renderer';
 import { getBiome } from './biomes';
+import { DRUMS } from './audio';
 
 // ============ AUDIO CONTEXT ============
 
@@ -73,6 +74,15 @@ let combatIntensity = 0; // 0 = calm, 1 = max tension
 let combatDroneOsc: OscillatorNode | null = null;
 let combatDroneGain: GainNode | null = null;
 let combatPulseTimer = 0;
+let combatDrumTimer = 0;
+let combatDrumStep = 0;
+
+// Tribal/Frenetic rhythm pattern (16 steps)
+// 1 = Kick, 2 = Snare, 3 = Tribal, 4 = Hihat
+const COMBAT_RHYTHM = [
+  1, 0, 3, 0, 2, 0, 3, 1,
+  1, 3, 4, 3, 2, 4, 1, 0
+];
 
 export function updateCombatTension(enemyCount: number, closestEnemyDist: number, dt: number) {
   // Calculate target intensity based on enemies and proximity
@@ -134,6 +144,31 @@ export function updateCombatTension(enemyCount: number, closestEnemyDist: number
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.4);
+  }
+
+  // --- Frenetic Combat Drums ---
+  if (combatIntensity > 0.15) {
+    // BPM scales with intensity: 100 BPM at 0.15 intensity -> 160 BPM at 1.0 intensity
+    const bpm = 110 + (combatIntensity * 70);
+    const stepDuration = 60 / bpm / 4; // 16th notes
+
+    combatDrumTimer -= dt;
+    if (combatDrumTimer <= 0) {
+      combatDrumTimer = stepDuration;
+      const note = COMBAT_RHYTHM[combatDrumStep % COMBAT_RHYTHM.length];
+      const vol = 0.05 + (combatIntensity * 0.15); // Volume scales with tension
+
+      if (note === 1) DRUMS.kick(vol);
+      else if (note === 2) DRUMS.snare(vol * 0.7);
+      else if (note === 3) DRUMS.tribal(vol * 0.8);
+      else if (note === 4) DRUMS.hihat(vol * 0.4);
+
+      combatDrumStep++;
+    }
+  } else {
+    // Reset drums when combat ends
+    combatDrumTimer = 0;
+    combatDrumStep = 0;
   }
 }
 

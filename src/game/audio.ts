@@ -654,6 +654,37 @@ export const SFX = {
   },
 };
 
+// ============ PROCEDURAL DRUMS (for frenetic combat) ============
+export const DRUMS = {
+  kick(vol = 0.15) {
+    const ctx = getCtx();
+    const t = ctx.currentTime;
+    // Deep thud
+    playFreqSweep(150, 40, 0.12, 'sine', vol);
+    // Initial click/impact
+    playNoise(0.02, vol * 0.4, 800, 'lowpass');
+    // Sub rumble
+    playTone(50, 0.1, 'sine', vol * 0.5, true);
+  },
+  snare(vol = 0.1) {
+    const ctx = getCtx();
+    const t = ctx.currentTime;
+    // Mid-range punch
+    playTone(200, 0.08, 'triangle', vol);
+    // Snap/fizzle
+    playNoise(0.12, vol * 1.2, 2500, 'highpass');
+  },
+  hihat(vol = 0.05) {
+    // Sharp sizzle
+    playNoise(0.015, vol, 7000, 'highpass');
+  },
+  tribal(vol = 0.12) {
+    // Tom-like tribal drum
+    playFreqSweep(250, 80, 0.15, 'sine', vol);
+    playNoise(0.03, vol * 0.3, 600, 'lowpass');
+  }
+};
+
 // Initialize audio on first user interaction
 export function initAudio() {
   if (!audioCtx) {
