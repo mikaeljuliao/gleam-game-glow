@@ -1,0 +1,5 @@
+﻿8842a59 - fix: update tile paths and finalize 32px pixel-perfect floor rendering
+67f9719 - refactor: optimize floor rendering for 32px grid, disable smoothing, and reorganize ice biome tiles
+716f865 - style: switch to direct floor tile rendering, removing solid color wash as requested for the new high-quality seamless tiles
+e299f91 - feat: replace floor tiles with new biome-specific specialized tiles (title-de-gelo, lava, planta)
+a74e68a - feat: use all ice tile variants (title-gelo-4 dominant + gelo/gelo-3/gelo-5 accents) and mix title/title-2 for non-ice biomes

@@ -49,9 +49,12 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
   // 2. PARALLAX LAYER 2 (Furthest)
   ctx.fillStyle = biome.bgLayer1;
   const p2x = (-gox * 0.2) % 400;
-  const p2y = (-goy * 0.2) % 400;
 
-  for (let i = -1; i < Math.ceil(rw / 400) + 1; i++) {
+  // Safe bounds for parallax tiles
+  const startI = -1;
+  const endI = Math.ceil(rw / 400) + 1;
+
+  for (let i = startI; i < endI; i++) {
     const x = i * 400 + p2x - gox;
     if (biome.theme === 'crystal') {
       // Sharp ice stalagmite silhouettes — NOT water, but frozen spires
@@ -83,13 +86,22 @@ export function renderViewportMargins(ctx: CanvasRenderingContext2D, time: numbe
 
   // 3. PARALLAX LAYER 1 (Walls / Pillars)
   const ts = C.TILE_SIZE;
+  if (ts <= 0) return; // Prevent infinite loop if constants are corrupted
+
   const startCol = Math.floor(-gox / ts) - 1;
   const endCol = Math.ceil((rw - gox) / ts) + 1;
   const startRow = Math.floor(-goy / ts) - 1;
   const endRow = Math.ceil((rh - goy) / ts) + 1;
 
-  for (let row = startRow; row < endRow; row++) {
-    for (let col = startCol; col < endCol; col++) {
+  // Final safety clamp for loops
+  const safeStartCol = Math.max(-100, startCol);
+  const safeEndCol = Math.min(C.dims.rc + 100, endCol);
+  const safeStartRow = Math.max(-50, startRow);
+  const safeEndRow = Math.min(C.dims.rr + 50, endRow);
+
+  for (let row = safeStartRow; row < safeEndRow; row++) {
+    for (let col = safeStartCol; col < safeEndCol; col++) {
+      // Skip the main arena area
       if (row >= 0 && row < C.dims.rr && col >= 0 && col < C.dims.rc) continue;
 
       const x = col * ts;
@@ -182,54 +194,55 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
   const biome = getBiome(floor);
   const ts = C.TILE_SIZE;
 
-  // ── Tile sets by Biome ──────────────────────────────────────────
+  // ── Tile sets by Biome (Uso dos novos chãos gerados) ──────────
   let tileSet: HTMLImageElement[] = [];
 
   if (biome.theme === 'crystal') {
     tileSet = [
-      getFloorTile('/title-de-gelo.png'),
-      getFloorTile('/title-de-gelo-2.png'),
-      getFloorTile('/title-de-gelo-3.png') // This is actually ice tile 3
+      getFloorTile('/tile-glacial-floor.png'),
+      getFloorTile('/tile-glacial-1.png'),
+      getFloorTile('/tile-glacial-2.png')
     ];
   } else if (biome.theme === 'volcano') {
-    tileSet = [getFloorTile('/title-de-lava.png')];
+    tileSet = [getFloorTile('/tile-lava-floor.png')];
   } else if (biome.theme === 'forest') {
     tileSet = [
-      getFloorTile('/title-de-planta.png')
+      getFloorTile('/tile-archives-floor.png'),
+      getFloorTile('/tile-archives-1.png')
     ];
   } else {
-    // Default fallback set
-    tileSet = [getFloorTile('/title-de-gelo.png')];
+    tileSet = [getFloorTile('/tile-glacial-floor.png')];
   }
 
-  // --- Disable image smoothing for crisp pixel-art appearance ---
+  // --- Desativar suavização para garantir pixel-art nítido ---
   ctx.imageSmoothingEnabled = false;
 
+  const rr = Math.min(100, C.dims.rr);
+  const rc = Math.min(100, C.dims.rc);
 
-  for (let row = 0; row < C.dims.rr; row++) {
-    for (let col = 0; col < C.dims.rc; col++) {
+  if (rr <= 0 || rc <= 0) return;
+
+  for (let row = 0; row < rr; row++) {
+    for (let col = 0; col < rc; col++) {
       const x = col * ts;
       const y = row * ts;
-      const isEdge = row === 0 || row === C.dims.rr - 1 || col === 0 || col === C.dims.rc - 1;
+      const isEdge = row === 0 || row === rr - 1 || col === 0 || col === rc - 1;
 
       if (isEdge) {
-        // ── WALLS ─────────────────────────────────────────────
+        // ── PAREDES ───────────────────────────────────────────
         ctx.fillStyle = biome.wall;
         ctx.fillRect(x, y, ts, ts);
 
-        // Top wall architectural face
         if (row === 0) {
           ctx.fillStyle = biome.wallTop;
           ctx.fillRect(x, y, ts, 12);
           ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
           ctx.fillRect(x, y, ts, 1);
-          // Wall detail accent line
           ctx.fillStyle = biome.accentGlow.replace(/[\d.]+\)$/, '0.12)');
           ctx.fillRect(x, y + 11, ts, 1);
         }
 
-        // Bottom wall — baseboard shadow
-        if (row === C.dims.rr - 1) {
+        if (row === rr - 1) {
           const bounce = ctx.createLinearGradient(x, y + ts - 6, x, y + ts);
           bounce.addColorStop(0, 'rgba(0,0,0,0)');
           bounce.addColorStop(1, 'rgba(0,0,0,0.35)');
@@ -237,100 +250,50 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
           ctx.fillRect(x, y + ts - 6, ts, 6);
         }
 
-        // Side walls — subtle depth shading
-        if (col === 0 || col === C.dims.rc - 1) {
+        if (col === 0 || col === rc - 1) {
           ctx.fillStyle = 'rgba(0,0,0,0.2)';
           ctx.fillRect(x, y, ts, ts);
         }
 
       } else {
-        // ── FLOOR TILES (Direct Sprite Rendering @ 32px) ──────
-        // Seamless high-quality tiles from public folder
+        // ── CHÃO (Renderização Direta @ 32px) ─────────────────
         const hash = (col * 17 + row * 31 + col * row * 7) % 700;
-
-        // 1) Pick tile from the biome set
         const tileIdx = hash % tileSet.length;
         const tile = tileSet[tileIdx];
 
-        // 2) Direct Base — Draw sprite with full 100% visibility
         if (tile.complete && tile.naturalWidth > 0) {
-          ctx.save();
-          // Subtle procedural brightness variation (0.97 to 1.03)
-          const brightness = 0.97 + (hash % 7) * 0.01;
-          ctx.filter = `brightness(${brightness})`;
-
-          ctx.globalAlpha = 1.0;
-          ctx.drawImage(tile, x, y, ts, ts); // ts is now 32px
-          ctx.restore();
+          // Renderização mais fiel possível, sem filtros de brilho ou ruído artificial
+          ctx.drawImage(tile, x, y, ts, ts);
         } else {
-          // Fallback while loading
           ctx.fillStyle = biome.floor;
           ctx.fillRect(x, y, ts, ts);
-        }
-
-        // 3) Micro-noise variation — breaks up the checkerboard feel
-        if (hash % 3 === 0) {
-          ctx.fillStyle = hash % 6 === 0
-            ? 'rgba(255,255,255,0.012)'
-            : 'rgba(0,0,0,0.015)';
-          ctx.fillRect(x, y, ts, ts);
-        }
-
-        // 4) Biome overlays ─────────────────────────────────────
-        // Volcano: animated lava crack
-        if (biome.theme === 'volcano' && hash % 17 === 0) {
-          const glow = Math.sin(time * 3 + hash) * 0.5 + 0.5;
-          ctx.save();
-          ctx.globalAlpha = 0.45;
-          ctx.shadowBlur = 3 * glow;
-          ctx.shadowColor = '#ff3300';
-          ctx.strokeStyle = `rgba(255, 70, 0, ${0.25 + glow * 0.3})`;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(x + 2, y + 4);
-          ctx.lineTo(x + ts - 3, y + ts - 3);
-          ctx.stroke();
-          ctx.restore();
-        }
-
-        // Forest: subtle fallen leaf
-        if (biome.theme === 'forest' && hash % 13 === 0) {
-          ctx.save();
-          ctx.globalAlpha = 0.18;
-          ctx.fillStyle = hash % 3 === 0 ? '#1a3a1a' : '#2a5a27';
-          ctx.beginPath();
-          ctx.ellipse(x + ts / 2, y + ts / 2, 4, 2, Math.PI / 4, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
         }
       }
     }
   }
 
-  // ── ROW SHADOW (top wall casting down onto floor) ──────────
+  // ── SOMBRA DA PAREDE SUPERIOR ──────────────────────
   const shadowGrad = ctx.createLinearGradient(0, ts, 0, ts * 3);
-  shadowGrad.addColorStop(0, 'rgba(0,0,0,0.30)');
+  shadowGrad.addColorStop(0, 'rgba(0,0,0,0.25)'); // Sombra suave fidedigna
   shadowGrad.addColorStop(1, 'rgba(0,0,0,0.00)');
   ctx.fillStyle = shadowGrad;
   ctx.fillRect(ts, ts, C.dims.gw - ts * 2, ts * 2);
 
-  // ── TORCHES ────────────────────────────────────────────────
+  // ── TOCHAS ────────────────────────────────────────────────
   const torchPositions: { x: number; y: number }[] = [];
-  for (let col = 4; col < C.dims.rc; col += 8) {
-    torchPositions.push({ x: col * C.TILE_SIZE, y: C.TILE_SIZE });
-    torchPositions.push({ x: col * C.TILE_SIZE, y: C.dims.gh - C.TILE_SIZE });
+  for (let tcol = 4; tcol < rc; tcol += 8) {
+    torchPositions.push({ x: tcol * ts, y: ts });
+    torchPositions.push({ x: tcol * ts, y: C.dims.gh - ts });
   }
-  for (let row = 5; row < C.dims.rr; row += 5) {
-    torchPositions.push({ x: C.TILE_SIZE, y: row * C.TILE_SIZE });
-    torchPositions.push({ x: C.dims.gw - C.TILE_SIZE, y: row * C.TILE_SIZE });
+  for (let trow = 5; trow < rr; trow += 5) {
+    torchPositions.push({ x: ts, y: trow * ts });
+    torchPositions.push({ x: C.dims.gw - ts, y: trow * ts });
   }
 
   const flicker = Math.sin(time * 8) * 0.1 + 0.9;
   for (let ti = 0; ti < torchPositions.length; ti++) {
     const t = torchPositions[ti];
     const localFlicker = flicker * (1 + Math.sin(time * 10 + ti) * 0.1);
-
-    // Glow pool on floor
     const glowR = 70;
     const floorGlow = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, glowR);
     const glowIntensity = (0.1 + 0.08 * localFlicker).toFixed(3);
@@ -339,7 +302,6 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
     ctx.fillStyle = floorGlow;
     ctx.fillRect(t.x - glowR, t.y - glowR, glowR * 2, glowR * 2);
 
-    // Procedural flame
     ctx.fillStyle = biome.accent;
     ctx.shadowBlur = 10;
     ctx.shadowColor = biome.accent;
@@ -349,7 +311,6 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
     ctx.quadraticCurveTo(t.x + fSway, t.y - 10, t.x + fSway * 0.2, t.y);
     ctx.fill();
     ctx.shadowBlur = 0;
-    // Handle
     ctx.fillStyle = biome.wallDetail;
     ctx.fillRect(t.x - 1, t.y - 2, 2, 10);
   }

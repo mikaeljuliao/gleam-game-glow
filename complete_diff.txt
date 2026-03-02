@@ -1,0 +1,131 @@
+﻿diff --git a/src/game/renderer.ts b/src/game/renderer.ts
+index 3bb2d13..57e36a7 100644
+--- a/src/game/renderer.ts
++++ b/src/game/renderer.ts
+@@ -165,42 +165,46 @@ const _floorTileCache: Record<string, HTMLImageElement> = {};
+ function getFloorTile(src: string): HTMLImageElement {
+   if (!_floorTileCache[src]) {
+     const img = new Image();
+-    img.src = src;
++    img.src = src ? src : '/placeholder.svg';
+     _floorTileCache[src] = img;
+   }
+   return _floorTileCache[src];
+ }
+ 
+-// Pre-load all floor tiles on module init
+-getFloorTile('/title.png');
+-getFloorTile('/title-2.png');
+-getFloorTile('/title-gelo.png');
+-getFloorTile('/title-gelo-3.png');
+-getFloorTile('/title-gelo-4.png');
+-getFloorTile('/title-gelo-5.png');
++// Pre-load new biome-specific floor tiles
++getFloorTile('/title-de-gelo.png');
++getFloorTile('/title-de-gelo-2.png');
++getFloorTile('/title-de-lava.png');
++getFloorTile('/title-de-planta.png');
++getFloorTile('/title-de-gelo-3.png');
+ 
+ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor = 1) {
+   const biome = getBiome(floor);
+   const ts = C.TILE_SIZE;
+ 
+-  // ÔöÇÔöÇ Tile sets ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+-  // Non-ice: title.png (main) + title-2.png (alt variation)
+-  // Ice:     title-gelo-4.png (dominant base) + title-gelo.png / title-gelo-3.png / title-gelo-5.png (accents)
+-  const iceTiles = [
+-    getFloorTile('/title-gelo-4.png'), // 0 ÔÇö dominant: seamless blue-grey stone (best for floor)
+-    getFloorTile('/title-gelo-4.png'), // 1 ÔÇö repeated to increase its weight
+-    getFloorTile('/title-gelo-4.png'), // 2 ÔÇö repeated again
+-    getFloorTile('/title-gelo.png'),   // 3 ÔÇö icicle wall accent (rare)
+-    getFloorTile('/title-gelo-3.png'), // 4 ÔÇö isometric ice block (rare)
+-    getFloorTile('/title-gelo-5.png'), // 5 ÔÇö icicle stone (rare)
+-  ];
+-  const genericTiles = [
+-    getFloorTile('/title.png'),        // 0 ÔÇö main dark dungeon stone
+-    getFloorTile('/title.png'),        // 1 ÔÇö repeated to increase weight
+-    getFloorTile('/title-2.png'),      // 2 ÔÇö alt flat dungeon tile
+-    getFloorTile('/title.png'),        // 3 ÔÇö main again
+-    getFloorTile('/title-2.png'),      // 4 ÔÇö alt
+-  ];
++  // ÔöÇÔöÇ Tile sets by Biome ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
++  let tileSet: HTMLImageElement[] = [];
++
++  if (biome.theme === 'crystal') {
++    tileSet = [
++      getFloorTile('/title-de-gelo.png'),
++      getFloorTile('/title-de-gelo-2.png'),
++      getFloorTile('/title-de-gelo-3.png') // This is actually ice tile 3
++    ];
++  } else if (biome.theme === 'volcano') {
++    tileSet = [getFloorTile('/title-de-lava.png')];
++  } else if (biome.theme === 'forest') {
++    tileSet = [
++      getFloorTile('/title-de-planta.png')
++    ];
++  } else {
++    // Default fallback set
++    tileSet = [getFloorTile('/title-de-gelo.png')];
++  }
++
++  // --- Disable image smoothing for crisp pixel-art appearance ---
++  ctx.imageSmoothingEnabled = false;
++
+ 
+   for (let row = 0; row < C.dims.rr; row++) {
+     for (let col = 0; col < C.dims.rc; col++) {
+@@ -240,36 +244,35 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
+         }
+ 
+       } else {
+-        // ÔöÇÔöÇ FLOOR TILES (sprite-based, muted) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+-        const hash = (col * 17 + row * 31 + col * row * 7) % 100;
++        // ÔöÇÔöÇ FLOOR TILES (Direct Sprite Rendering @ 32px) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
++        // Seamless high-quality tiles from public folder
++        const hash = (col * 17 + row * 31 + col * row * 7) % 700;
+ 
+-        // 1) Pick tile from the appropriate set using hash as index
+-        const isIce = biome.theme === 'crystal';
+-        const tileSet = isIce ? iceTiles : genericTiles;
++        // 1) Pick tile from the biome set
+         const tileIdx = hash % tileSet.length;
+         const tile = tileSet[tileIdx];
+ 
+-        // Draw sprite at low opacity ÔÇö organic texture without dominant grid
++        // 2) Direct Base ÔÇö Draw sprite with full 100% visibility
+         if (tile.complete && tile.naturalWidth > 0) {
+           ctx.save();
+-          ctx.globalAlpha = isIce ? 0.30 : 0.35;
+-          ctx.drawImage(tile, x, y, ts, ts);
++          // Subtle procedural brightness variation (0.97 to 1.03)
++          const brightness = 0.97 + (hash % 7) * 0.01;
++          ctx.filter = `brightness(${brightness})`;
++
++          ctx.globalAlpha = 1.0;
++          ctx.drawImage(tile, x, y, ts, ts); // ts is now 32px
+           ctx.restore();
++        } else {
++          // Fallback while loading
++          ctx.fillStyle = biome.floor;
++          ctx.fillRect(x, y, ts, ts);
+         }
+ 
+-        // 2) Solid biome-color wash ÔÇö unifies the tiles and kills the grid
+-        //    High enough to dominate, low enough to let texture breathe
+-        ctx.fillStyle = biome.floor;
+-        ctx.globalAlpha = 0.65;
+-        ctx.fillRect(x, y, ts, ts);
+-        ctx.globalAlpha = 1.0;
+-
+         // 3) Micro-noise variation ÔÇö breaks up the checkerboard feel
+-        //    Applied as a barely visible brightness push on ~1/3 of tiles
+         if (hash % 3 === 0) {
+           ctx.fillStyle = hash % 6 === 0
+-            ? 'rgba(255,255,255,0.018)'
+-            : 'rgba(0,0,0,0.025)';
++            ? 'rgba(255,255,255,0.012)'
++            : 'rgba(0,0,0,0.015)';
+           ctx.fillRect(x, y, ts, ts);
+         }
+ 

@@ -1,0 +1,28 @@
+﻿commit 8842a59079ba639d8e968d2d03111215fdd7aeb4
+Author: mikael <mikaeljuliao56@gmail.com>
+Date:   Tue Feb 24 05:28:48 2026 -0300
+
+    fix: update tile paths and finalize 32px pixel-perfect floor rendering
+
+diff --git a/src/game/renderer.ts b/src/game/renderer.ts
+index 13b78e0..57e36a7 100644
+--- a/src/game/renderer.ts
++++ b/src/game/renderer.ts
+@@ -176,7 +176,7 @@ getFloorTile('/title-de-gelo.png');
+ getFloorTile('/title-de-gelo-2.png');
+ getFloorTile('/title-de-lava.png');
+ getFloorTile('/title-de-planta.png');
+-getFloorTile('/title-de-planta-3.png');
++getFloorTile('/title-de-gelo-3.png');
+ 
+ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor = 1) {
+   const biome = getBiome(floor);
+@@ -189,7 +189,7 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
+     tileSet = [
+       getFloorTile('/title-de-gelo.png'),
+       getFloorTile('/title-de-gelo-2.png'),
+-      getFloorTile('/title-de-planta-3.png') // This is actually ice tile 3
++      getFloorTile('/title-de-gelo-3.png') // This is actually ice tile 3
+     ];
+   } else if (biome.theme === 'volcano') {
+     tileSet = [getFloorTile('/title-de-lava.png')];
