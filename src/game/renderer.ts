@@ -247,37 +247,39 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
     offCtx.imageSmoothingEnabled = true;
     offCtx.imageSmoothingQuality = 'high';
 
-    // ── RUÍDO COERENTE (estilo Perlin simplificado) ─────────────────────
-    // Em vez de hash aleatório por tile, usamos ondas senoidais em ângulos
-    // diferentes com frequência baixa. Mesmas frequências = manchas GRANDES e
-    // contínuas (tipo Hades). O seed é baseado no número do andar para que cada
-    // sala tenha um padrão diferente mas sempre determinístico.
-    const seed = floor * 7919; // número primo — garante variedade por andar
-    const angleA = (seed * 0.137) % Math.PI;
-    const angleB = (seed * 0.251) % Math.PI;
-    const angleC = (seed * 0.383) % Math.PI;
+    // ── RUÍDO COERENTE: ondas senoidais de baixa frequência ─────────
+    // Gera regiões orgânicas de alta/baixa influência atmosférica.
+    const seed = floor * 7919;
+    const angA = (seed * 0.137) % Math.PI;
+    const angB = (seed * 0.251) % Math.PI;
+    const angC = (seed * 0.383) % Math.PI;
+    const fA = 0.11, fB = 0.08, fC = 0.06;
 
-    // Frequência: quanto menor, maiores as manchas. ~0.12 → manchas de ~8 tiles
-    const freqA = 0.12;
-    const freqB = 0.09;
-    const freqC = 0.07;
-
-    // Pré-calcular o mapa de ruído para cada célula interior (0.0 → 1.0)
+    // Mapa de ruído normalizado [0,1] — influência atmosférica por célula
     const noiseMap: number[][] = [];
-    for (let row = 1; row < rr - 1; row++) {
-      noiseMap[row] = [];
-      for (let col = 1; col < rc - 1; col++) {
-        // Soma de 3 senóides em ângulos diferentes → ruído suave e orgânico
-        const nx = col + Math.cos(angleA) * 50;
-        const ny = row + Math.sin(angleA) * 50;
-        const n1 = Math.sin(nx * freqA + Math.cos(angleA)) * Math.cos(ny * freqA);
-        const n2 = Math.sin(nx * freqB + Math.sin(angleB) * 3.7) * Math.cos(ny * freqB + Math.cos(angleB));
-        const n3 = Math.sin(nx * freqC + angleC) * Math.cos(ny * freqC + Math.sin(angleC) * 2.1);
-        // Combina as 3 ondas e normaliza para [0, 1]
-        noiseMap[row][col] = (n1 * 0.5 + n2 * 0.33 + n3 * 0.17 + 1.0) * 0.5;
+    for (let r = 1; r < rr - 1; r++) {
+      noiseMap[r] = [];
+      for (let c = 1; c < rc - 1; c++) {
+        const nx = c + Math.cos(angA) * 40;
+        const ny = r + Math.sin(angA) * 40;
+        const n1 = Math.sin(nx * fA + Math.cos(angA)) * Math.cos(ny * fA);
+        const n2 = Math.sin(nx * fB + Math.sin(angB) * 3.7) * Math.cos(ny * fB + Math.cos(angB));
+        const n3 = Math.sin(nx * fC + angC) * Math.cos(ny * fC + Math.sin(angC) * 2.1);
+        noiseMap[r][c] = (n1 * 0.5 + n2 * 0.33 + n3 * 0.17 + 1.0) * 0.5;
       }
     }
 
+    // Derivar cores RGB do bioma para usar nos efeitos procedurais
+    // accent: "#rrggbb" ou "rgb(r,g,b)"
+    let biomR = 120, biomG = 120, biomB = 180; // fallback azulado
+    const hexMatch = biome.accent.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (hexMatch) {
+      biomR = parseInt(hexMatch[1], 16);
+      biomG = parseInt(hexMatch[2], 16);
+      biomB = parseInt(hexMatch[3], 16);
+    }
+
+    // ── PASSO 1: Chão base em TODAS as células (soberano, alpha 1.0) ─
     for (let row = 0; row < rr; row++) {
       for (let col = 0; col < rc; col++) {
         const x = col * ts;
@@ -308,39 +310,126 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
             offCtx.fillRect(x, y, ts, ts);
           }
         } else {
-          // ── CHÃO: base sempre desenhado primeiro ──────────────
+          // Chão base: sempre 100% opaco, identidade arquitetural principal
           offCtx.globalAlpha = 1.0;
           offCtx.drawImage(baseFloorImg, x, y, ts, ts);
-
-          // ── MANCHAS DE BIOMA usando ruído coerente ────────────
-          // noise > 0.35 → começa a introduzir o tile do bioma
-          // noise > 0.65 → tile do bioma quase sólido
-          // 0.35–0.65   → zona de transição suave (blend)
-          if (biomeAccents.length > 0) {
-            const noise = noiseMap[row][col];
-            const THRESH_LOW = 0.30; // abaixo → só chão base
-            const THRESH_HIGH = 0.62; // acima  → bioma quase sólido
-
-            if (noise > THRESH_LOW) {
-              // Quanto da textura de bioma mostrar: suave na borda, forte no centro
-              const blend = Math.min(1.0, (noise - THRESH_LOW) / (THRESH_HIGH - THRESH_LOW));
-              // Alpha: 0 na borda mínima, 0.88 no centro sólido
-              const alpha = blend * 0.88;
-              // Alterna entre variações do bioma com base na posição (sem hash aleatório)
-              const accentIdx = biomeAccents.length > 1
-                ? (Math.floor(noise * 3.7) % biomeAccents.length)
-                : 0;
-              const accentTile = biomeAccents[accentIdx];
-              offCtx.globalAlpha = alpha;
-              offCtx.drawImage(accentTile, x, y, ts, ts);
-              offCtx.globalAlpha = 1.0;
-            }
-          }
         }
       }
     }
 
-    // Sombra da parede superior (estática, entra no cache)
+    // ── PASSO 2: Tint wash atmosférico (multiply blend) ───────────────
+    // Maximo 28% de dominância visual — nunca substitui o base
+    offCtx.globalCompositeOperation = 'multiply';
+    for (let row = 1; row < rr - 1; row++) {
+      for (let col = 1; col < rc - 1; col++) {
+        const noise = noiseMap[row][col];
+        if (noise < 0.40) continue; // só nas zonas de maior influência
+        const x = col * ts;
+        const y = row * ts;
+
+        // Intensidade máx 0.28, cresce linearmente do threshold até 1.0
+        const intensity = Math.min(0.28, (noise - 0.40) / 0.60 * 0.28);
+        offCtx.fillStyle = `rgba(${biomR},${biomG},${biomB},${intensity.toFixed(3)})`;
+        offCtx.fillRect(x, y, ts, ts);
+      }
+    }
+    offCtx.globalCompositeOperation = 'source-over';
+
+    // ── PASSO 3: Rachaduras emissivas (canvas paths temáticos) ────────
+    // Linhas finas com a cor de acento do bioma desenhadas sobre o stone.
+    // Aparecem apenas onde o ruído é alto (zona de maior influência).
+    offCtx.globalCompositeOperation = 'screen';
+
+    const crackSeeds: Array<{ row: number; col: number; noise: number }> = [];
+    for (let row = 2; row < rr - 2; row++) {
+      for (let col = 2; col < rc - 2; col++) {
+        const noise = noiseMap[row][col];
+        // Só inicia rachaduras em picos de ruído (zona central da influência)
+        if (noise > 0.72 && ((row * 7 + col * 13) % 5 === 0)) {
+          crackSeeds.push({ row, col, noise });
+        }
+      }
+    }
+
+    // Desenha até 30 rachaduras para não sobrecarregar
+    const maxCracks = Math.min(30, crackSeeds.length);
+    for (let ci = 0; ci < maxCracks; ci++) {
+      const { row, col, noise } = crackSeeds[ci];
+      const cx = col * ts + ts / 2;
+      const cy = row * ts + ts / 2;
+
+      // Comprimento e ramificações baseados no ruído local
+      const crackLen = 8 + noise * 20;
+      const crackAlpha = 0.10 + noise * 0.18; // máx ~0.28
+
+      offCtx.save();
+      offCtx.strokeStyle = `rgba(${biomR},${biomG},${biomB},${crackAlpha.toFixed(3)})`;
+      offCtx.lineWidth = biome.theme === 'volcano' ? 1.2 : 0.8;
+      offCtx.lineCap = 'round';
+
+      // Traça 2-3 ramificações orgânicas por semente
+      const branches = biome.theme === 'crystal' ? 3 : 2;
+      for (let b = 0; b < branches; b++) {
+        const angle = (angA + ci * 1.4 + b * 2.1) % (Math.PI * 2);
+        offCtx.beginPath();
+        offCtx.moveTo(cx, cy);
+        let px = cx, py = cy;
+        const steps = Math.floor(crackLen / 3);
+        for (let s = 0; s < steps; s++) {
+          const jitter = (biome.theme === 'crystal') ? 1.2 : 2.0;
+          const da = angle + Math.sin(s * 0.8 + ci) * jitter;
+          px += Math.cos(da) * 3;
+          py += Math.sin(da) * 3;
+          offCtx.lineTo(px, py);
+        }
+        offCtx.stroke();
+      }
+      offCtx.restore();
+    }
+
+    // ── PASSO 4: Acumulação nas bordas de tile (seam bleed) ───────────
+    // O bioma "vaza" nas juntas entre tiles — efeito de desgaste/erosão.
+    // Usa source-over com alpha muito baixo nas bordas das células.
+    offCtx.globalCompositeOperation = 'source-over';
+    for (let row = 1; row < rr - 1; row++) {
+      for (let col = 1; col < rc - 1; col++) {
+        const noise = noiseMap[row][col];
+        if (noise < 0.35) continue;
+        const x = col * ts;
+        const y = row * ts;
+        const seamAlpha = (noise - 0.35) * 0.12; // máx ~0.078
+
+        offCtx.fillStyle = `rgba(${biomR},${biomG},${biomB},${seamAlpha.toFixed(3)})`;
+        // Borda superior e inferior (1px)
+        offCtx.fillRect(x + 1, y, ts - 2, 1);
+        offCtx.fillRect(x + 1, y + ts - 1, ts - 2, 1);
+        // Borda esquerda e direita (1px)
+        offCtx.fillRect(x, y + 1, 1, ts - 2);
+        offCtx.fillRect(x + ts - 1, y + 1, 1, ts - 2);
+      }
+    }
+
+    // ── PASSO 5: Glow emissivo puntual nos picos de fissura ──────────
+    // Pequenos blocos de luz (screen blend) no centro de alta influência.
+    // Lava: laranja quente. Gelo: azul frio. Floresta: verde suave.
+    offCtx.globalCompositeOperation = 'screen';
+    for (let ci = 0; ci < Math.min(20, crackSeeds.length); ci++) {
+      const { row, col, noise } = crackSeeds[ci];
+      const cx = col * ts + ts / 2;
+      const cy = row * ts + ts / 2;
+      const glowAlpha = (noise - 0.72) * 0.20; // máx ~0.05 — extremamente sutil
+      const glowR = 6 + noise * 8;
+      const g = offCtx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+      g.addColorStop(0, `rgba(${biomR},${biomG},${biomB},${glowAlpha.toFixed(3)})`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      offCtx.fillStyle = g;
+      offCtx.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2);
+    }
+
+    offCtx.globalCompositeOperation = 'source-over';
+    offCtx.globalAlpha = 1.0;
+
+    // ── Sombra da parede superior (estática, entra no cache) ─────────
     const shadowGrad = offCtx.createLinearGradient(0, ts, 0, ts * 3);
     shadowGrad.addColorStop(0, 'rgba(0,0,0,0.25)');
     shadowGrad.addColorStop(1, 'rgba(0,0,0,0.00)');
