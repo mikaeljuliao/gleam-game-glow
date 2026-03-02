@@ -138,26 +138,26 @@ export const VENDOR_LIGHT_RADIUS = 300;
 
 // Lighting System (Hades-inspired)
 export const LIGHTING_CONFIG = {
-  globalDarkness: 0.82,      // 80%-85% opacity (increased for more drama)
+  globalDarkness: 0.85,      // 80%-85% opacity (deep blacks)
   ambientColor: '#000000',   // Base darkness color
-  vignetteOpacity: 0.48,     // 45%-50% darker edges
+  vignetteOpacity: 0.50,     // 45%-50% darker edges
 
   playerLight: {
-    color: '#FFD37A',        // Warm default cast
-    radius: 180,             // Slightly larger
-    intensity: 1.25,         // Stronger highlight
+    color: '#FFBC42',        // More saturated amber (less white)
+    radius: 170,             // Balanced radius
+    intensity: 0.8,          // Reduced to avoid bleaching
   },
 
   crystalLight: {
-    color: '#00D4FF',        // Bright ice cyan
-    radius: 140,             // More bleed
-    intensity: 1.0,          // Stronger emission
+    color: '#00BAFF',        // Deeper cyan (less white)
+    radius: 130,             // Focused bleed
+    intensity: 0.7,          // Reduced emission
   },
 
   chestLight: {
-    color: '#FFB84D',        // Golden shimmer
-    radius: 115,
-    intensity: 0.85,
+    color: '#E6A817',        // Rich gold
+    radius: 110,
+    intensity: 0.6,
   },
 };
 

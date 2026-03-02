@@ -4885,9 +4885,9 @@ export function renderLighting(
   pRadius *= getHPLightPulse(hpRatio, time);
 
   const pGrad = lCtx.createRadialGradient(player.x, player.y, 0, player.x, player.y, pRadius);
-  pGrad.addColorStop(0, 'rgba(255,255,255,1.0)');
-  pGrad.addColorStop(0.3, 'rgba(255,255,255,0.8)');
-  pGrad.addColorStop(0.7, 'rgba(255,255,255,0.3)');
+  pGrad.addColorStop(0, 'rgba(255,255,255,0.95)'); // Soft center reveal (not fully white)
+  pGrad.addColorStop(0.35, 'rgba(255,255,255,0.7)');
+  pGrad.addColorStop(0.75, 'rgba(255,255,255,0.2)');
   pGrad.addColorStop(1, 'rgba(255,255,255,0)');
   lCtx.fillStyle = pGrad;
   lCtx.fillRect(player.x - pRadius, player.y - pRadius, pRadius * 2, pRadius * 2);
@@ -4898,8 +4898,8 @@ export function renderLighting(
     for (const o of room.obstacles) {
       const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
       const cGrad = lCtx.createRadialGradient(cx, cy, 0, cx, cy, cRadius);
-      cGrad.addColorStop(0, 'rgba(255,255,255,0.85)');
-      cGrad.addColorStop(0.5, 'rgba(255,255,255,0.4)');
+      // Soft reveal for crystals
+      cGrad.addColorStop(0, 'rgba(255,255,255,0.8)');
       cGrad.addColorStop(1, 'rgba(255,255,255,0)');
       lCtx.fillStyle = cGrad;
       lCtx.fillRect(cx - cRadius, cy - cRadius, cRadius * 2, cRadius * 2);
@@ -4912,8 +4912,7 @@ export function renderLighting(
     const pulse = Math.sin(time * 3.5) * 0.1 + 0.95;
     const chRadius = config.chestLight.radius * pulse;
     const chGrad = lCtx.createRadialGradient(cx, cy, 0, cx, cy, chRadius);
-    chGrad.addColorStop(0, 'rgba(255,255,255,0.85)');
-    chGrad.addColorStop(0.5, 'rgba(255,255,255,0.3)');
+    chGrad.addColorStop(0, 'rgba(255,255,255,0.8)');
     chGrad.addColorStop(1, 'rgba(255,255,255,0)');
     lCtx.fillStyle = chGrad;
     lCtx.fillRect(cx - chRadius, cy - chRadius, chRadius * 2, chRadius * 2);
@@ -4921,32 +4920,30 @@ export function renderLighting(
 
   // ── FINAL COMPOSITE OF LIGHT MASK ──
   ctx.save();
-  // Multiply blend requested for high contrast cinematic look
-  // (In browser canvas, source-over with destination-out Mask achieves identical look to Multiply with White)
+  // Drawing black layer with holes over main canvas darkens areas but reveals floor at 1.0 mask transparency
   ctx.globalAlpha = 1.0;
   ctx.drawImage(_lightOff, 0, 0);
 
   // ── PHASE 4: COLOR BLOOM PASS (Atmospheric Tinting) ───────────────
-  // Dramatic highlights and color bleed in light areas
+  // Screen mode is additive - we must keep alphas VERY low to avoid white washing
   ctx.globalCompositeOperation = 'screen';
 
-  // Player bloom - slightly warmer
+  // Player bloom - subtler '26' (15%) alpha
   const bloomGrad = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, pRadius * 0.85);
-  bloomGrad.addColorStop(0, config.playerLight.color + '66'); // 40% bleed
-  bloomGrad.addColorStop(0.6, config.playerLight.color + '22');
+  bloomGrad.addColorStop(0, config.playerLight.color + '26');
+  bloomGrad.addColorStop(0.6, config.playerLight.color + '0d');
   bloomGrad.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = bloomGrad;
   ctx.fillRect(player.x - pRadius, player.y - pRadius, pRadius * 2, pRadius * 2);
 
   // Crystal color bleed
   if (biome.theme === 'crystal' || biome.theme === 'volcano') {
-    const cColor = biome.theme === 'volcano' ? '#ff3300' : config.crystalLight.color;
+    const cColor = biome.theme === 'volcano' ? '#dd2200' : config.crystalLight.color;
     const cRadius = config.crystalLight.radius;
     for (const o of room.obstacles) {
       const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
       const bcGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cRadius * 0.9);
-      bcGrad.addColorStop(0, cColor + '55'); // Stronger color wash
-      bcGrad.addColorStop(0.5, cColor + '22');
+      bcGrad.addColorStop(0, cColor + '33'); // 20% bloom
       bcGrad.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = bcGrad;
       ctx.fillRect(cx - cRadius, cy - cRadius, cRadius * 2, cRadius * 2);
@@ -4958,8 +4955,7 @@ export function renderLighting(
     const cx = gw / 2, cy = gh / 2;
     const chRadius = config.chestLight.radius;
     const gGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, chRadius * 0.7);
-    gGrad.addColorStop(0, config.chestLight.color + '88'); // Stronger gold bloom
-    gGrad.addColorStop(0.6, config.chestLight.color + '33');
+    gGrad.addColorStop(0, config.chestLight.color + '33');
     gGrad.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = gGrad;
     ctx.fillRect(cx - chRadius, cy - chRadius, chRadius * 2, chRadius * 2);
