@@ -136,6 +136,31 @@ export const DOOR_WIDTH = 28;
 export const LIGHT_RADIUS = 130;
 export const VENDOR_LIGHT_RADIUS = 300;
 
+// Lighting System (Hades-inspired)
+export const LIGHTING_CONFIG = {
+  globalDarkness: 0.75,      // 60%-75% opacity (darkness intensity)
+  ambientColor: '#000000',   // Base darkness color
+  vignetteOpacity: 0.40,     // 30%-40% darker edges
+
+  playerLight: {
+    color: '#FFD37A',        // Warm default cast
+    radius: 160,
+    intensity: 1.0,
+  },
+
+  crystalLight: {
+    color: '#00D4FF',        // Bright ice cyan
+    radius: 120,
+    intensity: 0.8,
+  },
+
+  chestLight: {
+    color: '#FFB84D',        // Golden shimmer
+    radius: 100,
+    intensity: 0.7,
+  },
+};
+
 // Soul drops per enemy type (almas)
 export const SOUL_DROPS: Record<string, [number, number]> = {
   swarm: [1, 1],

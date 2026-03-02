@@ -247,132 +247,64 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
     offCtx.imageSmoothingEnabled = true;
     offCtx.imageSmoothingQuality = 'high';
 
-    // ─────────────────────────────────────────────────────────────────────
-    // SISTEMA DE COMPOSIÇÃO MACROESTRUTURAL
-    // Em vez de ruído por tile, geramos 2–4 zonas de influência no nível da sala.
-    // Cada zona: centro (em tiles), raio, intensidade.
-    // Cada tile herda intensidade = soma dos falloffs radiais das zonas.
-    // Isso cria storytelling direcional: "lava vaza de um canto", "gelo avança
-    // desde a parede norte", "corrupção emerge do centro".
-    // ─────────────────────────────────────────────────────────────────────
+    // ── MACRO COMPOSITION: Zone-Based Influence ────────────────────
+    // Em vez de ruído por tile, criamos 2-4 núcleos de influência por sala.
+    const seed = floor * 7919;
+    const zoneCount = 2 + (seed % 3); // 2 a 4 zonas macro
+    const zones: Array<{ cx: number; cy: number; radius: number; intensity: number }> = [];
 
-    // Semente determinística por andar
-    const seed = floor * 7919 + 1;
-    // Funções pseudo-aleatórias ancoradas no seed (sem Math.random)
-    const rng = (i: number) => ((Math.sin(seed + i * 127.1) * 43758.5453) % 1 + 1) % 1;
+    // Ângulos base para distorção orgânica do ruído
+    const angA = (seed * 0.137) % Math.PI;
+    const angB = (seed * 0.251) % Math.PI;
 
-    // Derivar RGB do biome.accent para usar nos efeitos
-    let biomR = 120, biomG = 120, biomB = 200;
-    const hexM = biome.accent.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-    if (hexM) {
-      biomR = parseInt(hexM[1], 16);
-      biomG = parseInt(hexM[2], 16);
-      biomB = parseInt(hexM[3], 16);
-    }
-
-    // ── GERAÇÃO DAS ZONAS DE INFLUÊNCIA ──────────────────────────────────
-    // Interior da sala em tiles (ignora paredes de borda)
-    const iW = rc - 2; // largura interior
-    const iH = rr - 2; // altura interior
-
-    interface Zone { cx: number; cy: number; radius: number; intensity: number; }
-    const zones: Zone[] = [];
-
-    if (biome.theme === 'volcano') {
-      // LAVA: 1–2 zonas emergindo de cantos ou paredes (direcional)
-      // Escolhe o canto dominante baseado no seed
-      const cornerIdx = Math.floor(rng(0) * 4);
-      const corners = [
-        { cx: 2, cy: 2 },           // noroeste
-        { cx: iW - 2, cy: 2 },      // nordeste
-        { cx: 2, cy: iH - 2 },      // sudoeste
-        { cx: iW - 2, cy: iH - 2 }, // sudeste
-      ];
-      const c = corners[cornerIdx];
-      // Zona principal: grande, intensa, ancorada no canto
-      zones.push({ cx: c.cx + 1, cy: c.cy + 1, radius: iW * 0.55, intensity: 1.0 });
-      // Zona secundária: menor, adjacente ao lado oposto (cria assimetria)
-      const c2 = corners[(cornerIdx + 2) % 4];
-      zones.push({ cx: c2.cx + 1, cy: c2.cy + 1, radius: iW * 0.28, intensity: 0.55 });
-
-    } else if (biome.theme === 'crystal') {
-      // GELO: 1 zona principal irradiando de uma borda + 1 foco secundário
-      // O gelo avança de uma parede específica (N/S/L/O)
-      const wallIdx = Math.floor(rng(1) * 4);
-      const wallOrigins = [
-        { cx: iW / 2, cy: 1 },          // parede norte
-        { cx: iW / 2, cy: iH - 1 },     // parede sul
-        { cx: 1, cy: iH / 2 },     // parede oeste
-        { cx: iW - 1, cy: iH / 2 },     // parede leste
-      ];
-      const w = wallOrigins[wallIdx];
-      zones.push({ cx: w.cx, cy: w.cy, radius: iH * 0.65, intensity: 1.0 });
-      // Foco secundário: racha no meio da sala (menor, alta intensidade localizada)
+    for (let i = 0; i < zoneCount; i++) {
+      const zSeed = Math.sin(seed + i * 144.7) * 10000;
+      const zRandom = Math.abs(zSeed) - Math.floor(Math.abs(zSeed));
       zones.push({
-        cx: iW * 0.4 + rng(2) * iW * 0.2,
-        cy: iH * 0.4 + rng(3) * iH * 0.2,
-        radius: iW * 0.20,
-        intensity: 0.70,
-      });
-
-    } else {
-      // FLORESTA/CORRUPÇÃO: 2–3 zonas orgânicas emergindo do centro e de gretas
-      // Centro principal (a corrupção "pulsa" do meio)
-      zones.push({
-        cx: iW * 0.35 + rng(4) * iW * 0.30,
-        cy: iH * 0.35 + rng(5) * iH * 0.30,
-        radius: iW * 0.45,
-        intensity: 0.90,
-      });
-      // Duas gretas secundárias em locais orgânicos
-      zones.push({
-        cx: 2 + rng(6) * (iW - 4),
-        cy: 2 + rng(7) * (iH - 4),
-        radius: iW * 0.22,
-        intensity: 0.65,
-      });
-      zones.push({
-        cx: 2 + rng(8) * (iW - 4),
-        cy: 2 + rng(9) * (iH - 4),
-        radius: iW * 0.18,
-        intensity: 0.50,
+        cx: 2 + (Math.floor(zRandom * 1234) % (rc - 4)),
+        cy: 2 + (Math.floor(zRandom * 5678) % (rr - 4)),
+        radius: 5 + (Math.floor(zRandom * 91011) % 12), // Raio em tiles
+        intensity: 0.8 + (zRandom * 0.2)
       });
     }
 
-    // ── MAPA DE INFLUÊNCIA: distância radial suavizada por tile ──────────
-    // influence[row][col] ∈ [0, 1]
-    // Usamos falloff quadrático (smooth) + micro-distorção para borda orgânica
-    const inflMap: number[][] = [];
-    for (let row = 1; row < rr - 1; row++) {
-      inflMap[row] = [];
-      for (let col = 1; col < rc - 1; col++) {
-        // Posição em coordenadas de "tile interior" (0..iW, 0..iH)
-        const tx = col - 1;
-        const ty = row - 1;
-
-        // Micro-distorção orgânica das bordas de zona (não per-tile noise)
-        // Usa senos com frequência baixa — não hash aleatório
-        const microdist = (Math.sin(tx * 0.47 + seed * 0.03) + Math.cos(ty * 0.39 + seed * 0.07)) * 1.2;
-
-        let total = 0;
+    // Mapa de influência macro [0,1]
+    const influenceMap: number[][] = [];
+    for (let r = 1; r < rr - 1; r++) {
+      influenceMap[r] = [];
+      for (let c = 1; c < rc - 1; c++) {
+        let maxInf = 0;
         for (const z of zones) {
-          const dx = tx - z.cx + microdist * 0.5;
-          const dy = ty - z.cy + microdist * 0.3;
-          const d = Math.sqrt(dx * dx + dy * dy);
-          const raw = 1.0 - Math.min(1.0, d / z.radius);
-          // Falloff suave (smoothstep ao quadrado)
-          const smooth = raw * raw * (3 - 2 * raw);
-          total += smooth * z.intensity;
+          const dx = c - z.cx;
+          const dy = r - z.cy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          // Distorção de baixa frequência para bordas orgânicas
+          const distortion = Math.sin(c * 0.4 + angA) * 0.6 + Math.cos(r * 0.4 + angB) * 0.6;
+          const effectiveDist = dist + distortion;
+
+          const falloff = Math.max(0, 1 - (effectiveDist / z.radius));
+          // Curva de potência para núcleos mais concentrados e bordas suaves
+          const inf = Math.pow(falloff, 1.3) * z.intensity;
+          if (inf > maxInf) maxInf = inf;
         }
-        inflMap[row][col] = Math.min(1.0, total);
+        influenceMap[r][c] = Math.min(1.0, maxInf);
       }
     }
 
-    // ── PASSO 1: Chão base, soberano em 100% ─────────────────────────────
+    // Derivar cores RGB do bioma
+    let biomR = 120, biomG = 120, biomB = 180;
+    const hexMatch = biome.accent.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (hexMatch) {
+      biomR = parseInt(hexMatch[1], 16);
+      biomG = parseInt(hexMatch[2], 16);
+      biomB = parseInt(hexMatch[3], 16);
+    }
+
+    // ── PASSO 1: Chão base (Arquitetura Dominante) ──────────────────
     for (let row = 0; row < rr; row++) {
       for (let col = 0; col < rc; col++) {
-        const x = col * ts;
-        const y = row * ts;
+        const x = col * ts, y = row * ts;
         const isEdge = row === 0 || row === rr - 1 || col === 0 || col === rc - 1;
         if (isEdge) {
           offCtx.fillStyle = biome.wall;
@@ -386,10 +318,10 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
             offCtx.fillRect(x, y + 11, ts, 1);
           }
           if (row === rr - 1) {
-            const b2 = offCtx.createLinearGradient(x, y + ts - 6, x, y + ts);
-            b2.addColorStop(0, 'rgba(0,0,0,0)');
-            b2.addColorStop(1, 'rgba(0,0,0,0.35)');
-            offCtx.fillStyle = b2;
+            const bounce = offCtx.createLinearGradient(x, y + ts - 6, x, y + ts);
+            bounce.addColorStop(0, 'rgba(0,0,0,0)');
+            bounce.addColorStop(1, 'rgba(0,0,0,0.35)');
+            offCtx.fillStyle = bounce;
             offCtx.fillRect(x, y + ts - 6, ts, 6);
           }
           if (col === 0 || col === rc - 1) {
@@ -397,79 +329,81 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
             offCtx.fillRect(x, y, ts, ts);
           }
         } else {
-          // Base: arquitetura é sempre o layer primário
           offCtx.globalAlpha = 1.0;
           offCtx.drawImage(baseFloorImg, x, y, ts, ts);
         }
       }
     }
 
-    // ── PASSO 2: Tint wash gradiente (multiply) — zonas externas ─────────
-    // Influência < 0.35 → sem tint. 0.35–1.0 → wash sutil (máx 25%)
+    // ── PASSO 2: Tint wash Atmosférico (Multiply Blend) ──────────────
+    // Aplicado às zonas de influência macro (máx 28% alpha em multiply)
     offCtx.globalCompositeOperation = 'multiply';
     for (let row = 1; row < rr - 1; row++) {
       for (let col = 1; col < rc - 1; col++) {
-        const infl = inflMap[row][col];
-        if (infl < 0.20) continue;
-        const alpha = Math.min(0.25, (infl - 0.20) / 0.80 * 0.25);
-        offCtx.fillStyle = `rgba(${biomR},${biomG},${biomB},${alpha.toFixed(3)})`;
-        offCtx.fillRect(col * ts, row * ts, ts, ts);
+        const inf = influenceMap[row][col];
+        if (inf < 0.1) continue;
+        const x = col * ts, y = row * ts;
+        const intensity = inf * 0.28;
+        offCtx.fillStyle = `rgba(${biomR},${biomG},${biomB},${intensity.toFixed(3)})`;
+        offCtx.fillRect(x, y, ts, ts);
       }
     }
     offCtx.globalCompositeOperation = 'source-over';
 
-    // ── PASSO 3: Rachaduras emissivas — concentradas nos núcleos de zona ──
-    // Só onde influence > 0.65 (zona core), máx 12 rachaduras por sala
+    // ── PASSO 3: Rachaduras Emissivas (Macro Focal Points) ────────────
+    // Rachaduras agora se concentram APENAS perto dos núcleos das zonas.
     offCtx.globalCompositeOperation = 'screen';
-    let crackCount = 0;
-    for (let row = 2; row < rr - 2 && crackCount < 12; row++) {
-      for (let col = 2; col < rc - 2 && crackCount < 12; col++) {
-        const infl = inflMap[row][col];
-        if (infl < 0.65) continue;
-        // Espaçamento mínimo entre rachaduras (não em toda célula acima do threshold)
-        if ((row * 5 + col * 7) % 4 !== 0) continue;
-
-        const cx = col * ts + ts / 2;
-        const cy = row * ts + ts / 2;
-        const crackAlpha = 0.08 + infl * 0.15; // máx 0.23 — sutil
-        const crackLen = 6 + infl * 18;
-
-        offCtx.save();
-        offCtx.strokeStyle = `rgba(${biomR},${biomG},${biomB},${crackAlpha.toFixed(3)})`;
-        offCtx.lineWidth = biome.theme === 'volcano' ? 1.1 : 0.7;
-        offCtx.lineCap = 'round';
-
-        const branches = biome.theme === 'crystal' ? 3 : 2;
-        for (let b = 0; b < branches; b++) {
-          // Ângulo derivado do seed e posição — não pseudo-random por frame
-          const baseAngle = (seed * 0.0017 + row * 0.41 + col * 0.37 + b * 2.09) % (Math.PI * 2);
-          offCtx.beginPath();
-          offCtx.moveTo(cx, cy);
-          let px = cx, py = cy;
-          const steps = Math.floor(crackLen / 3);
-          for (let s = 0; s < steps; s++) {
-            const da = baseAngle + Math.sin(s * 0.9 + row + col) * (biome.theme === 'crystal' ? 1.0 : 1.8);
-            px += Math.cos(da) * 3;
-            py += Math.sin(da) * 3;
-            offCtx.lineTo(px, py);
-          }
-          offCtx.stroke();
+    const crackSeeds: Array<{ row: number; col: number; inf: number }> = [];
+    for (let row = 2; row < rr - 2; row++) {
+      for (let col = 2; col < rc - 2; col++) {
+        const inf = influenceMap[row][col];
+        // Alta intensidade necessária para crack (focal points)
+        if (inf > 0.75 && ((row * 13 + col * 7) % 6 === 0)) {
+          crackSeeds.push({ row, col, inf });
         }
-        offCtx.restore();
-        crackCount++;
       }
     }
 
-    // ── PASSO 4: Seam bleed — borda de tile nas zonas de influência média ─
+    const maxCracks = Math.min(20, crackSeeds.length); // Reduzido para focar em grandes ranhuras
+    for (let ci = 0; ci < maxCracks; ci++) {
+      const { row, col, inf } = crackSeeds[ci];
+      const cx = col * ts + ts / 2, cy = row * ts + ts / 2;
+      const crackLen = 12 + inf * 25;
+      const crackAlpha = 0.15 + inf * 0.25;
+
+      offCtx.save();
+      offCtx.strokeStyle = `rgba(${biomR},${biomG},${biomB},${crackAlpha.toFixed(3)})`;
+      offCtx.lineWidth = biome.theme === 'volcano' ? 1.4 : 1.0;
+      offCtx.lineCap = 'round';
+
+      const branches = 2;
+      for (let b = 0; b < branches; b++) {
+        const angle = (angA + ci * 0.9 + b * 2.5) % (Math.PI * 2);
+        offCtx.beginPath();
+        offCtx.moveTo(cx, cy);
+        let px = cx, py = cy;
+        const steps = Math.floor(crackLen / 4);
+        for (let s = 0; s < steps; s++) {
+          const jitter = (biome.theme === 'crystal') ? 0.8 : 1.5;
+          const da = angle + Math.sin(s * 0.6 + ci) * jitter;
+          px += Math.cos(da) * 4;
+          py += Math.sin(da) * 4;
+          offCtx.lineTo(px, py);
+        }
+        offCtx.stroke();
+      }
+      offCtx.restore();
+    }
+
+    // ── PASSO 4: Seam Bleed (Erosão nas bordas) ───────────────────────
     offCtx.globalCompositeOperation = 'source-over';
     for (let row = 1; row < rr - 1; row++) {
       for (let col = 1; col < rc - 1; col++) {
-        const infl = inflMap[row][col];
-        if (infl < 0.30) continue;
-        const x = col * ts;
-        const y = row * ts;
-        const sAlpha = (infl - 0.30) * 0.09; // máx ~0.063
-        offCtx.fillStyle = `rgba(${biomR},${biomG},${biomB},${sAlpha.toFixed(3)})`;
+        const inf = influenceMap[row][col];
+        if (inf < 0.3) continue;
+        const x = col * ts, y = row * ts;
+        const seamAlpha = (inf - 0.3) * 0.15;
+        offCtx.fillStyle = `rgba(${biomR},${biomG},${biomB},${seamAlpha.toFixed(3)})`;
         offCtx.fillRect(x + 1, y, ts - 2, 1);
         offCtx.fillRect(x + 1, y + ts - 1, ts - 2, 1);
         offCtx.fillRect(x, y + 1, 1, ts - 2);
@@ -477,25 +411,22 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
       }
     }
 
-    // ── PASSO 5: Glow de zona — gradiente radial nos núcleos (screen) ────
-    // Um único glow grande por zona, extremamente sutil
+    // ── PASSO 5: Screen Glow (Zone Cores) ─────────────────────────────
     offCtx.globalCompositeOperation = 'screen';
-    for (const z of zones) {
-      const pcx = (z.cx + 1) * ts + ts / 2; // pixel center X
-      const pcy = (z.cy + 1) * ts + ts / 2; // pixel center Y
-      const glowPxR = z.radius * ts;
-      const gAlpha = z.intensity * 0.04;    // máx 0.04 — quase imperceptível individualmente
-      const grd = offCtx.createRadialGradient(pcx, pcy, 0, pcx, pcy, glowPxR);
-      grd.addColorStop(0, `rgba(${biomR},${biomG},${biomB},${gAlpha.toFixed(3)})`);
-      grd.addColorStop(1, 'rgba(0,0,0,0)');
-      offCtx.fillStyle = grd;
-      offCtx.fillRect(pcx - glowPxR, pcy - glowPxR, glowPxR * 2, glowPxR * 2);
+    for (let ci = 0; ci < Math.min(10, crackSeeds.length); ci++) {
+      const { row, col, inf } = crackSeeds[ci];
+      const cx = col * ts + ts / 2, cy = row * ts + ts / 2;
+      const glowR = 10 + inf * 15;
+      const g = offCtx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+      g.addColorStop(0, `rgba(${biomR},${biomG},${biomB},${(inf * 0.1).toFixed(3)})`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      offCtx.fillStyle = g;
+      offCtx.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2);
     }
-
     offCtx.globalCompositeOperation = 'source-over';
     offCtx.globalAlpha = 1.0;
 
-    // ── Sombra da parede superior (estática, entra no cache) ─────────
+    // Sombra estática
     const shadowGrad = offCtx.createLinearGradient(0, ts, 0, ts * 3);
     shadowGrad.addColorStop(0, 'rgba(0,0,0,0.25)');
     shadowGrad.addColorStop(1, 'rgba(0,0,0,0.00)');
@@ -4887,47 +4818,149 @@ export function renderParticles(ctx: CanvasRenderingContext2D, particles: Partic
   }
 }
 
-export function renderLighting(ctx: CanvasRenderingContext2D, px: number, py: number, radius: number, vp: Viewport, isVendorRoom: boolean = false) {
-  const brightness = getBrightness(); // Range [-0.5, 0.5]
+// === BREATHING LIGHT RADIUS ===
+// Returns a multiplier for the light radius based on HP
+function getHPLightPulse(hpRatio: number, time: number): number {
+  if (hpRatio > 0.5) return 1;
+  // Light "breathes" — pulses subtly, more intensely at low HP
+  const intensity = (0.5 - hpRatio) / 0.5; // 0 to 1
+  const breathRate = 1.5 + intensity * 2; // faster breathing at lower HP
+  const breathAmp = 0.05 + intensity * 0.15; // wider pulse at lower HP
+  return 1 - breathAmp + Math.sin(time * breathRate) * breathAmp;
+}
 
-  // Dynamic FOV: Shrink the light radius further if brightness is very low
-  // When brightness starts going below -0.2, we close the field of vision
-  let effectiveRadius = radius;
-  if (brightness < -0.2) {
-    const radiusFactor = Math.max(0.4, 1 + (brightness + 0.2) * 2); // At -0.5, radius is 40%
-    effectiveRadius *= radiusFactor;
+// Scratch canvas for lighting composite
+let _lightOff: OffscreenCanvas | null = null;
+let _lightCtx: OffscreenCanvasRenderingContext2D | null = null;
+
+export function renderLighting(
+  ctx: CanvasRenderingContext2D,
+  player: PlayerState,
+  room: DungeonRoom,
+  time: number,
+  floor: number,
+  vp: Viewport,
+  inVendorRoom: boolean = false
+) {
+  const { gw, gh } = C.dims;
+  const config = C.LIGHTING_CONFIG;
+  const biome = getBiome(floor);
+  const brightness = getBrightness();
+
+  if (!_lightOff || _lightOff.width !== gw || _lightOff.height !== gh) {
+    _lightOff = new OffscreenCanvas(gw, gh);
+    _lightCtx = _lightOff.getContext('2d')!;
+  }
+  const lCtx = _lightCtx!;
+
+  // ── PHASE 1: DARKNESS LAYER ───────────────────────────────────────
+  lCtx.clearRect(0, 0, gw, gh);
+
+  // Ambient darkness opacity scaled by game brightness state
+  // Map brightness [-0.5, 0.5] to intensity, floor at 0.6 if very bright
+  const darknessMult = inVendorRoom ? 0.35 : Math.max(0.6, 1 - (brightness + 0.1) * 1.5);
+  const finalGlobalOpacity = config.globalDarkness * darknessMult;
+
+  lCtx.fillStyle = config.ambientColor;
+  lCtx.globalAlpha = finalGlobalOpacity;
+  lCtx.fillRect(0, 0, gw, gh);
+
+  // ── PHASE 2: ROOM VIGNETTE ─────────────────────────────────────────
+  // Creates darker corners to focus player on the action center
+  const vRadius = Math.sqrt(gw * gw + gh * gh) / 1.8;
+  const vignette = lCtx.createRadialGradient(gw / 2, gh / 2, gw * 0.1, gw / 2, gh / 2, vRadius);
+  vignette.addColorStop(0, 'rgba(0,0,0,0)');
+  vignette.addColorStop(1, `rgba(0,0,0,${config.vignetteOpacity})`);
+  lCtx.globalAlpha = 1.0;
+  lCtx.fillStyle = vignette;
+  lCtx.fillRect(0, 0, gw, gh);
+
+  // ── PHASE 3: LIGHT EXCLUSION (Carving holes in darkness) ──────────
+  lCtx.globalCompositeOperation = 'destination-out';
+
+  // 3a. Player Light
+  let pRadius = config.playerLight.radius;
+  // Dynamic breathing/health pulse
+  const hpRatio = player.hp / player.maxHp;
+  pRadius *= getHPLightPulse(hpRatio, time);
+
+  const pGrad = lCtx.createRadialGradient(player.x, player.y, 0, player.x, player.y, pRadius);
+  pGrad.addColorStop(0, 'rgba(255,255,255,1.0)');
+  pGrad.addColorStop(0.4, 'rgba(255,255,255,0.6)');
+  pGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  lCtx.fillStyle = pGrad;
+  lCtx.fillRect(player.x - pRadius, player.y - pRadius, pRadius * 2, pRadius * 2);
+
+  // 3b. Crystal Light (Focal environmental points)
+  if (biome.theme === 'crystal' || biome.theme === 'volcano') {
+    const cRadius = config.crystalLight.radius;
+    for (const o of room.obstacles) {
+      const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+      const cGrad = lCtx.createRadialGradient(cx, cy, 0, cx, cy, cRadius);
+      cGrad.addColorStop(0, 'rgba(255,255,255,0.7)');
+      cGrad.addColorStop(1, 'rgba(255,255,255,0)');
+      lCtx.fillStyle = cGrad;
+      lCtx.fillRect(cx - cRadius, cy - cRadius, cRadius * 2, cRadius * 2);
+    }
   }
 
-  if (isVendorRoom) {
-    // Vendor room: very bright, warm light
-    // Scale the ambient shadow opacity based on brightness
-    const baseAlpha = 0.4;
-    const alphaScale = Math.max(0, 1 - (brightness + 0.5)); // +0.5 brightness -> alpha 0
-    const finalAlpha = baseAlpha * alphaScale;
-
-    const gradient = ctx.createRadialGradient(px, py, effectiveRadius * 0.5, px, py, effectiveRadius * 1.5);
-    gradient.addColorStop(0, 'rgba(5, 3, 10, 0)');
-    gradient.addColorStop(0.6, `rgba(5, 3, 10, ${finalAlpha * 0.25})`);
-    gradient.addColorStop(1, `rgba(5, 3, 10, ${finalAlpha})`);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(-vp.gox, -vp.goy, vp.rw, vp.rh);
-    return;
+  // 3c. Chest Shimmer
+  if (room.type === 'treasure' && !room.treasureCollected) {
+    const cx = gw / 2, cy = gh / 2;
+    const pulse = Math.sin(time * 3.5) * 0.1 + 0.95;
+    const chRadius = config.chestLight.radius * pulse;
+    const chGrad = lCtx.createRadialGradient(cx, cy, 0, cx, cy, chRadius);
+    chGrad.addColorStop(0, 'rgba(255,255,255,0.6)');
+    chGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    lCtx.fillStyle = chGrad;
+    lCtx.fillRect(cx - chRadius, cy - chRadius, chRadius * 2, chRadius * 2);
   }
 
-  // Standard room lighting
-  // Base darkness alphas at key stops
-  // Map brightness [-0.5, 0.5] to a multiplier that reduces shadow intensity
-  // CAP: Never let darknessMult go below 0.6 (ensures 60% darkness / 40% visibility max)
-  const darknessMult = Math.max(0.6, 1 - (brightness + 0.1) * 1.5);
+  // ── FINAL COMPOSITE OF LIGHT MASK ──
+  ctx.save();
+  // Multiply blend requested for high contrast cinematic look
+  // (In browser canvas, source-over with destination-out Mask achieves identical look to Multiply with White)
+  ctx.globalAlpha = 1.0;
+  ctx.drawImage(_lightOff, 0, 0);
 
-  const gradient = ctx.createRadialGradient(px, py, effectiveRadius * 0.15, px, py, effectiveRadius);
-  gradient.addColorStop(0, 'rgba(5, 3, 10, 0)');
-  gradient.addColorStop(0.3, `rgba(5, 3, 10, ${0.3 * darknessMult})`);
-  gradient.addColorStop(0.5, `rgba(5, 3, 10, ${0.65 * darknessMult})`);
-  gradient.addColorStop(0.7, `rgba(5, 3, 10, ${0.88 * darknessMult})`);
-  gradient.addColorStop(1, `rgba(5, 3, 10, ${0.97 * darknessMult})`);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(-vp.gox, -vp.goy, vp.rw, vp.rh);
+  // ── PHASE 4: COLOR BLOOM PASS (Atmospheric Tinting) ───────────────
+  // Dramatic highlights and color bleed in light areas
+  ctx.globalCompositeOperation = 'screen';
+
+  // Player bloom - slightly warmer
+  const bloomGrad = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, pRadius * 0.8);
+  bloomGrad.addColorStop(0, config.playerLight.color + '44'); // 25% opacity bloom
+  bloomGrad.addColorStop(0.5, config.playerLight.color + '11');
+  bloomGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = bloomGrad;
+  ctx.fillRect(player.x - pRadius, player.y - pRadius, pRadius * 2, pRadius * 2);
+
+  // Crystal color bleed
+  if (biome.theme === 'crystal' || biome.theme === 'volcano') {
+    const cColor = biome.theme === 'volcano' ? '#ff3300' : config.crystalLight.color;
+    const cRadius = config.crystalLight.radius;
+    for (const o of room.obstacles) {
+      const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+      const bcGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cRadius * 0.7);
+      bcGrad.addColorStop(0, cColor + '33');
+      bcGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = bcGrad;
+      ctx.fillRect(cx - cRadius, cy - cRadius, cRadius * 2, cRadius * 2);
+    }
+  }
+
+  // Chest golden shimmer
+  if (room.type === 'treasure' && !room.treasureCollected) {
+    const cx = gw / 2, cy = gh / 2;
+    const chRadius = config.chestLight.radius;
+    const gGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, chRadius * 0.6);
+    gGrad.addColorStop(0, config.chestLight.color + '55');
+    gGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gGrad;
+    ctx.fillRect(cx - chRadius, cy - chRadius, chRadius * 2, chRadius * 2);
+  }
+
+  ctx.restore();
 }
 
 export function renderHUD(ctx: CanvasRenderingContext2D, player: PlayerState, dungeon: DungeonMap, time: number, enemyCount: number, tutorialTimer: number, isMobile: boolean = false, vp: Viewport = { gox: 0, goy: 0, rw: C.dims.gw, rh: C.dims.gh }) {

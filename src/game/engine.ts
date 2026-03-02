@@ -16,7 +16,7 @@ import { PortalManager } from './portals';
 import { portalSystem } from './boss_portal';
 import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins, renderWeaponSelectionOverlay, spawnVacuumImpact, ProjectileOrigin, HandCastEffect, EnemyProjectileImpact, StaffChargeEffect, StaffImpactEffect, renderEssenceCores, renderBiomeAmbientFX } from './renderer';
 import { SFX, initAudio } from './audio';
-import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive, updateHPHorror, renderHPHorror, getHPLightPulse } from './horror';
+import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive, updateHPHorror, renderHPHorror } from './horror';
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
 import { checkTrapCollision, activateTrap, updateTrapEffects, resetTrapEffects, getLightsOutTimer, getPanicTimer, getDoorsLockedTimer, hasEffect } from './traps';
 import { AmuletInventory, createAmuletInventory, getRandomBossAmuletDrop, isAmuletEquipped, WarRhythmState, createWarRhythmState, getSoulCollectorBonus, getSoulCollectorSpeedBonus, AMULET_DEFS, addAmulet, addConsumable, getEquippedConsumable } from './amulets';
@@ -2664,16 +2664,11 @@ export class GameEngine {
       ctx.restore();
     }
 
-    // Lighting with breathing light effect
-    let lightRadius = C.LIGHT_RADIUS;
-    if (this.inVendorRoom) lightRadius = C.VENDOR_LIGHT_RADIUS;
-    if (hasEffect('blindness')) lightRadius = 40;
-    if (getLightsOutTimer() > 0) lightRadius = 15;
-    const hpRatio = this.player.hp / this.player.maxHp;
-    lightRadius *= getHPLightPulse(hpRatio, this.gameTime);
-    renderLighting(ctx, this.player.x, this.player.y, lightRadius, vp, this.inVendorRoom);
+    // Lighting with high-contrast dynamic system
+    renderLighting(ctx, this.player, room, this.gameTime, this.dungeon.floor, vp, this.inVendorRoom);
 
     // HP-reactive horror overlays (vignette, blood, heartbeat flash, shadows)
+    const hpRatio = this.player.hp / this.player.maxHp;
     renderHPHorror(ctx, hpRatio, this.gameTime, vp);
 
     // Horror events overlay
