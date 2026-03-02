@@ -4886,7 +4886,8 @@ export function renderLighting(
 
   const pGrad = lCtx.createRadialGradient(player.x, player.y, 0, player.x, player.y, pRadius);
   pGrad.addColorStop(0, 'rgba(255,255,255,1.0)');
-  pGrad.addColorStop(0.4, 'rgba(255,255,255,0.6)');
+  pGrad.addColorStop(0.3, 'rgba(255,255,255,0.8)');
+  pGrad.addColorStop(0.7, 'rgba(255,255,255,0.3)');
   pGrad.addColorStop(1, 'rgba(255,255,255,0)');
   lCtx.fillStyle = pGrad;
   lCtx.fillRect(player.x - pRadius, player.y - pRadius, pRadius * 2, pRadius * 2);
@@ -4897,7 +4898,8 @@ export function renderLighting(
     for (const o of room.obstacles) {
       const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
       const cGrad = lCtx.createRadialGradient(cx, cy, 0, cx, cy, cRadius);
-      cGrad.addColorStop(0, 'rgba(255,255,255,0.7)');
+      cGrad.addColorStop(0, 'rgba(255,255,255,0.85)');
+      cGrad.addColorStop(0.5, 'rgba(255,255,255,0.4)');
       cGrad.addColorStop(1, 'rgba(255,255,255,0)');
       lCtx.fillStyle = cGrad;
       lCtx.fillRect(cx - cRadius, cy - cRadius, cRadius * 2, cRadius * 2);
@@ -4910,7 +4912,8 @@ export function renderLighting(
     const pulse = Math.sin(time * 3.5) * 0.1 + 0.95;
     const chRadius = config.chestLight.radius * pulse;
     const chGrad = lCtx.createRadialGradient(cx, cy, 0, cx, cy, chRadius);
-    chGrad.addColorStop(0, 'rgba(255,255,255,0.6)');
+    chGrad.addColorStop(0, 'rgba(255,255,255,0.85)');
+    chGrad.addColorStop(0.5, 'rgba(255,255,255,0.3)');
     chGrad.addColorStop(1, 'rgba(255,255,255,0)');
     lCtx.fillStyle = chGrad;
     lCtx.fillRect(cx - chRadius, cy - chRadius, chRadius * 2, chRadius * 2);
@@ -4928,9 +4931,9 @@ export function renderLighting(
   ctx.globalCompositeOperation = 'screen';
 
   // Player bloom - slightly warmer
-  const bloomGrad = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, pRadius * 0.8);
-  bloomGrad.addColorStop(0, config.playerLight.color + '44'); // 25% opacity bloom
-  bloomGrad.addColorStop(0.5, config.playerLight.color + '11');
+  const bloomGrad = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, pRadius * 0.85);
+  bloomGrad.addColorStop(0, config.playerLight.color + '66'); // 40% bleed
+  bloomGrad.addColorStop(0.6, config.playerLight.color + '22');
   bloomGrad.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = bloomGrad;
   ctx.fillRect(player.x - pRadius, player.y - pRadius, pRadius * 2, pRadius * 2);
@@ -4941,8 +4944,9 @@ export function renderLighting(
     const cRadius = config.crystalLight.radius;
     for (const o of room.obstacles) {
       const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
-      const bcGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cRadius * 0.7);
-      bcGrad.addColorStop(0, cColor + '33');
+      const bcGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cRadius * 0.9);
+      bcGrad.addColorStop(0, cColor + '55'); // Stronger color wash
+      bcGrad.addColorStop(0.5, cColor + '22');
       bcGrad.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = bcGrad;
       ctx.fillRect(cx - cRadius, cy - cRadius, cRadius * 2, cRadius * 2);
@@ -4953,8 +4957,9 @@ export function renderLighting(
   if (room.type === 'treasure' && !room.treasureCollected) {
     const cx = gw / 2, cy = gh / 2;
     const chRadius = config.chestLight.radius;
-    const gGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, chRadius * 0.6);
-    gGrad.addColorStop(0, config.chestLight.color + '55');
+    const gGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, chRadius * 0.7);
+    gGrad.addColorStop(0, config.chestLight.color + '88'); // Stronger gold bloom
+    gGrad.addColorStop(0.6, config.chestLight.color + '33');
     gGrad.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = gGrad;
     ctx.fillRect(cx - chRadius, cy - chRadius, chRadius * 2, chRadius * 2);
