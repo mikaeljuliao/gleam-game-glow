@@ -38,7 +38,6 @@ export const BIOMES: Biome[] = [
         obstacleSprites: [
             "/sprits-cenario-4.png",
             "/sprits-cenario-8.png",
-            "/sprits-cenario-5.png",
             "/sprits-cenario-9.png",
             "/sprits-cenario-10.png",
         ]
@@ -60,7 +59,11 @@ export const BIOMES: Biome[] = [
         rays: "rgba(180, 255, 120, 0.08)",
         bgLayer1: "#141a0e",
         bgLayer2: "#0a0d07",
-        obstacleSprites: ["/obstacles/ancient_shelf.png", "/obstacles/ivy_statue.png"]
+        obstacleSprites: [
+            "/sprits-cenario-2.png",
+            "/sprits-cenario-3.png",
+            "/sprits-cenario-7.png",
+        ]
     },
     {
         // Floors 5-6
@@ -79,7 +82,9 @@ export const BIOMES: Biome[] = [
         rays: "rgba(255, 120, 50, 0.12)",
         bgLayer1: "#1a0808",
         bgLayer2: "#100404",
-        obstacleSprites: ["/obstacles/lava_pillar.png", "/obstacles/burnt_debris.png"]
+        obstacleSprites: [
+            "/sprits-cenario-6.png",
+        ]
     }
 ];
 

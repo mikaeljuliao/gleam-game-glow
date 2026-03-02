@@ -184,38 +184,34 @@ function getFloorTile(src: string): HTMLImageElement {
 }
 
 // Pre-load new biome-specific floor tiles
-getFloorTile('/title-de-gelo.png');
-getFloorTile('/title-de-gelo-2.png');
-getFloorTile('/title-de-lava.png');
-getFloorTile('/title-de-planta.png');
-getFloorTile('/title-de-gelo-3.png');
+getFloorTile('/chao-base-original.png');
+getFloorTile('/chao-base-gelo-original.png');
+getFloorTile('/chao-base-lava-original.png');
+getFloorTile('/chao-base-planta-original.png');
+getFloorTile('/choa-base-lava-2-original.png');
 
 export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor = 1) {
   const biome = getBiome(floor);
   const ts = C.TILE_SIZE;
 
-  // ── Tile sets by Biome (Uso dos novos chãos gerados) ──────────
-  let tileSet: HTMLImageElement[] = [];
+  // ── Pré-carregar imagens ───────────────────────────────────────
+  const baseFloorImg = getFloorTile('/chao-base-original.png');
+  let biomeAccents: HTMLImageElement[] = [];
 
   if (biome.theme === 'crystal') {
-    tileSet = [
-      getFloorTile('/tile-glacial-floor.png'),
-      getFloorTile('/tile-glacial-1.png'),
-      getFloorTile('/tile-glacial-2.png')
-    ];
+    biomeAccents = [getFloorTile('/chao-base-gelo-original.png')];
   } else if (biome.theme === 'volcano') {
-    tileSet = [getFloorTile('/tile-lava-floor.png')];
-  } else if (biome.theme === 'forest') {
-    tileSet = [
-      getFloorTile('/tile-archives-floor.png'),
-      getFloorTile('/tile-archives-1.png')
+    biomeAccents = [
+      getFloorTile('/chao-base-lava-original.png'),
+      getFloorTile('/choa-base-lava-2-original.png'),
     ];
-  } else {
-    tileSet = [getFloorTile('/tile-glacial-floor.png')];
+  } else if (biome.theme === 'forest') {
+    biomeAccents = [getFloorTile('/chao-base-planta-original.png')];
   }
 
-  // --- Desativar suavização para garantir pixel-art nítido ---
-  ctx.imageSmoothingEnabled = false;
+  // --- Suavização ativa: essencial para redimensionar texturas fotorrealistas ---
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
 
   const rr = Math.min(100, C.dims.rr);
   const rc = Math.min(100, C.dims.rc);
@@ -256,17 +252,37 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
         }
 
       } else {
-        // ── CHÃO (Renderização Direta @ 32px) ─────────────────
-        const hash = (col * 17 + row * 31 + col * row * 7) % 700;
-        const tileIdx = hash % tileSet.length;
-        const tile = tileSet[tileIdx];
+        // ── CHÃO BASE: cobre 100% das células ─────────────────
+        const hash = (col * 17 + row * 31 + col * row * 7) & 0xFFFF;
 
-        if (tile.complete && tile.naturalWidth > 0) {
-          // Renderização mais fiel possível, sem filtros de brilho ou ruído artificial
-          ctx.drawImage(tile, x, y, ts, ts);
+        // Leve variação de brilho por célula para evitar repetição (±3%)
+        const brightness = 0.97 + (hash % 7) * 0.01;
+
+        if (baseFloorImg.complete && baseFloorImg.naturalWidth > 0) {
+          ctx.save();
+          ctx.filter = `brightness(${brightness})`;
+          ctx.drawImage(baseFloorImg, x, y, ts, ts);
+          ctx.filter = 'none';
+          ctx.restore();
         } else {
           ctx.fillStyle = biome.floor;
           ctx.fillRect(x, y, ts, ts);
+        }
+
+        // ── ACENTO BIOMA: detalhe esparso sobre o chão base ───
+        // ~12% das células para lava/planta, ~15% para gelo
+        const accentThreshold = biome.theme === 'crystal' ? 15 : 12;
+        const useAccent = (hash % 100) < accentThreshold;
+
+        if (useAccent && biomeAccents.length > 0) {
+          const accentTile = biomeAccents[(hash >> 4) % biomeAccents.length];
+          if (accentTile.complete && accentTile.naturalWidth > 0) {
+            ctx.save();
+            // Alpha semitransparente: detalhe sem cobrir o chão base
+            ctx.globalAlpha = 0.50 + (hash % 25) * 0.014; // 0.50 → 0.85
+            ctx.drawImage(accentTile, x, y, ts, ts);
+            ctx.restore();
+          }
         }
       }
     }
