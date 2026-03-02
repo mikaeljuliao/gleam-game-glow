@@ -626,45 +626,50 @@ export function renderShadows(
   const { x: dx, y: dy } = config.shadowDir;
 
   ctx.save();
-  ctx.fillStyle = `rgba(0,0,0,${config.baseOpacity})`;
+  // We'll use a slightly softer alpha for the projected part
+  const contactAlpha = config.baseOpacity;
+  const projectionAlpha = config.baseOpacity * 0.5;
 
-  // 1. Obstacle Shadows (Projected trapezoids for height + base ellipse)
+  // 1. Obstacle Shadows
   for (const o of room.obstacles) {
     const cx = o.x + o.w / 2;
     const cy = o.y + o.h / 2;
 
-    // Base contact shadow
+    // PRIMARY CONTACT SHADOW (Oval at base)
+    ctx.fillStyle = `rgba(0,0,0,${contactAlpha})`;
     ctx.beginPath();
-    ctx.ellipse(cx, cy, o.w * 0.55, o.h * 0.35, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + o.h * 0.35, o.w * 0.5, o.h * 0.25, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Projected "height" shadow
+    // SUBTLE HEIGHT PROJECTION
     const hMult = config.obstacleHeightMult;
-    const h = o.h * 1.5; // Virtual height for projection
+    const h = o.h * 1.2;
 
+    ctx.fillStyle = `rgba(0,0,0,${projectionAlpha})`;
     ctx.beginPath();
-    ctx.moveTo(o.x, o.y + o.h * 0.82);
-    ctx.lineTo(o.x + o.w, o.y + o.h * 0.82);
-    // Project points away from light
-    ctx.lineTo(o.x + o.w + dx * h * hMult, o.y + o.h * 0.82 + dy * h * hMult);
-    ctx.lineTo(o.x + dx * h * hMult, o.y + o.h * 0.82 + dy * h * hMult);
+    ctx.moveTo(o.x + 2, o.y + o.h * 0.85);
+    ctx.lineTo(o.x + o.w - 2, o.y + o.h * 0.85);
+    // Tiny projection
+    ctx.lineTo(o.x + o.w - 2 + dx * h * hMult, o.y + o.h * 0.85 + dy * h * hMult);
+    ctx.lineTo(o.x + 2 + dx * h * hMult, o.y + o.h * 0.85 + dy * h * hMult);
     ctx.closePath();
     ctx.fill();
   }
 
-  // 2. Enemy Shadows
+  // 2. Enemy Shadows (Anchored directly under)
+  ctx.fillStyle = `rgba(0,0,0,${contactAlpha})`;
   for (const e of enemies) {
     if (e.isDying) continue;
     ctx.beginPath();
-    ctx.ellipse(e.x + dx * 2, e.y + 6 + dy * 2, 8.5, 4.5, 0, 0, Math.PI * 2);
+    // Centered under feet
+    ctx.ellipse(e.x + dx * 1.5, e.y + 7.5 + dy * 1.5, 8, 4, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // 3. Player Shadow
-  const movePulse = player.isMoving ? 2.5 : 0;
+  // 3. Player Shadow (Anchored and stable)
   ctx.beginPath();
-  // Slightly ahead in direction of movement logic
-  ctx.ellipse(player.x + dx * 3, player.y + 7 + dy * 3, 10 + movePulse, 5, 0, 0, Math.PI * 2);
+  // Directly under player, ignoring movement pulse for stability
+  ctx.ellipse(player.x + dx * 2, player.y + 8 + dy * 2, 9.5, 4.5, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
