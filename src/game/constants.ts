@@ -161,6 +161,16 @@ export const LIGHTING_CONFIG = {
   },
 };
 
+// Shadow System (Hades-inspired)
+export const SHADOW_CONFIG = {
+  lightOffset: { x: -8, y: -8 }, // Light source relative offset (top-left)
+  shadowDir: { x: 0.8, y: 0.8 },  // Projection direction (towards bottom-right)
+  baseOpacity: 0.45,             // 40%-60% target range
+  blur: 3,
+  playerShadowScale: { w: 1.2, h: 0.6 },
+  obstacleHeightMult: 0.35,      // Scale shadow length based on object height
+};
+
 // Soul drops per enemy type (almas)
 export const SOUL_DROPS: Record<string, [number, number]> = {
   swarm: [1, 1],

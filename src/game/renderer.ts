@@ -614,19 +614,68 @@ export function renderDoors(ctx: CanvasRenderingContext2D, room: DungeonRoom, ti
   if (room.doors.east) drawDoor(C.dims.gw - C.TILE_SIZE, midY - dw / 2, C.TILE_SIZE, dw, 'east');
 }
 
-export function renderObstacles(ctx: CanvasRenderingContext2D, obstacles: Obstacle[], floor = 1) {
+export function renderShadows(
+  ctx: CanvasRenderingContext2D,
+  player: PlayerState,
+  enemies: EnemyState[],
+  room: DungeonRoom,
+  time: number,
+  floor: number
+) {
+  const config = C.SHADOW_CONFIG;
+  const { x: dx, y: dy } = config.shadowDir;
+
+  ctx.save();
+  ctx.fillStyle = `rgba(0,0,0,${config.baseOpacity})`;
+
+  // 1. Obstacle Shadows (Projected trapezoids for height + base ellipse)
+  for (const o of room.obstacles) {
+    const cx = o.x + o.w / 2;
+    const cy = o.y + o.h / 2;
+
+    // Base contact shadow
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, o.w * 0.55, o.h * 0.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Projected "height" shadow
+    const hMult = config.obstacleHeightMult;
+    const h = o.h * 1.5; // Virtual height for projection
+
+    ctx.beginPath();
+    ctx.moveTo(o.x, o.y + o.h * 0.82);
+    ctx.lineTo(o.x + o.w, o.y + o.h * 0.82);
+    // Project points away from light
+    ctx.lineTo(o.x + o.w + dx * h * hMult, o.y + o.h * 0.82 + dy * h * hMult);
+    ctx.lineTo(o.x + dx * h * hMult, o.y + o.h * 0.82 + dy * h * hMult);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 2. Enemy Shadows
+  for (const e of enemies) {
+    if (e.isDying) continue;
+    ctx.beginPath();
+    ctx.ellipse(e.x + dx * 2, e.y + 6 + dy * 2, 8.5, 4.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 3. Player Shadow
+  const movePulse = player.isMoving ? 2.5 : 0;
+  ctx.beginPath();
+  // Slightly ahead in direction of movement logic
+  ctx.ellipse(player.x + dx * 3, player.y + 7 + dy * 3, 10 + movePulse, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+export function renderObstacles(ctx: CanvasRenderingContext2D, obstacles: Obstacle[], floor: number) {
   const biome = getBiome(floor);
   const time = Date.now() / 1000;
 
   for (const o of obstacles) {
     const hash = ((o.x * 7 + o.y * 13) & 0xFF);
-
-    // 0. AMBIENT OCCLUSION (Soft floor shadow at base only)
-    const aoGrad = ctx.createRadialGradient(o.x + o.w / 2, o.y + o.h / 2, 2, o.x + o.w / 2, o.y + o.h / 2, Math.max(o.w, o.h) * 1.5);
-    aoGrad.addColorStop(0, 'rgba(0,0,0,0.6)');
-    aoGrad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = aoGrad;
-    ctx.fillRect(o.x - 10, o.y - 10, o.w + 20, o.h + 20);
 
     // 1. SPRITE or BIOME HERO SILHOUETTE
     ctx.save();
@@ -1095,15 +1144,15 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
 
 // OLD (Hyper-Detailed) - Disabled
 /* function drawOriginalCharacterBody_OLD(ctx: CanvasRenderingContext2D, p: PlayerState, time: number, lookX: number, hoodShift: number, breathe: number, walkCycle: number = 0, tilt: number = 0) {
-
-
+ 
+ 
   // Palette (Darker, richer, higher contrast)
   const C_BASE_DARK = '#08080c';
   const C_BASE_MID = '#12121a';
   const C_BASE_LIGHT = '#202030'; // Highlight base
   const C_RIM_LIGHT = 'rgba(180, 220, 255, 0.5)'; // Sharp rim
   const C_ACCENT_CYAN = 'rgba(0, 255, 255, 0.2)';
-
+ 
   // Helpers
   const grad = (x1: number, y1: number, x2: number, y2: number, c1: string, c2: string) => {
     const g = ctx.createLinearGradient(x1, y1, x2, y2);
@@ -1111,14 +1160,14 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
     g.addColorStop(1, c2);
     return g;
   };
-
+ 
   const gRadial = (x: number, y: number, r: number, c1: string, c2: string) => {
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, c1);
     g.addColorStop(1, c2);
     return g;
   };
-
+ 
   // === 1. CAPE (Epic Flow) ===
   // Outer layer (Dark Void)
   const capeG = grad(0, -10, 0, 15, '#050508', '#000000');
@@ -1129,7 +1178,7 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
   ctx.quadraticCurveTo(0, 15, 12, 12);
   ctx.lineTo(7, -4);
   ctx.fill();
-
+ 
   // Volume folds (Subtle highlight)
   ctx.fillStyle = 'rgba(20, 20, 30, 0.3)';
   ctx.beginPath();
@@ -1144,11 +1193,11 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
   ctx.lineTo(7, 12);
   ctx.lineTo(4, -4);
   ctx.fill();
-
+ 
   // === 2. LEGS (Cyber-Armor) ===
   const drawLeg = (mx: number) => {
     const side = mx < 0 ? -1 : 1;
-
+ 
     // Thigh (Muscular Armor)
     const thighG = grad(mx + side, 4, mx - side, 8, C_BASE_LIGHT, C_BASE_DARK);
     ctx.fillStyle = thighG;
@@ -1158,7 +1207,7 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
     ctx.lineTo(mx - side * 1.5, 8); // Inner knee
     ctx.lineTo(mx, 4);
     ctx.fill();
-
+ 
     // Knee Plating (Diamond)
     ctx.fillStyle = '#1a1a25';
     ctx.beginPath();
@@ -1174,7 +1223,7 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
     ctx.lineTo(mx + side * 1.5, 8);
     ctx.lineTo(mx + side * 0.5, 8.5);
     ctx.fill();
-
+ 
     // Boot (Heavy & Sleek)
     const bootG = grad(mx, 9, mx, 14, '#151520', '#020204');
     ctx.fillStyle = bootG;
@@ -1184,7 +1233,7 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
     ctx.lineTo(mx + side * 2, 13);
     ctx.lineTo(mx - side * 1, 14); // Heel
     ctx.fill();
-
+ 
     // Boot Tip (Grounded)
     ctx.fillStyle = '#050508';
     ctx.beginPath();
@@ -1193,7 +1242,7 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
     ctx.lineTo(mx + side * 0.5, 15);
     ctx.lineTo(mx - side, 14);
     ctx.fill();
-
+ 
     // Boot Rim Light
     ctx.strokeStyle = C_RIM_LIGHT;
     ctx.lineWidth = 0.5;
@@ -1202,12 +1251,12 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
     ctx.lineTo(mx + side * 2, 13);
     ctx.stroke();
   };
-
+ 
   drawLeg(-3.2);
   drawLeg(3.2);
-
+ 
   // === 3. TORSO (Anatomical Scuplture) ===
-
+ 
   // Waist / Core
   const waistG = grad(0, 4, 0, 7, C_BASE_MID, C_BASE_DARK);
   ctx.fillStyle = waistG;
@@ -1217,7 +1266,7 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
   ctx.lineTo(3, 7);
   ctx.lineTo(-3, 7);
   ctx.fill();
-
+ 
   // Abdominal Plating (Ultra-defined)
   ctx.fillStyle = '#050508'; // Dark gaps
   ctx.globalAlpha = 0.6;
@@ -1225,7 +1274,7 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
   ctx.fillRect(-3, 3, 6, 0.5); // Horiz line
   ctx.fillRect(-2.5, 4.5, 5, 0.5); // Horiz line
   ctx.globalAlpha = 1;
-
+ 
   // Chest / Pecs (Power Armor)
   const chestG = grad(0, -5, 0, 2, '#252535', '#101015');
   ctx.fillStyle = chestG;
@@ -1235,7 +1284,7 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
   ctx.lineTo(4, 4); // Taper to waist
   ctx.lineTo(-4, 4);
   ctx.fill();
-
+ 
   // Pec Separation (Deep groove)
   ctx.fillStyle = '#050508';
   ctx.beginPath();
@@ -1244,7 +1293,7 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
   ctx.lineTo(0.5, 0);
   ctx.lineTo(0, -5);
   ctx.fill();
-
+ 
   // Pec Rim Light (Definition)
   ctx.strokeStyle = C_RIM_LIGHT;
   ctx.lineWidth = 0.5;
@@ -1252,11 +1301,11 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
   ctx.moveTo(-6, -2); ctx.quadraticCurveTo(-3, -1, -0.5, 0);
   ctx.moveTo(6, -2); ctx.quadraticCurveTo(3, -1, 0.5, 0);
   ctx.stroke();
-
+ 
   // === 4. ARMS & HANDS (Detailed) ===
   const drawArm = (mx: number) => {
     const side = mx < 0 ? -1 : 1;
-
+ 
     // Shoulder (Pauldrons) - Multi-faceted
     const shG = grad(mx, -6, mx, -1, C_BASE_LIGHT, C_BASE_DARK);
     ctx.fillStyle = shG;
@@ -1272,15 +1321,15 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
     ctx.beginPath();
     ctx.moveTo(mx, -5); ctx.lineTo(mx + side * 4.5, -4.5); ctx.lineTo(mx + side * 3.5, 1);
     ctx.stroke();
-
+ 
     // Arm (Bicep)
     ctx.fillStyle = C_BASE_MID;
     ctx.fillRect(mx + side * 1.5 - 1.5, 0, 3, 4.5);
-
+ 
     // -- DETAILED HAND / GAUNTLET --
     const hx = mx + side * 1.5;
     const hy = 4.5;
-
+ 
     // Gauntlet Bracer
     ctx.fillStyle = '#1a1a25';
     ctx.beginPath();
@@ -1289,11 +1338,11 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
     ctx.lineTo(hx + 2.5, hy + 3);
     ctx.lineTo(hx - 2.5, hy + 3);
     ctx.fill();
-
+ 
     // Hand Base (Palm/Back)
     ctx.fillStyle = '#0a0a10';
     ctx.fillRect(hx - 2, hy + 3, 4, 3);
-
+ 
     // Knuckles (Defined)
     ctx.fillStyle = '#252535';
     ctx.beginPath();
@@ -1301,7 +1350,7 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
     ctx.arc(hx + 0, hy + 6.2, 0.8, 0, Math.PI * 2); // Middle
     ctx.arc(hx + 1.5, hy + 6, 0.8, 0, Math.PI * 2); // Ring
     ctx.fill();
-
+ 
     // Fingers (Closed Fist Grip)
     ctx.fillStyle = '#151520';
     ctx.beginPath();
@@ -1310,7 +1359,7 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
     ctx.lineTo(hx + 1.5, hy + 8.5); // Tapered finger tips
     ctx.lineTo(hx - 1.5, hy + 8.5);
     ctx.fill();
-
+ 
     // Thumb (Wrapped)
     ctx.fillStyle = '#202030';
     ctx.beginPath();
@@ -1320,27 +1369,27 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
     ctx.lineTo(hx - side * 2.2, hy + 5.5);
     ctx.fill();
   };
-
+ 
   drawArm(-5.5);
   drawArm(5.5);
-
+ 
   // === 5. SYMBOL (Celestial) ===
   ctx.shadowColor = '#00ffff';
   ctx.shadowBlur = 12;
   ctx.fillStyle = '#ffffff';
-
+ 
   // Moon
   ctx.beginPath();
   ctx.arc(0, -2, 2.2, 0, Math.PI * 2);
   ctx.fill();
-
+ 
   // Cutout
   ctx.globalCompositeOperation = 'destination-out';
   ctx.beginPath();
   ctx.arc(0.7, -2.2, 1.8, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalCompositeOperation = 'source-over';
-
+ 
   // Star (Sharp)
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
@@ -1353,14 +1402,14 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
   ctx.quadraticCurveTo(sx - sSize * 0.1, sy - sSize * 0.1, sx, sy - sSize);
   ctx.fill();
   ctx.shadowBlur = 0;
-
+ 
   // === 6. HEAD (The Nano Helmet) ===
   const hy = -7;
-
+ 
   // Helmet Gradient (Metallic sheen)
   const headG = grad(0, hy - 8, 0, hy + 6, '#303045', '#020204');
   ctx.fillStyle = headG;
-
+ 
   // Silhouette Path
   ctx.beginPath();
   ctx.moveTo(0, hy + 5); // Chin
@@ -1372,26 +1421,26 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
   ctx.lineTo(-6.5, hy - 1);  // Cheek L
   ctx.quadraticCurveTo(-5, hy + 4, 0, hy + 5);  // Chin
   ctx.fill();
-
+ 
   // Helmet Inner Detail (Contrast)
   ctx.fillStyle = '#000000';
   ctx.beginPath();
   ctx.moveTo(-5, hy - 4); ctx.lineTo(-6.5, hy - 11); ctx.lineTo(-3.5, hy - 6); ctx.fill();
   ctx.beginPath();
   ctx.moveTo(5, hy - 4); ctx.lineTo(6.5, hy - 11); ctx.lineTo(3.5, hy - 6); ctx.fill();
-
+ 
   // Helmet Highlights (Glisten)
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
   ctx.lineWidth = 0.8;
   ctx.beginPath();
   ctx.moveTo(-2, hy - 7); ctx.quadraticCurveTo(0, hy - 6, 2, hy - 7); // Forehead
   ctx.stroke();
-
+ 
   // Eyes (Piercing Soul)
   ctx.shadowColor = '#00ffff';
   ctx.shadowBlur = 18;
   ctx.fillStyle = '#ffffff';
-
+ 
   // Left Eye
   ctx.beginPath();
   ctx.ellipse(-2.8, hy, 2.2, 3.4, 0.35, 0, Math.PI * 2);
@@ -1400,9 +1449,9 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
   ctx.beginPath();
   ctx.ellipse(2.8, hy, 2.2, 3.4, -0.35, 0, Math.PI * 2);
   ctx.fill();
-
+ 
   ctx.shadowBlur = 0;
-
+ 
   // Pupil/Depth Illusion
   ctx.fillStyle = '#00ffff';
   ctx.globalAlpha = 0.5;
@@ -1413,7 +1462,7 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
   ctx.ellipse(2.8, hy, 1.4, 2.4, -0.35, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
-
+ 
   // Final Rim Light (Backlighting - Crucial for "Pop")
   ctx.strokeStyle = 'rgba(180, 230, 255, 0.4)';
   ctx.lineWidth = 0.8;
@@ -1421,7 +1470,7 @@ function drawOriginalCharacterBody(ctx: CanvasRenderingContext2D, p: PlayerState
   ctx.moveTo(-6.5, hy - 1);
   ctx.quadraticCurveTo(-5, hy - 8, -7.5, hy - 14); // Ear Rim L
   ctx.stroke();
-
+ 
   ctx.beginPath();
   ctx.moveTo(6.5, hy - 1);
   ctx.quadraticCurveTo(5, hy - 8, 7.5, hy - 14); // Ear Rim R

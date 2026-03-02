@@ -14,7 +14,7 @@ import {
 import { getRandomUpgrades, checkSynergies, getOwnedTags, SYNERGIES } from './upgrades';
 import { PortalManager } from './portals';
 import { portalSystem } from './boss_portal';
-import { renderFloor, renderDoors, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins, renderWeaponSelectionOverlay, spawnVacuumImpact, ProjectileOrigin, HandCastEffect, EnemyProjectileImpact, StaffChargeEffect, StaffImpactEffect, renderEssenceCores, renderBiomeAmbientFX } from './renderer';
+import { renderFloor, renderDoors, renderShadows, renderObstacles, renderPlayer, renderEnemy, renderProjectile, renderParticles, renderLighting, renderHUD, applyScreenEffects, getShakeOffset, renderHiddenTraps, renderTrapEffectOverlay, renderViewportMargins, renderWeaponSelectionOverlay, spawnVacuumImpact, ProjectileOrigin, HandCastEffect, EnemyProjectileImpact, StaffChargeEffect, StaffImpactEffect, renderEssenceCores, renderBiomeAmbientFX } from './renderer';
 import { SFX, initAudio } from './audio';
 import { startBackgroundMusic, stopBackgroundMusic, HorrorSFX, createHorrorEvent, spawnFog, renderHorrorEvents, renderSpecialRoom, updateCombatTension, triggerBossIntro, isBossIntroActive, updateBossIntro, renderBossIntro, startVendorAmbience, stopVendorAmbience, isVendorAmbienceActive, updateHPHorror, renderHPHorror } from './horror';
 import { saveGame, loadGame, clearSave, restorePlayerState, restoreDungeon } from './save';
@@ -2593,6 +2593,9 @@ export class GameEngine {
       renderHiddenTraps(ctx, room.hiddenTraps, this.gameTime);
     }
     renderDoors(ctx, room, this.gameTime, getDoorsLockedTimer() > 0, this.dungeon, this.player.x, this.player.y);
+
+    // 2D Projected Shadows (Hades-style depth)
+    renderShadows(ctx, this.player, this.enemies, room, this.gameTime, this.dungeon.floor);
 
     renderObstacles(ctx, room.obstacles, this.dungeon.floor);
     portalSystem.render(ctx, this.gameTime, this.player);
