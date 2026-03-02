@@ -247,47 +247,134 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
     offCtx.imageSmoothingEnabled = true;
     offCtx.imageSmoothingQuality = 'high';
 
-    // ── RUÍDO COERENTE: ondas senoidais de baixa frequência ─────────
-    // Gera regiões orgânicas de alta/baixa influência atmosférica.
-    const seed = floor * 7919;
-    const angA = (seed * 0.137) % Math.PI;
-    const angB = (seed * 0.251) % Math.PI;
-    const angC = (seed * 0.383) % Math.PI;
-    const fA = 0.11, fB = 0.08, fC = 0.06;
+    // ─────────────────────────────────────────────────────────────────────
+    // SISTEMA DE COMPOSIÇÃO MACROESTRUTURAL
+    // Em vez de ruído por tile, geramos 2–4 zonas de influência no nível da sala.
+    // Cada zona: centro (em tiles), raio, intensidade.
+    // Cada tile herda intensidade = soma dos falloffs radiais das zonas.
+    // Isso cria storytelling direcional: "lava vaza de um canto", "gelo avança
+    // desde a parede norte", "corrupção emerge do centro".
+    // ─────────────────────────────────────────────────────────────────────
 
-    // Mapa de ruído normalizado [0,1] — influência atmosférica por célula
-    const noiseMap: number[][] = [];
-    for (let r = 1; r < rr - 1; r++) {
-      noiseMap[r] = [];
-      for (let c = 1; c < rc - 1; c++) {
-        const nx = c + Math.cos(angA) * 40;
-        const ny = r + Math.sin(angA) * 40;
-        const n1 = Math.sin(nx * fA + Math.cos(angA)) * Math.cos(ny * fA);
-        const n2 = Math.sin(nx * fB + Math.sin(angB) * 3.7) * Math.cos(ny * fB + Math.cos(angB));
-        const n3 = Math.sin(nx * fC + angC) * Math.cos(ny * fC + Math.sin(angC) * 2.1);
-        noiseMap[r][c] = (n1 * 0.5 + n2 * 0.33 + n3 * 0.17 + 1.0) * 0.5;
+    // Semente determinística por andar
+    const seed = floor * 7919 + 1;
+    // Funções pseudo-aleatórias ancoradas no seed (sem Math.random)
+    const rng = (i: number) => ((Math.sin(seed + i * 127.1) * 43758.5453) % 1 + 1) % 1;
+
+    // Derivar RGB do biome.accent para usar nos efeitos
+    let biomR = 120, biomG = 120, biomB = 200;
+    const hexM = biome.accent.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (hexM) {
+      biomR = parseInt(hexM[1], 16);
+      biomG = parseInt(hexM[2], 16);
+      biomB = parseInt(hexM[3], 16);
+    }
+
+    // ── GERAÇÃO DAS ZONAS DE INFLUÊNCIA ──────────────────────────────────
+    // Interior da sala em tiles (ignora paredes de borda)
+    const iW = rc - 2; // largura interior
+    const iH = rr - 2; // altura interior
+
+    interface Zone { cx: number; cy: number; radius: number; intensity: number; }
+    const zones: Zone[] = [];
+
+    if (biome.theme === 'volcano') {
+      // LAVA: 1–2 zonas emergindo de cantos ou paredes (direcional)
+      // Escolhe o canto dominante baseado no seed
+      const cornerIdx = Math.floor(rng(0) * 4);
+      const corners = [
+        { cx: 2, cy: 2 },           // noroeste
+        { cx: iW - 2, cy: 2 },      // nordeste
+        { cx: 2, cy: iH - 2 },      // sudoeste
+        { cx: iW - 2, cy: iH - 2 }, // sudeste
+      ];
+      const c = corners[cornerIdx];
+      // Zona principal: grande, intensa, ancorada no canto
+      zones.push({ cx: c.cx + 1, cy: c.cy + 1, radius: iW * 0.55, intensity: 1.0 });
+      // Zona secundária: menor, adjacente ao lado oposto (cria assimetria)
+      const c2 = corners[(cornerIdx + 2) % 4];
+      zones.push({ cx: c2.cx + 1, cy: c2.cy + 1, radius: iW * 0.28, intensity: 0.55 });
+
+    } else if (biome.theme === 'crystal') {
+      // GELO: 1 zona principal irradiando de uma borda + 1 foco secundário
+      // O gelo avança de uma parede específica (N/S/L/O)
+      const wallIdx = Math.floor(rng(1) * 4);
+      const wallOrigins = [
+        { cx: iW / 2, cy: 1 },          // parede norte
+        { cx: iW / 2, cy: iH - 1 },     // parede sul
+        { cx: 1, cy: iH / 2 },     // parede oeste
+        { cx: iW - 1, cy: iH / 2 },     // parede leste
+      ];
+      const w = wallOrigins[wallIdx];
+      zones.push({ cx: w.cx, cy: w.cy, radius: iH * 0.65, intensity: 1.0 });
+      // Foco secundário: racha no meio da sala (menor, alta intensidade localizada)
+      zones.push({
+        cx: iW * 0.4 + rng(2) * iW * 0.2,
+        cy: iH * 0.4 + rng(3) * iH * 0.2,
+        radius: iW * 0.20,
+        intensity: 0.70,
+      });
+
+    } else {
+      // FLORESTA/CORRUPÇÃO: 2–3 zonas orgânicas emergindo do centro e de gretas
+      // Centro principal (a corrupção "pulsa" do meio)
+      zones.push({
+        cx: iW * 0.35 + rng(4) * iW * 0.30,
+        cy: iH * 0.35 + rng(5) * iH * 0.30,
+        radius: iW * 0.45,
+        intensity: 0.90,
+      });
+      // Duas gretas secundárias em locais orgânicos
+      zones.push({
+        cx: 2 + rng(6) * (iW - 4),
+        cy: 2 + rng(7) * (iH - 4),
+        radius: iW * 0.22,
+        intensity: 0.65,
+      });
+      zones.push({
+        cx: 2 + rng(8) * (iW - 4),
+        cy: 2 + rng(9) * (iH - 4),
+        radius: iW * 0.18,
+        intensity: 0.50,
+      });
+    }
+
+    // ── MAPA DE INFLUÊNCIA: distância radial suavizada por tile ──────────
+    // influence[row][col] ∈ [0, 1]
+    // Usamos falloff quadrático (smooth) + micro-distorção para borda orgânica
+    const inflMap: number[][] = [];
+    for (let row = 1; row < rr - 1; row++) {
+      inflMap[row] = [];
+      for (let col = 1; col < rc - 1; col++) {
+        // Posição em coordenadas de "tile interior" (0..iW, 0..iH)
+        const tx = col - 1;
+        const ty = row - 1;
+
+        // Micro-distorção orgânica das bordas de zona (não per-tile noise)
+        // Usa senos com frequência baixa — não hash aleatório
+        const microdist = (Math.sin(tx * 0.47 + seed * 0.03) + Math.cos(ty * 0.39 + seed * 0.07)) * 1.2;
+
+        let total = 0;
+        for (const z of zones) {
+          const dx = tx - z.cx + microdist * 0.5;
+          const dy = ty - z.cy + microdist * 0.3;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          const raw = 1.0 - Math.min(1.0, d / z.radius);
+          // Falloff suave (smoothstep ao quadrado)
+          const smooth = raw * raw * (3 - 2 * raw);
+          total += smooth * z.intensity;
+        }
+        inflMap[row][col] = Math.min(1.0, total);
       }
     }
 
-    // Derivar cores RGB do bioma para usar nos efeitos procedurais
-    // accent: "#rrggbb" ou "rgb(r,g,b)"
-    let biomR = 120, biomG = 120, biomB = 180; // fallback azulado
-    const hexMatch = biome.accent.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-    if (hexMatch) {
-      biomR = parseInt(hexMatch[1], 16);
-      biomG = parseInt(hexMatch[2], 16);
-      biomB = parseInt(hexMatch[3], 16);
-    }
-
-    // ── PASSO 1: Chão base em TODAS as células (soberano, alpha 1.0) ─
+    // ── PASSO 1: Chão base, soberano em 100% ─────────────────────────────
     for (let row = 0; row < rr; row++) {
       for (let col = 0; col < rc; col++) {
         const x = col * ts;
         const y = row * ts;
         const isEdge = row === 0 || row === rr - 1 || col === 0 || col === rc - 1;
-
         if (isEdge) {
-          // Paredes
           offCtx.fillStyle = biome.wall;
           offCtx.fillRect(x, y, ts, ts);
           if (row === 0) {
@@ -299,10 +386,10 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
             offCtx.fillRect(x, y + 11, ts, 1);
           }
           if (row === rr - 1) {
-            const bounce = offCtx.createLinearGradient(x, y + ts - 6, x, y + ts);
-            bounce.addColorStop(0, 'rgba(0,0,0,0)');
-            bounce.addColorStop(1, 'rgba(0,0,0,0.35)');
-            offCtx.fillStyle = bounce;
+            const b2 = offCtx.createLinearGradient(x, y + ts - 6, x, y + ts);
+            b2.addColorStop(0, 'rgba(0,0,0,0)');
+            b2.addColorStop(1, 'rgba(0,0,0,0.35)');
+            offCtx.fillStyle = b2;
             offCtx.fillRect(x, y + ts - 6, ts, 6);
           }
           if (col === 0 || col === rc - 1) {
@@ -310,120 +397,99 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
             offCtx.fillRect(x, y, ts, ts);
           }
         } else {
-          // Chão base: sempre 100% opaco, identidade arquitetural principal
+          // Base: arquitetura é sempre o layer primário
           offCtx.globalAlpha = 1.0;
           offCtx.drawImage(baseFloorImg, x, y, ts, ts);
         }
       }
     }
 
-    // ── PASSO 2: Tint wash atmosférico (multiply blend) ───────────────
-    // Maximo 28% de dominância visual — nunca substitui o base
+    // ── PASSO 2: Tint wash gradiente (multiply) — zonas externas ─────────
+    // Influência < 0.35 → sem tint. 0.35–1.0 → wash sutil (máx 25%)
     offCtx.globalCompositeOperation = 'multiply';
     for (let row = 1; row < rr - 1; row++) {
       for (let col = 1; col < rc - 1; col++) {
-        const noise = noiseMap[row][col];
-        if (noise < 0.40) continue; // só nas zonas de maior influência
-        const x = col * ts;
-        const y = row * ts;
-
-        // Intensidade máx 0.28, cresce linearmente do threshold até 1.0
-        const intensity = Math.min(0.28, (noise - 0.40) / 0.60 * 0.28);
-        offCtx.fillStyle = `rgba(${biomR},${biomG},${biomB},${intensity.toFixed(3)})`;
-        offCtx.fillRect(x, y, ts, ts);
+        const infl = inflMap[row][col];
+        if (infl < 0.20) continue;
+        const alpha = Math.min(0.25, (infl - 0.20) / 0.80 * 0.25);
+        offCtx.fillStyle = `rgba(${biomR},${biomG},${biomB},${alpha.toFixed(3)})`;
+        offCtx.fillRect(col * ts, row * ts, ts, ts);
       }
     }
     offCtx.globalCompositeOperation = 'source-over';
 
-    // ── PASSO 3: Rachaduras emissivas (canvas paths temáticos) ────────
-    // Linhas finas com a cor de acento do bioma desenhadas sobre o stone.
-    // Aparecem apenas onde o ruído é alto (zona de maior influência).
+    // ── PASSO 3: Rachaduras emissivas — concentradas nos núcleos de zona ──
+    // Só onde influence > 0.65 (zona core), máx 12 rachaduras por sala
     offCtx.globalCompositeOperation = 'screen';
+    let crackCount = 0;
+    for (let row = 2; row < rr - 2 && crackCount < 12; row++) {
+      for (let col = 2; col < rc - 2 && crackCount < 12; col++) {
+        const infl = inflMap[row][col];
+        if (infl < 0.65) continue;
+        // Espaçamento mínimo entre rachaduras (não em toda célula acima do threshold)
+        if ((row * 5 + col * 7) % 4 !== 0) continue;
 
-    const crackSeeds: Array<{ row: number; col: number; noise: number }> = [];
-    for (let row = 2; row < rr - 2; row++) {
-      for (let col = 2; col < rc - 2; col++) {
-        const noise = noiseMap[row][col];
-        // Só inicia rachaduras em picos de ruído (zona central da influência)
-        if (noise > 0.72 && ((row * 7 + col * 13) % 5 === 0)) {
-          crackSeeds.push({ row, col, noise });
+        const cx = col * ts + ts / 2;
+        const cy = row * ts + ts / 2;
+        const crackAlpha = 0.08 + infl * 0.15; // máx 0.23 — sutil
+        const crackLen = 6 + infl * 18;
+
+        offCtx.save();
+        offCtx.strokeStyle = `rgba(${biomR},${biomG},${biomB},${crackAlpha.toFixed(3)})`;
+        offCtx.lineWidth = biome.theme === 'volcano' ? 1.1 : 0.7;
+        offCtx.lineCap = 'round';
+
+        const branches = biome.theme === 'crystal' ? 3 : 2;
+        for (let b = 0; b < branches; b++) {
+          // Ângulo derivado do seed e posição — não pseudo-random por frame
+          const baseAngle = (seed * 0.0017 + row * 0.41 + col * 0.37 + b * 2.09) % (Math.PI * 2);
+          offCtx.beginPath();
+          offCtx.moveTo(cx, cy);
+          let px = cx, py = cy;
+          const steps = Math.floor(crackLen / 3);
+          for (let s = 0; s < steps; s++) {
+            const da = baseAngle + Math.sin(s * 0.9 + row + col) * (biome.theme === 'crystal' ? 1.0 : 1.8);
+            px += Math.cos(da) * 3;
+            py += Math.sin(da) * 3;
+            offCtx.lineTo(px, py);
+          }
+          offCtx.stroke();
         }
+        offCtx.restore();
+        crackCount++;
       }
     }
 
-    // Desenha até 30 rachaduras para não sobrecarregar
-    const maxCracks = Math.min(30, crackSeeds.length);
-    for (let ci = 0; ci < maxCracks; ci++) {
-      const { row, col, noise } = crackSeeds[ci];
-      const cx = col * ts + ts / 2;
-      const cy = row * ts + ts / 2;
-
-      // Comprimento e ramificações baseados no ruído local
-      const crackLen = 8 + noise * 20;
-      const crackAlpha = 0.10 + noise * 0.18; // máx ~0.28
-
-      offCtx.save();
-      offCtx.strokeStyle = `rgba(${biomR},${biomG},${biomB},${crackAlpha.toFixed(3)})`;
-      offCtx.lineWidth = biome.theme === 'volcano' ? 1.2 : 0.8;
-      offCtx.lineCap = 'round';
-
-      // Traça 2-3 ramificações orgânicas por semente
-      const branches = biome.theme === 'crystal' ? 3 : 2;
-      for (let b = 0; b < branches; b++) {
-        const angle = (angA + ci * 1.4 + b * 2.1) % (Math.PI * 2);
-        offCtx.beginPath();
-        offCtx.moveTo(cx, cy);
-        let px = cx, py = cy;
-        const steps = Math.floor(crackLen / 3);
-        for (let s = 0; s < steps; s++) {
-          const jitter = (biome.theme === 'crystal') ? 1.2 : 2.0;
-          const da = angle + Math.sin(s * 0.8 + ci) * jitter;
-          px += Math.cos(da) * 3;
-          py += Math.sin(da) * 3;
-          offCtx.lineTo(px, py);
-        }
-        offCtx.stroke();
-      }
-      offCtx.restore();
-    }
-
-    // ── PASSO 4: Acumulação nas bordas de tile (seam bleed) ───────────
-    // O bioma "vaza" nas juntas entre tiles — efeito de desgaste/erosão.
-    // Usa source-over com alpha muito baixo nas bordas das células.
+    // ── PASSO 4: Seam bleed — borda de tile nas zonas de influência média ─
     offCtx.globalCompositeOperation = 'source-over';
     for (let row = 1; row < rr - 1; row++) {
       for (let col = 1; col < rc - 1; col++) {
-        const noise = noiseMap[row][col];
-        if (noise < 0.35) continue;
+        const infl = inflMap[row][col];
+        if (infl < 0.30) continue;
         const x = col * ts;
         const y = row * ts;
-        const seamAlpha = (noise - 0.35) * 0.12; // máx ~0.078
-
-        offCtx.fillStyle = `rgba(${biomR},${biomG},${biomB},${seamAlpha.toFixed(3)})`;
-        // Borda superior e inferior (1px)
+        const sAlpha = (infl - 0.30) * 0.09; // máx ~0.063
+        offCtx.fillStyle = `rgba(${biomR},${biomG},${biomB},${sAlpha.toFixed(3)})`;
         offCtx.fillRect(x + 1, y, ts - 2, 1);
         offCtx.fillRect(x + 1, y + ts - 1, ts - 2, 1);
-        // Borda esquerda e direita (1px)
         offCtx.fillRect(x, y + 1, 1, ts - 2);
         offCtx.fillRect(x + ts - 1, y + 1, 1, ts - 2);
       }
     }
 
-    // ── PASSO 5: Glow emissivo puntual nos picos de fissura ──────────
-    // Pequenos blocos de luz (screen blend) no centro de alta influência.
-    // Lava: laranja quente. Gelo: azul frio. Floresta: verde suave.
+    // ── PASSO 5: Glow de zona — gradiente radial nos núcleos (screen) ────
+    // Um único glow grande por zona, extremamente sutil
     offCtx.globalCompositeOperation = 'screen';
-    for (let ci = 0; ci < Math.min(20, crackSeeds.length); ci++) {
-      const { row, col, noise } = crackSeeds[ci];
-      const cx = col * ts + ts / 2;
-      const cy = row * ts + ts / 2;
-      const glowAlpha = (noise - 0.72) * 0.20; // máx ~0.05 — extremamente sutil
-      const glowR = 6 + noise * 8;
-      const g = offCtx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
-      g.addColorStop(0, `rgba(${biomR},${biomG},${biomB},${glowAlpha.toFixed(3)})`);
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      offCtx.fillStyle = g;
-      offCtx.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2);
+    for (const z of zones) {
+      const pcx = (z.cx + 1) * ts + ts / 2; // pixel center X
+      const pcy = (z.cy + 1) * ts + ts / 2; // pixel center Y
+      const glowPxR = z.radius * ts;
+      const gAlpha = z.intensity * 0.04;    // máx 0.04 — quase imperceptível individualmente
+      const grd = offCtx.createRadialGradient(pcx, pcy, 0, pcx, pcy, glowPxR);
+      grd.addColorStop(0, `rgba(${biomR},${biomG},${biomB},${gAlpha.toFixed(3)})`);
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      offCtx.fillStyle = grd;
+      offCtx.fillRect(pcx - glowPxR, pcy - glowPxR, glowPxR * 2, glowPxR * 2);
     }
 
     offCtx.globalCompositeOperation = 'source-over';
