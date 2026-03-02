@@ -183,7 +183,12 @@ function getFloorTile(src: string): HTMLImageElement {
   return _floorTileCache[src];
 }
 
-// Pre-load new biome-specific floor tiles
+// ── Offscreen Floor Cache: 1 canvas por andar ─────────────────
+// O chão é estático — renderizamos 1x e blitamos todo frame.
+// Isso elimina centenas de drawImage + ctx.filter por frame.
+const _floorOffscreenCache: Record<string, OffscreenCanvas> = {};
+
+// Pre-load biome floor tiles
 getFloorTile('/chao-base-original.png');
 getFloorTile('/chao-base-gelo-original.png');
 getFloorTile('/chao-base-lava-original.png');
@@ -194,7 +199,6 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
   const biome = getBiome(floor);
   const ts = C.TILE_SIZE;
 
-  // ── Pré-carregar imagens ───────────────────────────────────────
   const baseFloorImg = getFloorTile('/chao-base-original.png');
   let biomeAccents: HTMLImageElement[] = [];
 
@@ -209,93 +213,151 @@ export function renderFloor(ctx: CanvasRenderingContext2D, time: number, floor =
     biomeAccents = [getFloorTile('/chao-base-planta-original.png')];
   }
 
-  // --- Suavização ativa: essencial para redimensionar texturas fotorrealistas ---
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-
   const rr = Math.min(100, C.dims.rr);
   const rc = Math.min(100, C.dims.rc);
-
   if (rr <= 0 || rc <= 0) return;
 
-  for (let row = 0; row < rr; row++) {
-    for (let col = 0; col < rc; col++) {
-      const x = col * ts;
-      const y = row * ts;
-      const isEdge = row === 0 || row === rr - 1 || col === 0 || col === rc - 1;
+  const cacheKey = `floor_${floor}_${rr}_${rc}`;
+  if (!_floorOffscreenCache[cacheKey]) {
+    // Verifica se todas as imagens estão prontas
+    const allLoaded = baseFloorImg.complete && baseFloorImg.naturalWidth > 0
+      && biomeAccents.every(img => img.complete && img.naturalWidth > 0);
 
-      if (isEdge) {
-        // ── PAREDES ───────────────────────────────────────────
-        ctx.fillStyle = biome.wall;
-        ctx.fillRect(x, y, ts, ts);
+    if (!allLoaded) {
+      // Imagens ainda carregando — fallback rápido com cor sólida
+      ctx.fillStyle = biome.floor;
+      ctx.fillRect(ts, ts, C.dims.gw - ts * 2, C.dims.gh - ts * 2);
+      ctx.fillStyle = biome.wall;
+      for (let col = 0; col < rc; col++) {
+        ctx.fillRect(col * ts, 0, ts, ts);
+        ctx.fillRect(col * ts, (rr - 1) * ts, ts, ts);
+      }
+      for (let row = 1; row < rr - 1; row++) {
+        ctx.fillRect(0, row * ts, ts, ts);
+        ctx.fillRect((rc - 1) * ts, row * ts, ts, ts);
+      }
+      return;
+    }
 
-        if (row === 0) {
-          ctx.fillStyle = biome.wallTop;
-          ctx.fillRect(x, y, ts, 12);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-          ctx.fillRect(x, y, ts, 1);
-          ctx.fillStyle = biome.accentGlow.replace(/[\d.]+\)$/, '0.12)');
-          ctx.fillRect(x, y + 11, ts, 1);
-        }
+    // Cria offscreen canvas e pinta o chão completo 1 única vez
+    const offW = rc * ts;
+    const offH = rr * ts;
+    const off = new OffscreenCanvas(offW, offH);
+    const offCtx = off.getContext('2d')!;
+    offCtx.imageSmoothingEnabled = true;
+    offCtx.imageSmoothingQuality = 'high';
 
-        if (row === rr - 1) {
-          const bounce = ctx.createLinearGradient(x, y + ts - 6, x, y + ts);
-          bounce.addColorStop(0, 'rgba(0,0,0,0)');
-          bounce.addColorStop(1, 'rgba(0,0,0,0.35)');
-          ctx.fillStyle = bounce;
-          ctx.fillRect(x, y + ts - 6, ts, 6);
-        }
+    // ── RUÍDO COERENTE (estilo Perlin simplificado) ─────────────────────
+    // Em vez de hash aleatório por tile, usamos ondas senoidais em ângulos
+    // diferentes com frequência baixa. Mesmas frequências = manchas GRANDES e
+    // contínuas (tipo Hades). O seed é baseado no número do andar para que cada
+    // sala tenha um padrão diferente mas sempre determinístico.
+    const seed = floor * 7919; // número primo — garante variedade por andar
+    const angleA = (seed * 0.137) % Math.PI;
+    const angleB = (seed * 0.251) % Math.PI;
+    const angleC = (seed * 0.383) % Math.PI;
 
-        if (col === 0 || col === rc - 1) {
-          ctx.fillStyle = 'rgba(0,0,0,0.2)';
-          ctx.fillRect(x, y, ts, ts);
-        }
+    // Frequência: quanto menor, maiores as manchas. ~0.12 → manchas de ~8 tiles
+    const freqA = 0.12;
+    const freqB = 0.09;
+    const freqC = 0.07;
 
-      } else {
-        // ── CHÃO BASE: cobre 100% das células ─────────────────
-        const hash = (col * 17 + row * 31 + col * row * 7) & 0xFFFF;
+    // Pré-calcular o mapa de ruído para cada célula interior (0.0 → 1.0)
+    const noiseMap: number[][] = [];
+    for (let row = 1; row < rr - 1; row++) {
+      noiseMap[row] = [];
+      for (let col = 1; col < rc - 1; col++) {
+        // Soma de 3 senóides em ângulos diferentes → ruído suave e orgânico
+        const nx = col + Math.cos(angleA) * 50;
+        const ny = row + Math.sin(angleA) * 50;
+        const n1 = Math.sin(nx * freqA + Math.cos(angleA)) * Math.cos(ny * freqA);
+        const n2 = Math.sin(nx * freqB + Math.sin(angleB) * 3.7) * Math.cos(ny * freqB + Math.cos(angleB));
+        const n3 = Math.sin(nx * freqC + angleC) * Math.cos(ny * freqC + Math.sin(angleC) * 2.1);
+        // Combina as 3 ondas e normaliza para [0, 1]
+        noiseMap[row][col] = (n1 * 0.5 + n2 * 0.33 + n3 * 0.17 + 1.0) * 0.5;
+      }
+    }
 
-        // Leve variação de brilho por célula para evitar repetição (±3%)
-        const brightness = 0.97 + (hash % 7) * 0.01;
+    for (let row = 0; row < rr; row++) {
+      for (let col = 0; col < rc; col++) {
+        const x = col * ts;
+        const y = row * ts;
+        const isEdge = row === 0 || row === rr - 1 || col === 0 || col === rc - 1;
 
-        if (baseFloorImg.complete && baseFloorImg.naturalWidth > 0) {
-          ctx.save();
-          ctx.filter = `brightness(${brightness})`;
-          ctx.drawImage(baseFloorImg, x, y, ts, ts);
-          ctx.filter = 'none';
-          ctx.restore();
+        if (isEdge) {
+          // Paredes
+          offCtx.fillStyle = biome.wall;
+          offCtx.fillRect(x, y, ts, ts);
+          if (row === 0) {
+            offCtx.fillStyle = biome.wallTop;
+            offCtx.fillRect(x, y, ts, 12);
+            offCtx.fillStyle = 'rgba(255,255,255,0.08)';
+            offCtx.fillRect(x, y, ts, 1);
+            offCtx.fillStyle = biome.accentGlow.replace(/[\d.]+\)$/, '0.12)');
+            offCtx.fillRect(x, y + 11, ts, 1);
+          }
+          if (row === rr - 1) {
+            const bounce = offCtx.createLinearGradient(x, y + ts - 6, x, y + ts);
+            bounce.addColorStop(0, 'rgba(0,0,0,0)');
+            bounce.addColorStop(1, 'rgba(0,0,0,0.35)');
+            offCtx.fillStyle = bounce;
+            offCtx.fillRect(x, y + ts - 6, ts, 6);
+          }
+          if (col === 0 || col === rc - 1) {
+            offCtx.fillStyle = 'rgba(0,0,0,0.2)';
+            offCtx.fillRect(x, y, ts, ts);
+          }
         } else {
-          ctx.fillStyle = biome.floor;
-          ctx.fillRect(x, y, ts, ts);
-        }
+          // ── CHÃO: base sempre desenhado primeiro ──────────────
+          offCtx.globalAlpha = 1.0;
+          offCtx.drawImage(baseFloorImg, x, y, ts, ts);
 
-        // ── ACENTO BIOMA: detalhe esparso sobre o chão base ───
-        // ~12% das células para lava/planta, ~15% para gelo
-        const accentThreshold = biome.theme === 'crystal' ? 15 : 12;
-        const useAccent = (hash % 100) < accentThreshold;
+          // ── MANCHAS DE BIOMA usando ruído coerente ────────────
+          // noise > 0.35 → começa a introduzir o tile do bioma
+          // noise > 0.65 → tile do bioma quase sólido
+          // 0.35–0.65   → zona de transição suave (blend)
+          if (biomeAccents.length > 0) {
+            const noise = noiseMap[row][col];
+            const THRESH_LOW = 0.30; // abaixo → só chão base
+            const THRESH_HIGH = 0.62; // acima  → bioma quase sólido
 
-        if (useAccent && biomeAccents.length > 0) {
-          const accentTile = biomeAccents[(hash >> 4) % biomeAccents.length];
-          if (accentTile.complete && accentTile.naturalWidth > 0) {
-            ctx.save();
-            // Alpha semitransparente: detalhe sem cobrir o chão base
-            ctx.globalAlpha = 0.50 + (hash % 25) * 0.014; // 0.50 → 0.85
-            ctx.drawImage(accentTile, x, y, ts, ts);
-            ctx.restore();
+            if (noise > THRESH_LOW) {
+              // Quanto da textura de bioma mostrar: suave na borda, forte no centro
+              const blend = Math.min(1.0, (noise - THRESH_LOW) / (THRESH_HIGH - THRESH_LOW));
+              // Alpha: 0 na borda mínima, 0.88 no centro sólido
+              const alpha = blend * 0.88;
+              // Alterna entre variações do bioma com base na posição (sem hash aleatório)
+              const accentIdx = biomeAccents.length > 1
+                ? (Math.floor(noise * 3.7) % biomeAccents.length)
+                : 0;
+              const accentTile = biomeAccents[accentIdx];
+              offCtx.globalAlpha = alpha;
+              offCtx.drawImage(accentTile, x, y, ts, ts);
+              offCtx.globalAlpha = 1.0;
+            }
           }
         }
       }
     }
+
+    // Sombra da parede superior (estática, entra no cache)
+    const shadowGrad = offCtx.createLinearGradient(0, ts, 0, ts * 3);
+    shadowGrad.addColorStop(0, 'rgba(0,0,0,0.25)');
+    shadowGrad.addColorStop(1, 'rgba(0,0,0,0.00)');
+    offCtx.fillStyle = shadowGrad;
+    offCtx.fillRect(ts, ts, offW - ts * 2, ts * 2);
+
+    _floorOffscreenCache[cacheKey] = off;
   }
 
-  // ── SOMBRA DA PAREDE SUPERIOR ──────────────────────
-  const shadowGrad = ctx.createLinearGradient(0, ts, 0, ts * 3);
-  shadowGrad.addColorStop(0, 'rgba(0,0,0,0.25)'); // Sombra suave fidedigna
-  shadowGrad.addColorStop(1, 'rgba(0,0,0,0.00)');
-  ctx.fillStyle = shadowGrad;
-  ctx.fillRect(ts, ts, C.dims.gw - ts * 2, ts * 2);
+  // ── BLIT: 1 único drawImage por frame ─────────────────────────
+  const cached = _floorOffscreenCache[cacheKey];
+  if (cached) {
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(cached, 0, 0);
+  }
 
-  // ── TOCHAS ────────────────────────────────────────────────
+  // ── TOCHAS (animadas — ficam fora do cache) ──────────────────
   const torchPositions: { x: number; y: number }[] = [];
   for (let tcol = 4; tcol < rc; tcol += 8) {
     torchPositions.push({ x: tcol * ts, y: ts });
