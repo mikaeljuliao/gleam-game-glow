@@ -1,7 +1,7 @@
 import { EnemyState, EnemyType, PlayerState, ProjectileState, Vec2 } from './types';
 import { updateBossAI } from './bosses';
 import * as C from './constants';
-import { makeBasicProjectile, makeNeedleProjectile, makeHeavyProjectile } from './enemyProjectiles';
+import { makeBasicProjectile, makeNeedleProjectile, makeHeavyProjectile, makeCultistFireball } from './enemyProjectiles';
 
 export function createEnemy(type: EnemyType, x: number, y: number): EnemyState {
   const configs: Record<EnemyType, { hp: number; speed: number; damage: number; size: number }> = {
@@ -21,6 +21,8 @@ export function createEnemy(type: EnemyType, x: number, y: number): EnemyState {
     accelerator: { hp: C.ACCEL_HP, speed: C.ACCEL_SPEED, damage: C.ACCEL_DAMAGE, size: C.ACCEL_SIZE },
     ranged: { hp: 35, speed: 25, damage: 16, size: 14 },
     boss: { hp: C.BOSS_HP, speed: C.BOSS_SPEED, damage: C.BOSS_DAMAGE, size: C.BOSS_SIZE },
+    stone_guardian: { hp: 175, speed: 90, damage: 25, size: 24 },
+    abyss_cultist: { hp: 45, speed: 50, damage: 18, size: 18 },
   };
   const c = configs[type];
   return {
@@ -35,6 +37,12 @@ export function createEnemy(type: EnemyType, x: number, y: number): EnemyState {
     stealthAlpha: type === 'stalker' ? 0.05 : 1,
     lunging: false,
     summonTimer: type === 'necromancer' ? C.NECRO_SUMMON_COOLDOWN : 0,
+    animationType: 'breathing-idle',
+    animationFrame: 0,
+    animationTimer: 0,
+    animationDirection: 'south',
+    spawnX: x,
+    spawnY: y,
   };
 }
 
@@ -400,6 +408,244 @@ export function updateEnemy(e: EnemyState, player: PlayerState, dt: number, allE
       break;
     }
 
+    case 'stone_guardian': {
+      e.animationTimer += dt;
+
+      const agroRange = 220;
+      const leashRange = 450;
+      const attackRange = 38;
+
+      // Update Facing Direction based on movement target
+      let targetDx = dx;
+      let targetDy = dy;
+
+      if (e.aiState === 'returning' && e.spawnX !== undefined && e.spawnY !== undefined) {
+        targetDx = e.spawnX - e.x;
+        targetDy = e.spawnY - e.y;
+      }
+
+      if (Math.abs(targetDx) > 1 || Math.abs(targetDy) > 1) {
+        const angles = ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'];
+        const angle = Math.atan2(targetDy, targetDx);
+        let index = Math.round(angle / (Math.PI / 4));
+        if (index < 0) index += 8;
+        e.animationDirection = angles[index % 8];
+      }
+
+      // State Machine
+      if (e.aiState === 'hit') {
+        if (e.animationTimer >= 0.08) {
+          e.animationTimer = 0;
+          e.animationFrame = (e.animationFrame! + 1);
+          if (e.animationFrame! >= 6) {
+            e.aiState = 'chase';
+            e.animationType = 'walking-8-frames';
+            e.animationFrame = 0;
+          }
+        }
+      } else if (e.aiState === 'attack') {
+        const frameCap = e.animationType === 'leg-sweep' ? 7 : 6;
+        const impactFrame = e.animationType === 'leg-sweep' ? 4 : 3;
+
+        if (e.animationTimer >= 0.08) {
+          e.animationTimer = 0;
+          e.animationFrame = (e.animationFrame! + 1);
+
+          if (e.animationFrame === impactFrame && dist < attackRange + 12) {
+            player.hp -= e.damage * 0.4;
+            player.knockbackX += (player.x - e.x) * 0.45;
+            player.knockbackY += (player.y - e.y) * 0.45;
+          }
+
+          if (e.animationFrame! >= frameCap) {
+            e.aiState = 'chase';
+            e.animationType = 'walking-8-frames';
+            e.animationFrame = 0;
+            e.attackCooldown = 0.5 + Math.random() * 0.5;
+          }
+        }
+      } else if (e.aiState === 'returning') {
+        const sdx = e.spawnX! - e.x;
+        const sdy = e.spawnY! - e.y;
+        const sdist = Math.sqrt(sdx * sdx + sdy * sdy);
+        const sn = normalize(sdx, sdy);
+
+        e.x += (sn.x + sepX * 0.3) * e.speed * 0.8 * dt;
+        e.y += (sn.y + sepY * 0.3) * e.speed * 0.8 * dt;
+
+        e.animationType = 'walking-8-frames';
+        if (e.animationTimer >= 0.09) {
+          e.animationTimer = 0;
+          e.animationFrame = (e.animationFrame! + 1) % 8;
+        }
+
+        if (sdist < 10 || dist < agroRange * 0.6) {
+          e.aiState = 'idle';
+        }
+      } else if (e.aiState === 'patrol') {
+        const patrolSpeed = e.speed * 0.4;
+        e.x += (e.vx + sepX * 0.1) * patrolSpeed * dt;
+        e.y += (e.vy + sepY * 0.1) * patrolSpeed * dt;
+
+        // Update direction for patrol
+        const angle = Math.atan2(e.vy, e.vx);
+        const angles = ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'];
+        let index = Math.round(angle / (Math.PI / 4));
+        if (index < 0) index += 8;
+        e.animationDirection = angles[index % 8];
+
+        e.animationType = 'walking-8-frames';
+        if (e.animationTimer >= 0.12) {
+          e.animationTimer = 0;
+          e.animationFrame = (e.animationFrame! + 1) % 8;
+        }
+
+        if (dist < agroRange || e.stateTimer <= 0) {
+          e.aiState = 'idle';
+          e.stateTimer = 1.0 + Math.random() * 2;
+        }
+      } else {
+        // IDLE / CHASE Logic
+        if (dist < agroRange || e.hp < e.maxHp) {
+          if (dist < attackRange && e.attackCooldown <= 0) {
+            e.aiState = 'attack';
+            const attacks = ['cross-punch', 'leg-sweep', 'fireball'];
+            e.animationType = attacks[Math.floor(Math.random() * attacks.length)];
+            e.animationFrame = 0;
+            e.animationTimer = 0;
+          } else {
+            e.aiState = 'chase';
+            e.animationType = 'walking-8-frames';
+
+            // Relentless pursuit
+            e.x += (n.x + sepX * 0.4) * e.speed * dt;
+            e.y += (n.y + sepY * 0.4) * e.speed * dt;
+
+            // Sincronizar animação para não deslizar
+            if (e.animationTimer >= 0.07) {
+              e.animationTimer = 0;
+              e.animationFrame = (e.animationFrame! + 1) % 8;
+            }
+
+            if (dist > leashRange && e.hp >= e.maxHp) {
+              e.aiState = 'returning';
+            }
+          }
+        } else {
+          e.aiState = 'idle';
+          e.animationType = 'breathing-idle';
+
+          // Random Wander
+          if (Math.random() < 0.005) {
+            e.aiState = 'patrol';
+            e.stateTimer = 1.5 + Math.random() * 2;
+            const wanderAngle = Math.random() * Math.PI * 2;
+            e.vx = Math.cos(wanderAngle);
+            e.vy = Math.sin(wanderAngle);
+          }
+
+          if (e.animationTimer >= 0.18) {
+            e.animationTimer = 0;
+            e.animationFrame = (e.animationFrame! + 1) % 4;
+          }
+        }
+      }
+      break;
+    }
+
+    case 'abyss_cultist': {
+      e.animationTimer += dt;
+      const agroRange = 340;
+      const minKeepDist = 140;
+      const maxKeepDist = 240;
+
+      // Direction logic
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        const angles = ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'];
+        const angle = Math.atan2(dy, dx);
+        let index = Math.round(angle / (Math.PI / 4));
+        if (index < 0) index += 8;
+        e.animationDirection = angles[index % 8];
+      }
+
+      if (e.aiState === 'hit') {
+        if (e.animationTimer >= 0.08) {
+          e.animationTimer = 0;
+          e.animationFrame = (e.animationFrame! + 1);
+          if (e.animationFrame! >= 4) {
+            e.aiState = 'chase';
+            e.animationFrame = 0;
+          }
+        }
+      } else if (e.aiState === 'attack') {
+        e.animationType = 'fireball';
+        if (e.animationTimer >= 0.09) {
+          e.animationTimer = 0;
+          e.animationFrame = (e.animationFrame! + 1);
+
+          if (e.animationFrame === 3) {
+            const angle = Math.atan2(dy, dx);
+            projectiles.push(makeCultistFireball(e.x, e.y, angle, e.damage));
+          }
+
+          if (e.animationFrame! >= 6) {
+            e.aiState = 'idle';
+            e.animationType = 'breathing-idle';
+            e.animationFrame = 0;
+            e.attackCooldown = 0.6 + Math.random() * 0.8; // Faster cooldown
+          }
+        }
+      } else {
+        // RANGED AI Logic
+        if (dist < agroRange) {
+          if (e.attackCooldown <= 0 && dist < 260) {
+            e.aiState = 'attack';
+            e.animationType = 'fireball';
+            e.animationFrame = 0;
+            e.animationTimer = 0;
+          } else {
+            e.aiState = 'chase';
+            let mx = 0, my = 0;
+
+            if (dist < minKeepDist) {
+              // Move away
+              mx = -n.x;
+              my = -n.y;
+            } else if (dist > maxKeepDist) {
+              // Move closer
+              mx = n.x;
+              my = n.y;
+            }
+
+            if (mx !== 0 || my !== 0) {
+              e.x += (mx + sepX * 0.5) * e.speed * dt;
+              e.y += (my + sepY * 0.5) * e.speed * dt;
+              e.animationType = 'walking-8-frames';
+              if (e.animationTimer >= 0.1) {
+                e.animationTimer = 0;
+                e.animationFrame = (e.animationFrame! + 1) % 8;
+              }
+            } else {
+              e.aiState = 'idle';
+              e.animationType = 'breathing-idle';
+              if (e.animationTimer >= 0.15) {
+                e.animationTimer = 0;
+                e.animationFrame = (e.animationFrame! + 1) % 4;
+              }
+            }
+          }
+        } else {
+          e.aiState = 'idle';
+          e.animationType = 'breathing-idle';
+          if (e.animationTimer >= 0.2) {
+            e.animationTimer = 0;
+            e.animationFrame = (e.animationFrame! + 1) % 4;
+          }
+        }
+      }
+      break;
+    }
+
     case 'boss': {
       updateBossAI(e, player, dx, dy, dist, dt, projectiles, allEnemies);
       break;
@@ -419,6 +665,13 @@ export function damageEnemy(e: EnemyState, dmg: number, kx: number, ky: number):
   e.flashTime = 0.12;
   e.knockbackX += kx * 30;
   e.knockbackY += ky * 30;
+
+  if ((e.type === 'stone_guardian' || e.type === 'abyss_cultist') && e.aiState !== 'death') {
+    e.aiState = 'hit';
+    e.animationFrame = 0;
+    e.animationTimer = 0;
+  }
+
   return e.hp <= 0;
 }
 
@@ -427,6 +680,8 @@ export function getXPForEnemy(type: EnemyType): number {
     swarm: 3, chaser: 8, shooter: 10, bomber: 12, wraith: 15, tank: 15,
     necromancer: 20, stalker: 18, phantom: 5, boss: 60,
     flash_hunter: 15, distortion: 22, flicker_fiend: 14, warper: 16, accelerator: 18, ranged: 20,
+    stone_guardian: 25,
+    abyss_cultist: 12,
   };
   return xpMap[type];
 }

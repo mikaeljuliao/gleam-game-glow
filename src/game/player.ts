@@ -82,6 +82,8 @@ export function createPlayer(): PlayerState {
     isStaffCharging: false,
     staffChargeTimer: 0,
     staffChargeTarget: { x: 0, y: 0 },
+    knockbackX: 0,
+    knockbackY: 0,
   };
 }
 
@@ -163,8 +165,14 @@ export function updatePlayer(p: PlayerState, moveDir: Vec2, dt: number) {
     speed *= 0.5;
   }
 
-  p.x += moveDir.x * speed * dt;
-  p.y += moveDir.y * speed * dt;
+  p.x += (moveDir.x * speed + p.knockbackX) * dt;
+  p.y += (moveDir.y * speed + p.knockbackY) * dt;
+
+  // Decay knockback
+  p.knockbackX *= Math.pow(0.0001, dt);
+  p.knockbackY *= Math.pow(0.0001, dt);
+  if (Math.abs(p.knockbackX) < 1) p.knockbackX = 0;
+  if (Math.abs(p.knockbackY) < 1) p.knockbackY = 0;
 
   p.isMoving = (moveDir.x !== 0 || moveDir.y !== 0);
 

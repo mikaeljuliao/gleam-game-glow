@@ -97,6 +97,9 @@ export interface PlayerState {
   isStaffCharging: boolean;
   staffChargeTimer: number;
   staffChargeTarget: Vec2;
+  // Knockback for combat feel
+  knockbackX: number;
+  knockbackY: number;
 }
 
 export type PortalState = 'locked' | 'available' | 'completed';
@@ -111,7 +114,7 @@ export interface Portal {
 
 export type WeaponType = 'sword' | 'daggers' | 'staff';
 
-export type EnemyType = 'chaser' | 'shooter' | 'tank' | 'boss' | 'wraith' | 'bomber' | 'swarm' | 'necromancer' | 'stalker' | 'phantom' | 'flash_hunter' | 'distortion' | 'flicker_fiend' | 'warper' | 'accelerator' | 'ranged';
+export type EnemyType = 'chaser' | 'shooter' | 'tank' | 'boss' | 'wraith' | 'bomber' | 'swarm' | 'necromancer' | 'stalker' | 'phantom' | 'flash_hunter' | 'distortion' | 'flicker_fiend' | 'warper' | 'accelerator' | 'ranged' | 'stone_guardian' | 'abyss_cultist';
 
 export type TrapType = 'spikes' | 'phantom_summon' | 'poison_cloud' | 'bear_trap';
 
@@ -128,7 +131,7 @@ export interface EnemyState {
   vx: number;
   vy: number;
   attackCooldown: number;
-  aiState: 'idle' | 'chase' | 'attack' | 'charge' | 'cooldown' | 'teleport' | 'fuse' | 'phasing';
+  aiState: 'idle' | 'chase' | 'attack' | 'charge' | 'cooldown' | 'teleport' | 'fuse' | 'phasing' | 'hit' | 'death' | 'patrol' | 'returning';
   stateTimer: number;
   flashTime: number;
   knockbackX: number;
@@ -152,6 +155,14 @@ export interface EnemyState {
   isDying?: boolean;
   dyingTimer?: number;
   lastHitAngle?: number;
+  // Animation system for professional enemies
+  animationType?: string;
+  animationFrame?: number;
+  animationTimer?: number;
+  animationDirection?: string;
+  // AI/Movement
+  spawnX?: number;
+  spawnY?: number;
 }
 
 export interface EssenceCore {
@@ -189,7 +200,7 @@ export interface ProjectileState {
   animationTimer: number;
   maxLifetime: number;
   // Enemy projectile visual identity
-  projectileKind?: 'basic' | 'needle' | 'heavy' | 'boss_orb' | 'boss_arc' | 'boss_void' | 'boss_frag' | 'staff_bolt';
+  projectileKind?: 'basic' | 'needle' | 'heavy' | 'boss_orb' | 'boss_arc' | 'boss_void' | 'boss_frag' | 'staff_bolt' | 'cultist_fireball';
   _split?: boolean;
 }
 
