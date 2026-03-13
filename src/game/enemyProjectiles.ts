@@ -138,6 +138,19 @@ export function makeBossFragProjectile(
     };
 }
 
+/** Abyss Cultist Fireball */
+export function makeCultistFireball(
+    x: number, y: number,
+    angle: number,
+    damage: number,
+    speed = 230
+): ProjectileState {
+    return {
+        ...base(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, 5, damage, 3),
+        projectileKind: 'cultist_fireball',
+    };
+}
+
 // ── Split logic (called from engine update) ──────────────────────────────────
 
 /**

@@ -1669,7 +1669,8 @@ export class GameEngine {
 
   private doMeleeHit() {
     const isKatana = this.player.weapon === 'daggers';
-    const isFinisher = this.player.activeComboStep === 4;
+    const comboStep = this.player.activeComboStep;
+    const isFinisher = comboStep === 4;
 
     let rangeBase = C.MELEE_RANGE * this.player.areaMultiplier;
     let arcMult = 1.0;
@@ -1678,13 +1679,13 @@ export class GameEngine {
 
     if (isKatana) {
       const strike = this.katanaController.getCurrentStrike();
-      rangeBase *= 0.85; // Natural katana short range
-      rangeBase *= strike.rangeMult;
+      // Use the range base directly with the strike multiplier for better consistency with sprites
+      rangeBase = rangeBase * strike.rangeMult;
       arcMult = strike.arcMult;
       dmgMult = strike.damageMult;
       knockback = strike.knockback;
 
-      // Katana movement mechanics
+      // Katana movement mechanics (lunge)
       if (strike.lunge > 0) {
         this.player.x += Math.cos(this.player.meleeAngle) * strike.lunge;
         this.player.y += Math.sin(this.player.meleeAngle) * strike.lunge;
@@ -1695,7 +1696,7 @@ export class GameEngine {
         rangeBase *= 1.8;
         arcMult = 2.2;
         dmgMult = 1.6;
-      } else if (this.player.activeComboStep === 3) {
+      } else if (comboStep === 3) {
         rangeBase *= 1.4;
         arcMult = 1.4;
         dmgMult = 1.3;
@@ -1721,11 +1722,11 @@ export class GameEngine {
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
       const currentArc = C.MELEE_ARC * arcMult;
-
       if (Math.abs(angleDiff) > currentArc / 2) continue;
 
       const strengthMult = this.player.strengthBuffTimer > 0 ? 1.5 : 1.0;
-      let dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier * this.getAmuletDamageMult() * strengthMult * (isKatana ? dmgMult : (isFinisher ? 1.6 : (this.player.activeComboStep === 3 ? 1.3 : 1.0))));
+      let dmg = Math.floor(this.player.baseDamage * this.player.damageMultiplier * this.getAmuletDamageMult() * strengthMult * (isKatana ? dmgMult : (isFinisher ? 1.6 : (comboStep === 3 ? 1.3 : 1.0))));
+
       // Berserker
       if (this.player.berserker && this.player.hp / this.player.maxHp < 0.3) {
         dmg = Math.floor(dmg * 1.8);
@@ -1738,7 +1739,6 @@ export class GameEngine {
       }
       const nx = dist > 0 ? dx / dist : 0;
       const ny = dist > 0 ? dy / dist : 0;
-      // Fixed: knockback is now defined in doMeleeHit scope
       const dead = damageEnemy(e, dmg, nx * knockback, ny * knockback);
       if (dead) {
         e.lastHitAngle = Math.atan2(ny, nx);
@@ -1746,18 +1746,18 @@ export class GameEngine {
       this.stats.damageDealt += dmg;
       spawnDamageText(this.particles, e.x, e.y, `${dmg}`);
 
-      // Elegant slice particles (vibrant energy sparks)
+      // Visual feedback
+      const contactColor = isFinisher ? '#ffffff' : '#99eeff';
       spawnSpark(this.particles, e.x, e.y, '#ac4dff', 5);
-      // Bright white/blue energy sparks for contact feedback
-      spawnSpark(this.particles, e.x, e.y, '#ffffff', 6);
-      spawnSpark(this.particles, e.x, e.y, '#66ccff', 12);
-      spawnSpark(this.particles, e.x, e.y, '#99eeff', 8);
-      // Subtle extra polish: fast metallic shards
-      spawnBladeShard(this.particles, e.x, e.y, 5);
+      spawnSpark(this.particles, e.x, e.y, contactColor, 8);
+      if (isFinisher) {
+        spawnExplosion(this.particles, e.x, e.y, 10);
+        spawnBladeShard(this.particles, e.x, e.y, 8);
+      } else {
+        spawnBladeShard(this.particles, e.x, e.y, 3);
+      }
 
-      // Permanent but subtle scratch on the environment
       spawnSlashMark(e.x, e.y, this.player.meleeAngle);
-
       hitAny = true;
 
       if (dead) {
@@ -1767,21 +1767,23 @@ export class GameEngine {
     }
 
     if (meleeDeadSet.size > 0) {
-      // Immediate removal for melee kills — dead enemies must vanish right away
       this.enemies = this.enemies.filter(e => !meleeDeadSet.has(e));
     }
 
     if (hitAny) {
       SFX.meleeHit();
-      const isFinisher = this.player.activeComboStep === 4;
-      // Ultra-snappy hit-stop for katana feel (0.04s is just right)
-      const hitStopBase = isKatana ? (isFinisher ? 0.08 : 0.04) : (isFinisher ? 0.12 : 0.06);
+      // Ultra-snappy hit-stop for katana feel (0.04s for normal, 0.1s for finisher)
+      const hitStopBase = isKatana ? (isFinisher ? 0.1 : 0.04) : (isFinisher ? 0.12 : 0.06);
       this.hitStopTimer = hitStopBase;
 
-      // Screen shake only for sword or katana finisher
-      if (!isKatana || isFinisher) {
-        this.addEffect('shake', isFinisher ? 6 : 2, 0.1);
+      // Screen feedback
+      if (isFinisher) {
+        this.addEffect('shake', 10, 0.2);
+        this.addEffect('flash', 0.8, 0.1, 'rgba(255, 255, 255, 0.3)');
+      } else {
+        this.addEffect('shake', isKatana ? 2 : 4, 0.1);
       }
+
       this.player.dashCooldown = Math.max(0, this.player.dashCooldown - 0.25);
     } else {
       SFX.meleeWhiff();

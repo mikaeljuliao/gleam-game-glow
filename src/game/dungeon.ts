@@ -88,8 +88,8 @@ function checkConnectivity(room: DungeonRoom, obstacles: Obstacle[]): boolean {
 }
 
 function getEnemyTypes(floor: number): EnemyType[] {
-  const types: EnemyType[] = ['chaser', 'chaser', 'swarm'];
-  if (floor >= 1) types.push('shooter', 'swarm', 'swarm', 'flicker_fiend');
+  const types: EnemyType[] = ['chaser', 'chaser', 'swarm', 'stone_guardian'];
+  if (floor >= 1) types.push('shooter', 'swarm', 'swarm', 'flicker_fiend', 'abyss_cultist');
   if (floor >= 2) types.push('bomber', 'wraith', 'chaser', 'stalker', 'flash_hunter', 'warper');
   if (floor >= 3) types.push('tank', 'wraith', 'shooter', 'necromancer', 'distortion', 'accelerator');
   if (floor >= 4) types.push('bomber', 'tank', 'wraith', 'stalker', 'necromancer', 'flash_hunter', 'warper', 'distortion');

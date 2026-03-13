@@ -623,54 +623,94 @@ export function renderShadows(
   floor: number
 ) {
   const config = C.SHADOW_CONFIG;
-  const { x: dx, y: dy } = config.shadowDir;
+  const { x: dx, y: dy } = config.shadowDir; // Light direction offset for depth
 
   ctx.save();
-  // We'll use a slightly softer alpha for the projected part
+  ctx.globalCompositeOperation = 'multiply'; // Blends naturally with tiles
   const contactAlpha = config.baseOpacity;
-  const projectionAlpha = config.baseOpacity * 0.5;
 
-  // 1. Obstacle Shadows
+  // 1. Obstacle Shadows (Flat ellipse, aligned to base)
   for (const o of room.obstacles) {
-    const cx = o.x + o.w / 2;
-    const cy = o.y + o.h / 2;
+    const shadowX = o.x + o.w / 2 + dx * 3;
+    const shadowY = o.y + o.h - (o.h * 0.1) + dy * 3;
+    const shadowW = o.w * 0.4;
+    const shadowH = o.h * 0.2;
 
-    // PRIMARY CONTACT SHADOW (Oval at base)
     ctx.fillStyle = `rgba(0,0,0,${contactAlpha})`;
     ctx.beginPath();
-    ctx.ellipse(cx, cy + o.h * 0.35, o.w * 0.5, o.h * 0.25, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // SUBTLE HEIGHT PROJECTION
-    const hMult = config.obstacleHeightMult;
-    const h = o.h * 1.2;
-
-    ctx.fillStyle = `rgba(0,0,0,${projectionAlpha})`;
-    ctx.beginPath();
-    ctx.moveTo(o.x + 2, o.y + o.h * 0.85);
-    ctx.lineTo(o.x + o.w - 2, o.y + o.h * 0.85);
-    // Tiny projection
-    ctx.lineTo(o.x + o.w - 2 + dx * h * hMult, o.y + o.h * 0.85 + dy * h * hMult);
-    ctx.lineTo(o.x + 2 + dx * h * hMult, o.y + o.h * 0.85 + dy * h * hMult);
-    ctx.closePath();
+    ctx.ellipse(shadowX, shadowY, shadowW, shadowH, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // 2. Enemy Shadows (Anchored directly under)
-  ctx.fillStyle = `rgba(0,0,0,${contactAlpha})`;
+  // 2. Enemy Shadows (Flat ellipse, aligned to feet)
   for (const e of enemies) {
     if (e.isDying) continue;
+    const halfH = (e.height || 16) / 2;
+    const shadowX = e.x + dx * 5;
+    const shadowY = e.y + halfH + dy * 5;
+
+    ctx.fillStyle = `rgba(0,0,0,${contactAlpha})`;
     ctx.beginPath();
-    // Centered under feet
-    ctx.ellipse(e.x + dx * 1.5, e.y + 7.5 + dy * 1.5, 8, 4, 0, 0, Math.PI * 2);
+    if (e.type === 'stone_guardian') {
+      ctx.ellipse(shadowX, shadowY, 14, 6, 0, 0, Math.PI * 2);
+    } else if (e.type === 'abyss_cultist') {
+      ctx.ellipse(shadowX, shadowY, 9, 3.5, 0, 0, Math.PI * 2);
+    } else {
+      ctx.ellipse(shadowX, shadowY, 7, 3, 0, 0, Math.PI * 2);
+    }
     ctx.fill();
   }
 
-  // 3. Player Shadow (Anchored and stable)
-  ctx.beginPath();
-  // Directly under player, ignoring movement pulse for stability
-  ctx.ellipse(player.x + dx * 2, player.y + 8 + dy * 2, 9.5, 4.5, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // 3. Player Shadow (Dynamic Grounding & Visual Elevation Response)
+  {
+    // Replicate visual elevation logic from renderPlayer to sync shadow response
+    let animY = 0;
+    if (player.meleeAttacking) {
+      const step = player.activeComboStep || 1;
+      const duration = C.MELEE_COOLDOWN * (step === 4 ? 1.5 : 1.0);
+      const t = 1 - (player.meleeTimer / duration);
+      if (step === 3) {
+        if (t < 0.3) animY = 2;       // Crouch state (pushes shadow slightly)
+        else if (t < 0.6) animY = -3; // Jump state (shadow should shrink/fade)
+        else animY = 0;
+      }
+    }
+
+    // Shadow remains fixed on the ground plane (player.y)
+    // Anchored at almost zero distance to feet pixels for grounded feel
+    const px = player.x;
+    const py = player.y + 0.5; // Sit directly under the footprint (max 1px gap)
+
+    // Dynamic response to vertical movement (animY)
+    const isJumping = animY < 0;
+    const scale = isJumping ? Math.max(0.75, 1 + animY * 0.08) : 1;
+    const opacityMult = isJumping ? Math.max(0.4, 1 + animY * 0.15) : 1;
+
+    // Use current scale from config (1.4 for 1.6-2.0 coverage relative to 16px player)
+    const baseW = 10 * config.playerShadowScale.w;
+    const baseH = 10 * config.playerShadowScale.h;
+    const pW = baseW * scale;
+    const pH = baseH * scale;
+
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.scale(pW, pH);
+
+    // Advanced Radial gradient for soft, feathered edges (Matches AAA atmosphere)
+    // Increased spread for smoother falloff (no hard center)
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    const alpha = contactAlpha * opacityMult;
+    grad.addColorStop(0, `rgba(0,0,0,${alpha})`);      // Solid core (but not hard)
+    grad.addColorStop(0.4, `rgba(0,0,0,${alpha * 0.9})`); // Spread core wider
+    grad.addColorStop(0.8, `rgba(0,0,0,${alpha * 0.3})`); // Soft falloff start
+    grad.addColorStop(1, 'rgba(0,0,0,0)');             // Perfectly invisible edge
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 
   ctx.restore();
 }
@@ -1072,6 +1112,37 @@ function getSpriteFrameForFacing(p: PlayerState): SpriteFrame | SpriteFrame[] {
 }
 
 // ── Main Draw Function ────────────────────────────────────────
+/**
+ * Render a specific combo attack sprite.
+ */
+function renderComboSprite(ctx: CanvasRenderingContext2D, p: PlayerState, step: number, time: number) {
+  const src = `/player-combo-${step}.png`;
+  const sprite = getSprite(src);
+
+  if (sprite.complete && sprite.naturalWidth !== 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    const baseTargetHeight = 64;
+    const h = baseTargetHeight;
+    const scale = h / Math.max(sprite.naturalHeight, 1);
+    const w = sprite.naturalWidth * scale;
+
+    const flipX = p.facing.x < 0;
+    if (flipX) {
+      ctx.scale(-1, 1);
+      ctx.drawImage(sprite, -w / 2, -h, w, h);
+    } else {
+      ctx.drawImage(sprite, -w / 2, -h, w, h);
+    }
+    ctx.restore();
+  } else {
+    // Fallback to normal rendering if combo sprite not loaded
+    drawOriginalCharacterBody(ctx, p, time);
+  }
+}
+
 /**
  * Render the official player character.
  * Body: ctx.drawImage ONLY.
@@ -1579,7 +1650,10 @@ function drawIdleRunPose(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
       }
 
       ctx.save();
-      ctx.translate(finalSx, finalSy);
+      // Refined positioning for the sword in the hand
+      const offsetX = 10; // Positive moves away from center
+      const offsetY = -42; // Upward offset for hand height
+      ctx.translate(finalSx + (p.facing.x < 0 ? -offsetX : offsetX), offsetY);
 
       if (p.weapon === 'staff') {
         // STAFF POSITIONING: High presence, vertical, no flip scaling
@@ -1587,7 +1661,6 @@ function drawIdleRunPose(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
       } else {
         if (p.facing.x < 0 && !isBackFrame) ctx.scale(-1, 1);
         ctx.rotate(rot + sway);
-        // Corrected: p.weapon can only be 'sword' (or 'daggers' if logic allowed, but it's in the else of 'isDual')
         const weaponLen = 34;
         drawEquippedWeapon(ctx, p, weaponLen, isMoving ? 0.2 : 0, time);
       }
@@ -1613,7 +1686,7 @@ function drawAttackPose1(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
 
   ctx.save();
   ctx.translate(bx, by);
-  drawOriginalCharacterBody(ctx, p, time);
+  renderComboSprite(ctx, p, 1, time);
   ctx.restore();
 
   // Attack 1: Swift Horizontal (R -> L)
@@ -1630,11 +1703,13 @@ function drawAttackPose1(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   const socketR = isFront ? SOCKET_FRONT_R : (currentFrame.handSocket || SOCKET_FRONT_R);
   const sx = socketR.x * (currentFrame.flipX ? -1 : 1);
 
+  /* 
   ctx.save();
   ctx.translate(bx + sx, y + socketR.y);
   ctx.rotate(currentAngle);
   drawEquippedWeapon(ctx, p, 38, 1, time, true);
   ctx.restore();
+  */
 
   if (t > 0.1 && t < 0.6) {
     drawSlashTrail(ctx, bx, by, C.MELEE_RANGE * 0.85, angleStart, currentAngle, 'azure');
@@ -1656,7 +1731,7 @@ function drawAttackPose2(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
 
   ctx.save();
   ctx.translate(bx, by);
-  drawOriginalCharacterBody(ctx, p, time);
+  renderComboSprite(ctx, p, 2, time);
   ctx.restore();
 
   const angleStart = p.meleeAngle + C.MELEE_ARC / 2;
@@ -1672,12 +1747,14 @@ function drawAttackPose2(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   const socketR = isFront ? SOCKET_FRONT_R : (currentFrame.handSocket || SOCKET_FRONT_R);
   const sx = socketR.x * (currentFrame.flipX ? -1 : 1);
 
+  /*
   ctx.save();
   ctx.translate(bx + sx, y + socketR.y);
   ctx.rotate(currentAngle);
   ctx.scale(1, -1); // Visual trick for reverse cut
   drawEquippedWeapon(ctx, p, 38, 1, time, true);
   ctx.restore();
+  */
 
   if (t > 0.05 && t < 0.5) {
     drawSlashTrail(ctx, bx, by, C.MELEE_RANGE * 0.85, angleStart, currentAngle, 'azure');
@@ -1700,7 +1777,8 @@ function drawAttackPose3(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
 
   ctx.save();
   ctx.translate(bx, by + liftY);
-  drawOriginalCharacterBody(ctx, p, time);
+  // drawOriginalCharacterBody(ctx, p, time);
+  renderComboSprite(ctx, p, 3, time);
   ctx.restore();
 
   // Weapon: Diagonal Upward Slash
@@ -1717,11 +1795,13 @@ function drawAttackPose3(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   const socketR = isFront ? SOCKET_FRONT_R : (currentFrame.handSocket || SOCKET_FRONT_R);
   const sx = socketR.x * (currentFrame.flipX ? -1 : 1);
 
+  /*
   ctx.save();
   ctx.translate(bx + sx, y + liftY + socketR.y);
   ctx.rotate(currentAngle);
   drawEquippedWeapon(ctx, p, 42, 1, time, true);
   ctx.restore();
+  */
 
   if (t > 0.1 && t < 0.6) {
     drawSlashTrail(ctx, bx, by + liftY, C.MELEE_RANGE * 1.0, angleStart, currentAngle, 'iron');
@@ -1743,7 +1823,7 @@ function drawAttackPose4(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
 
   ctx.save();
   ctx.translate(bx, by);
-  drawOriginalCharacterBody(ctx, p, time);
+  renderComboSprite(ctx, p, 4, time);
   ctx.restore();
 
   // DOUBLE CROSS SLASH (X)
@@ -1763,22 +1843,26 @@ function drawAttackPose4(ctx: CanvasRenderingContext2D, p: PlayerState, x: numbe
   const sxR = socketR.x * (currentFrame.flipX ? -1 : 1);
   const sxL = socketL.x * (currentFrame.flipX ? -1 : 1);
 
+  /*
   // Draw two katanas in an X pattern
   ctx.save();
   ctx.translate(bx + sxR, y + socketR.y);
   ctx.rotate(currentAngle);
   drawEquippedWeapon(ctx, p, 44, 1, time, true);
   ctx.restore();
+  */
 
   const angleStartL = p.meleeAngle + C.MELEE_ARC / 1.2;
   const angleEndL = p.meleeAngle - C.MELEE_ARC / 1.2;
   const currentAngleL = angleStartL + (angleEndL - angleStartL) * swingT;
 
+  /*
   ctx.save();
   ctx.translate(bx + sxL, y + socketL.y);
   ctx.rotate(currentAngleL);
   drawEquippedWeapon(ctx, p, 44, 1, time, true);
   ctx.restore();
+  */
 
   if (t > 0.3 && t < 0.8) {
     drawSlashTrail(ctx, bx, by, C.MELEE_RANGE * 1.4, angleStart, currentAngle, 'azure');
@@ -2001,99 +2085,22 @@ function drawDualDaggers(ctx: CanvasRenderingContext2D, length: number, isAttack
 
 /** Draws a professional-grade AAA longsword */
 function drawLongsword(ctx: CanvasRenderingContext2D, length: number, isAttacking: number, time: number) {
-  // Increase proportions for a larger, more impactful weapon
-  // Pivô Estrutural: Centro do Cabo (Handle)
-  // O cabo tem 10px de comprimento. Centro em x=0 -> Cabo de -5 a +5.
   const hiltLen = 10;
-  const guardW = 16;
-  const bladeLen = length - hiltLen;
-
-  // 1. Hilt (Leather wrapped)
-  ctx.fillStyle = '#1a0f08';
-  ctx.fillRect(-hiltLen / 2, -2, hiltLen, 4);
-
-  // Leather wraps detail - Ajustadas para o novo centro
-  ctx.strokeStyle = '#3d2b1f';
-  ctx.lineWidth = 0.8;
-  for (let i = 0; i < 5; i++) {
-    const ox = -hiltLen / 2 + 1 + i * 1.8;
-    ctx.beginPath();
-    ctx.moveTo(ox, -2);
-    ctx.lineTo(ox + 0.8, 2);
-    ctx.stroke();
+  const swordSprite = getSprite('/sword.png');
+  if (swordSprite.complete && swordSprite.naturalWidth !== 0) {
+    ctx.save();
+    const w = 48;
+    const h = (swordSprite.naturalHeight / swordSprite.naturalWidth) * w;
+    ctx.drawImage(swordSprite, -hiltLen / 2, -h / 2, w, h);
+    ctx.restore();
+  } else {
+    const guardW = 16;
+    const bladeLen = length - hiltLen;
+    ctx.fillStyle = '#1a0f08';
+    ctx.fillRect(-hiltLen / 2, -2, hiltLen, 4);
   }
-
-  // 2. Heavy Weighted Pommel - No início do cabo
-  const pommelGrad = ctx.createRadialGradient(-hiltLen / 2, 0, 0, -hiltLen / 2, 0, 3.5);
-  pommelGrad.addColorStop(0, '#ffcc33');
-  pommelGrad.addColorStop(1, '#aa8833');
-  ctx.fillStyle = pommelGrad;
-  ctx.beginPath();
-  ctx.arc(-hiltLen / 2, 0, 3.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 3. Ornate Crossguard - Na junção com a lâmina (x = hiltLen/2)
-  const silverGrad = ctx.createLinearGradient(hiltLen / 2, -guardW / 2, hiltLen / 2, guardW / 2);
-  silverGrad.addColorStop(0, '#555555');
-  silverGrad.addColorStop(0.2, '#aaaaaa');
-  silverGrad.addColorStop(0.5, '#ffffff');
-  silverGrad.addColorStop(1, '#444444');
-  ctx.fillStyle = silverGrad;
-
-  ctx.beginPath();
-  ctx.moveTo(hiltLen / 2, -guardW / 2);
-  ctx.bezierCurveTo(hiltLen / 2 - 4, -guardW / 4, hiltLen / 2 - 4, guardW / 4, hiltLen / 2, guardW / 2);
-  ctx.lineTo(hiltLen / 2 + 3, guardW / 3);
-  ctx.lineTo(hiltLen / 2 + 3, -guardW / 3);
-  ctx.closePath();
-  ctx.fill();
-
-  // 4. Central Magical Gem - No centro da guarda
-  const gemPulse = 0.8 + Math.sin(time * 5) * 0.2;
-  const gemGrad = ctx.createRadialGradient(hiltLen / 2, 0, 0, hiltLen / 2, 0, 2.5);
-  gemGrad.addColorStop(0, '#ffffff');
-  gemGrad.addColorStop(1, '#0044ff');
-  ctx.fillStyle = gemGrad;
-  ctx.beginPath();
-  ctx.arc(hiltLen / 2, 0, 2 * gemPulse, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 5. Elite Blade - Começando após a guarda
-  const bladeWidth = 3.2;
-  const bladeGrad = ctx.createLinearGradient(hiltLen / 2 + 3, -bladeWidth, hiltLen / 2 + 3, bladeWidth);
-  bladeGrad.addColorStop(0, '#444444');
-  bladeGrad.addColorStop(0.5, '#e0f0ff');
-  bladeGrad.addColorStop(1, '#333333');
-
-  ctx.fillStyle = bladeGrad;
-  ctx.beginPath();
-  ctx.moveTo(hiltLen / 2 + 3, -bladeWidth);
-  ctx.lineTo(hiltLen / 2 + bladeLen - 5, -bladeWidth * 0.7);
-  ctx.lineTo(hiltLen / 2 + bladeLen, 0);
-  ctx.lineTo(hiltLen / 2 + bladeLen - 5, bladeWidth * 0.7);
-  ctx.lineTo(hiltLen / 2 + 3, bladeWidth);
-  ctx.closePath();
-  ctx.fill();
-
-  // 6. Deep Fuller (Central Groove)
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-  ctx.fillRect(8, -0.8, bladeLen - 20, 1.6);
-
-  // 7. Dynamic Blade Shimmer (Glint)
-  const shineSpeed = isAttacking ? 20 : 4;
-  const shinePos = (Math.sin(time * shineSpeed) * 0.5 + 0.5) * (bladeLen - 10) + 10;
-  const g = ctx.createRadialGradient(shinePos, 0, 0, shinePos, 0, 6);
-  g.addColorStop(0, 'rgba(135, 206, 250, 0.5)');
-  g.addColorStop(1, 'rgba(100, 200, 255, 0)');
-
-  ctx.save();
-  ctx.globalCompositeOperation = 'screen';
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(shinePos, 0, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
 }
+
 
 
 
@@ -2336,10 +2343,6 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
     // No jitter or scaling as per user request ("nada de distorção ou mexida")
     // Just the flash effect (handlers below) is enough feedback
   }
-
-  // Shadow
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-  ctx.fillRect(x - half + 1, y + half - 1, s - 2, 2);
 
   if (e.isDying) {
     ctx.fillStyle = '#1a0033'; // Deep dimensional purple
@@ -3897,6 +3900,78 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, e: EnemyState, time: 
       }
       break;
     }
+
+    case 'abyss_cultist': {
+      const animType = e.animationType || 'breathing-idle';
+      const dir = e.animationDirection || 'south';
+      const frameNum = (e.animationFrame || 0).toString().padStart(3, '0');
+      const path = `/inimigo-2/animations/${animType}/${dir}/frame_${frameNum}.png`;
+      const img = getSprite(path);
+
+      if (img.complete && img.naturalWidth > 0) {
+        ctx.save();
+        const drawS = s * 2.8;
+
+        if (e.flashTime > 0) {
+          ctx.filter = 'brightness(2.2) sepia(1.0) hue-rotate(280deg)'; // Purple magic flash
+        }
+
+        ctx.drawImage(img, x - drawS / 2, y - drawS / 2 - 4, drawS, drawS);
+        ctx.restore();
+      } else {
+        // Fallback
+        ctx.fillStyle = '#220044';
+        ctx.beginPath();
+        ctx.arc(x, y, s / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ff00ff';
+        ctx.fillRect(x - 2, y - 2, 4, 4);
+      }
+      break;
+    }
+
+    case 'stone_guardian': {
+      const animType = e.animationType || 'breathing-idle';
+      const dir = e.animationDirection || 'south';
+      const frameNum = (e.animationFrame || 0).toString().padStart(3, '0');
+      const path = `/inimigo/animations/${animType}/${dir}/frame_${frameNum}.png`;
+      const img = getSprite(path);
+
+      if (img.complete && img.naturalWidth > 0) {
+        ctx.save();
+        const drawS = s * 2.5; // Visual size relative to hit box (approx 60px)
+
+        // Handle Flash (Hit)
+        if (e.flashTime > 0) {
+          ctx.filter = 'brightness(2.0)';
+        }
+
+        // Draw centered on actor base
+        ctx.drawImage(img, x - drawS / 2, y - drawS / 2 - 8, drawS, drawS);
+
+        // Visual feedback for heavy impact
+        if (e.aiState === 'attack') {
+          const impactFrame = e.animationType === 'leg-sweep' ? 4 : 3;
+          if (e.animationFrame === impactFrame) {
+            const progress = (e.animationTimer || 0) / 0.08;
+            EnemyProjectileVisual.renderMeleeImpact(ctx, x, y + 10, progress, 40, 'rgba(150, 150, 150, 1)');
+          }
+        }
+
+        ctx.restore();
+      } else {
+        // Fallback to a stone block if image not loaded
+        ctx.fillStyle = '#666666';
+        ctx.beginPath();
+        ctx.roundRect(x - half, y - half, s, s, 4);
+        ctx.fill();
+        // Eyes for the fallback
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(x - 4, y - 2, 2, 2);
+        ctx.fillRect(x + 2, y - 2, 2, 2);
+      }
+      break;
+    }
   }
 
   // Reset alpha for wraith
@@ -4205,6 +4280,7 @@ export const EnemyProjectileVisual = {
       case 'boss_arc': this._drawBossArc(ctx, p, time); break;
       case 'boss_void': this._drawBossVoid(ctx, p, time); break;
       case 'boss_frag': this._drawBossFrag(ctx, p, time); break;
+      case 'cultist_fireball': this._drawCultistFireball(ctx, p, time); break;
       default: this._drawBasic(ctx, p, time); break;
     }
     ctx.restore();
@@ -4373,6 +4449,104 @@ export const EnemyProjectileVisual = {
     ctx.beginPath();
     ctx.arc(0, 0, s * 0.4, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+  },
+
+  /**
+   * MeleeAttackVisual: Ground shockwaves for heavy enemies
+   */
+  renderMeleeImpact(ctx: CanvasRenderingContext2D, x: number, y: number, progress: number, size: number, color: string) {
+    ctx.save();
+    ctx.beginPath();
+    // Expanding ring
+    const radius = size * progress;
+    const alpha = 1 - progress;
+    ctx.strokeStyle = color.replace('1)', `${alpha})`);
+    ctx.lineWidth = 2;
+    ctx.ellipse(x, y + 5, radius, radius * 0.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Internal dust/cracks
+    if (progress < 0.5) {
+      ctx.beginPath();
+      ctx.strokeStyle = color.replace('1)', `${alpha * 0.5})`);
+      ctx.ellipse(x, y + 5, radius * 0.6, radius * 0.3, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+
+  _drawCultistFireball(ctx: CanvasRenderingContext2D, p: ProjectileState, time: number) {
+    const r = p.size;
+    const pulse = 1 + Math.sin(time * 25) * 0.15;
+
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+
+    // 1. Ethereal Magic Trail (Stretches behind)
+    const trailLen = 32 * pulse;
+    const trailGrad = ctx.createLinearGradient(-trailLen, 0, 0, 0);
+    trailGrad.addColorStop(0, 'rgba(150, 0, 255, 0)');
+    trailGrad.addColorStop(0.3, 'rgba(180, 50, 255, 0.2)');
+    trailGrad.addColorStop(0.7, 'rgba(220, 100, 255, 0.4)');
+    trailGrad.addColorStop(1, 'rgba(255, 200, 255, 0.7)');
+
+    ctx.fillStyle = trailGrad;
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 0.9);
+    ctx.quadraticCurveTo(-trailLen * 0.5, -r * 1.5, -trailLen, 0);
+    ctx.quadraticCurveTo(-trailLen * 0.5, r * 1.5, 0, r * 0.9);
+    ctx.fill();
+
+    // 2. Energetic Pulse Aura (Outer Glow)
+    const glowRadius = r * pulse * 2.8;
+    const aura = ctx.createRadialGradient(0, 0, 0, 0, 0, glowRadius);
+    aura.addColorStop(0, 'rgba(255, 100, 255, 0.4)');
+    aura.addColorStop(0.6, 'rgba(150, 0, 255, 0.15)');
+    aura.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 3. The Core "Crystal/Shard" (Inner dangerous shape)
+    ctx.rotate(time * 15); // Rotating dangerous core
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#ff55ff';
+
+    const coreS = r * 1.1;
+    ctx.beginPath();
+    ctx.moveTo(coreS, 0);
+    ctx.lineTo(0, coreS * 0.6);
+    ctx.lineTo(-coreS, 0);
+    ctx.lineTo(0, -coreS * 0.6);
+    ctx.closePath();
+    ctx.fill();
+
+    // 4. Arcane Arcs (Static-like energy)
+    ctx.strokeStyle = `rgba(220, 180, 255, ${0.4 * pulse})`;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 2; i++) {
+      ctx.beginPath();
+      const offset = (time * 20 + i * Math.PI) % (Math.PI * 2);
+      const bx = Math.cos(offset) * r * 1.5;
+      const by = Math.sin(offset) * r * 0.8;
+      ctx.moveTo(bx, by);
+      ctx.lineTo(bx + (Math.random() - 0.5) * 10, by + (Math.random() - 0.5) * 10);
+      ctx.stroke();
+    }
+
+    // 5. Arcane Sparks
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < 3; i++) {
+      const ang = (time * 12 + i * 2) % (Math.PI * 2);
+      const dist = r * 1.5;
+      ctx.fillStyle = '#ffccff';
+      ctx.fillRect(Math.cos(ang) * dist, Math.sin(ang) * dist, 2, 2);
+    }
+
     ctx.restore();
   },
 };
@@ -4654,6 +4828,20 @@ export const EnemyProjectileImpact = {
         }
         particles.push({
           x, y, vx: 0, vy: 0, life: 0.2, maxLife: 0.2, size: 30, color: 'rgba(0, 255, 255, 0.4)', type: 'explosion'
+        });
+        break;
+      case 'cultist_fireball':
+        // Magical purple burst
+        for (let i = 0; i < 12; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const s = 60 + Math.random() * 80;
+          particles.push({
+            x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+            life: 0.4, maxLife: 0.4, size: 2.5, color: i % 2 === 0 ? '#ff00ff' : '#aa00ff', type: 'spark'
+          });
+        }
+        particles.push({
+          x, y, vx: 0, vy: 0, life: 0.25, maxLife: 0.25, size: 25, color: 'rgba(200, 50, 255, 0.4)', type: 'explosion'
         });
         break;
       default:

@@ -610,22 +610,31 @@ export const SFX = {
     setTimeout(() => playTone(120, 0.15, 'square', 0.06), 100);
   },
   katana1() {
-    playFreqSweep(1400, 1100, 0.06, 'sawtooth', 0.07);
-    playNoise(0.04, 0.06, 3500, 'highpass');
+    // Sharp swift cut
+    playFreqSweep(1600, 1100, 0.08, 'sawtooth', 0.09);
+    playNoise(0.04, 0.07, 4000, 'highpass');
   },
   katana2() {
-    playFreqSweep(1500, 1200, 0.05, 'sawtooth', 0.08);
-    playNoise(0.05, 0.08, 4000, 'highpass');
+    // Inverted swift cut
+    playFreqSweep(1500, 1400, 0.06, 'sawtooth', 0.1);
+    playNoise(0.05, 0.09, 4500, 'highpass');
+    setTimeout(() => playTone(600, 0.03, 'sine', 0.05), 20);
   },
   katana3() {
-    playFreqSweep(1200, 1600, 0.08, 'sawtooth', 0.09);
-    playNoise(0.06, 0.1, 4500, 'highpass');
-    playTone(500, 0.04, 'sine', 0.06);
+    // Diagonal up-slash - rising pitch
+    playFreqSweep(1100, 1800, 0.1, 'sawtooth', 0.11);
+    playNoise(0.07, 0.12, 5000, 'highpass');
+    playTone(450, 0.05, 'sine', 0.07);
   },
   katana4() {
-    playFreqSweep(1800, 400, 0.1, 'sawtooth', 0.12);
-    playNoise(0.12, 0.15, 3000, 'lowpass');
-    playTone(300, 0.08, 'square', 0.08);
+    // HEAVY FINISHER - Massive power release
+    playFreqSweep(2200, 200, 0.15, 'sawtooth', 0.15);
+    playNoise(0.2, 0.2, 2000, 'lowpass');
+    playTone(150, 0.12, 'square', 0.1);
+    setTimeout(() => {
+      playTone(60, 0.2, 'sine', 0.15);
+      playNoise(0.1, 0.1, 500);
+    }, 50);
   },
   staffCharge() {
     // Som grave crescente

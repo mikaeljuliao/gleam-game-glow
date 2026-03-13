@@ -163,12 +163,12 @@ export const LIGHTING_CONFIG = {
 
 // Shadow System (Hades-inspired)
 export const SHADOW_CONFIG = {
-  lightOffset: { x: -4, y: -4 }, // Reduced offset
-  shadowDir: { x: 0.2, y: 0.2 },  // Drastically reduced projection
-  baseOpacity: 0.55,             // 50%-60% target range
-  blur: 2,
-  playerShadowScale: { w: 1.1, h: 0.5 },
-  obstacleHeightMult: 0.15,      // 15%-20% of height max
+  lightOffset: { x: -3, y: -3 }, // Slightly tighter
+  shadowDir: { x: 0.15, y: 0.15 }, // Project even less
+  baseOpacity: 0.42,             // Refined target for better blending
+  blur: 1.5,
+  playerShadowScale: { w: 1.4, h: 0.55 }, // Increased for weight & width (1.4 * 10 = 14 radius)
+  obstacleHeightMult: 0.10,      // Max 10% projection height
 };
 
 // Soul drops per enemy type (almas)
@@ -187,6 +187,8 @@ export const SOUL_DROPS: Record<string, [number, number]> = {
   warper: [2, 4],
   accelerator: [3, 4],
   phantom: [1, 2],
+  stone_guardian: [4, 6],
+  abyss_cultist: [3, 4],
   boss: [10, 15],
 };
 
